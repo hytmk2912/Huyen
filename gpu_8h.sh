@@ -1,29 +1,43 @@
 #!/usr/bin/env bash
-# VPS GPU — 1 lenh. Bat buoc: export CPU_IP=...
-# HF_TOKEN khong bat buoc. Khong co token thi chi luu ve VPS CPU.
+# VPS GPU — 1 lenh.
+# Bat buoc: CPU_IP
+# Goi y: CPU_PORT=7110 CPU_USER=root
+# Tuy chon: CPU_PASS='...'  (mat khau SSH cua VPS CPU, KHONG phai Gmail)
+#           HF_TOKEN=hf_...  (khong bat buoc)
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 CPU_IP="${CPU_IP:-}"
-SYNC_PASS="${SYNC_PASS:-huyen-sync-7b}"
+CPU_USER="${CPU_USER:-root}"
+CPU_PORT="${CPU_PORT:-7110}"
+CPU_PASS="${CPU_PASS:-}"
 HF_TOKEN="${HF_TOKEN:-}"
 HF_REPO="${HF_REPO:-hytmk2912/huyen-code-7b}"
 TARGET_HOURS="${TARGET_HOURS:-6.8}"
 WORKDIR="${WORKDIR:-/root/ai-agent}"
 DATA_DIR="$WORKDIR/nanoGPT/data/code_7b"
 CKPT_DIR="$WORKDIR/nanoGPT/out-code-7b"
-RSYNC_URL="rsync://huyen@${CPU_IP}:8730/huyen"
-export RSYNC_PASSWORD="$SYNC_PASS"
+REMOTE="${CPU_USER}@${CPU_IP}"
 
-[[ -n "$CPU_IP" ]] || { echo "THIEU CPU_IP. Vi du: export CPU_IP=1.2.3.4"; exit 1; }
+[[ -n "$CPU_IP" ]] || { echo "THIEU CPU_IP"; exit 1; }
 
 apt-get update -y
-apt-get install -y python3 python3-pip python3-venv git rsync build-essential python3-dev libaio-dev curl ca-certificates
+apt-get install -y python3 python3-pip python3-venv git rsync openssh-client sshpass build-essential python3-dev libaio-dev curl ca-certificates
 if [[ ! -f /swapfile_train ]]; then
   fallocate -l 96G /swapfile_train || dd if=/dev/zero of=/swapfile_train bs=1M count=98304
   chmod 600 /swapfile_train; mkswap /swapfile_train
 fi
 swapon /swapfile_train || true
 sysctl -w vm.swappiness=60 || true
+
+SSH_BASE=(ssh -p "$CPU_PORT" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
+if [[ -n "$CPU_PASS" ]]; then
+  export SSHPASS="$CPU_PASS"
+  RSYNC_SSH="sshpass -e ssh -p ${CPU_PORT} -o StrictHostKeyChecking=accept-new -o PreferredAuthentications=password -o PubkeyAuthentication=no -o ServerAliveInterval=30"
+  SSH_RUN=(sshpass -e "${SSH_BASE[@]}" -o PreferredAuthentications=password -o PubkeyAuthentication=no)
+else
+  RSYNC_SSH="ssh -p ${CPU_PORT} -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30"
+  SSH_RUN=("${SSH_BASE[@]}")
+fi
 
 mkdir -p "$WORKDIR"; cd "$WORKDIR"
 python3 -m venv .venv
@@ -33,22 +47,24 @@ pip install torch --index-url https://download.pytorch.org/whl/cu128 || pip inst
 pip install numpy transformers datasets tiktoken tqdm deepspeed huggingface_hub safetensors
 [[ -d $WORKDIR/nanoGPT/.git ]] || git clone https://github.com/karpathy/nanoGPT.git "$WORKDIR/nanoGPT"
 cd "$WORKDIR/nanoGPT"
-mkdir -p "$DATA_DIR" "$CKPT_DIR" /root/ai-agent/nvme_offload
+mkdir -p "$DATA_DIR" "$CKPT_DIR" /root/ai-agent/nvme_offload /root/.ssh
+[[ -f /root/.ssh/id_ed25519 ]] || ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519
 
-echo "== Cho rsync VPS CPU (toi da 5 phut) =="
+echo "== Cho SSH $REMOTE port $CPU_PORT =="
 ok=0
 for i in $(seq 1 30); do
-  if rsync -q "${RSYNC_URL}/" >/dev/null 2>&1; then ok=1; break; fi
-  echo "chua gap rsync $CPU_IP:8730 ($i/30)"; sleep 10
+  if "${SSH_RUN[@]}" -o ConnectTimeout=8 -o BatchMode=$([[ -n $CPU_PASS ]] && echo no || echo yes) "$REMOTE" "echo ssh_ok" >/dev/null 2>&1; then ok=1; break; fi
+  echo "chua SSH duoc ($i/30)"; sleep 10
 done
-[[ "$ok" == 1 ]] || { echo "KHONG ket noi rsync://$CPU_IP:8730 — mo port 8730 tren VPS CPU"; exit 1; }
+[[ "$ok" == 1 ]] || { echo "KHONG SSH duoc $REMOTE:$CPU_PORT. Kiem tra IP/port/mat khau VPS CPU."; exit 1; }
 
-rsync -avP "${RSYNC_URL}/nanoGPT/data/code_7b/" "$DATA_DIR/" || true
+"${SSH_RUN[@]}" "$REMOTE" "mkdir -p ~/ai-agent/nanoGPT/data/code_7b ~/ai-agent/nanoGPT/data/code_3b ~/ai-agent/nanoGPT/out-code-7b"
+rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/data/code_7b/" "$DATA_DIR/" || true
 if [[ ! -f $DATA_DIR/train.bin ]]; then
-  rsync -avP "${RSYNC_URL}/nanoGPT/data/code_3b/train.bin" "$DATA_DIR/" || true
-  rsync -avP "${RSYNC_URL}/nanoGPT/data/code_3b/val.bin" "$DATA_DIR/" || true
+  rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/data/code_3b/train.bin" "$DATA_DIR/" || true
+  rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/data/code_3b/val.bin" "$DATA_DIR/" || true
 fi
-rsync -avP "${RSYNC_URL}/nanoGPT/out-code-7b/" "$CKPT_DIR/" || true
+rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/out-code-7b/" "$CKPT_DIR/" || true
 [[ -f $DATA_DIR/train.bin ]] || { echo KHONG CO train.bin tren VPS CPU; exit 1; }
 python3 - << PY
 import os
@@ -84,14 +100,13 @@ def get_batch(split):
 def rotate_ckpts():
     tags = sorted([p for p in glob.glob(os.path.join(CKPT_DIR, "step_*")) if os.path.isdir(p)], key=os.path.getmtime)
     while len(tags) > KEEP:
-        old = tags.pop(0); shutil.rmtree(old, ignore_errors=True)
+        shutil.rmtree(tags.pop(0), ignore_errors=True)
 os.makedirs(CKPT_DIR, exist_ok=True)
 train_size = os.path.getsize(os.path.join(DATA_DIR, "train.bin")) // 2
 tokens_per_step = MICRO_BATCH * BLOCK_SIZE * GRAD_ACCUM
 print(f"Train tokens: {train_size:,}. tokens/step {tokens_per_step:,}")
 config = GPTConfig(block_size=BLOCK_SIZE, vocab_size=50304, n_layer=32, n_head=32, n_embd=4096, dropout=0.0, bias=False)
-n_params = sum(p.numel() for p in GPT(config).parameters())
-print(f"GPT 7B-class: {n_params/1e9:.2f}B (khong phai Llama)")
+print(f"GPT 7B-class: {sum(p.numel() for p in GPT(config).parameters())/1e9:.2f}B (khong phai Llama)")
 model = GPT(config)
 model_engine, _, _, _ = deepspeed.initialize(model=model, model_parameters=model.parameters(), config="ds_config_7b.json")
 it = tokens_seen = 0
@@ -109,7 +124,7 @@ start = last_save = time.time(); calibrated = False
 os.makedirs("/root/ai-agent/nvme_offload", exist_ok=True)
 while True:
     if (time.time() - start) / 3600 >= TARGET_HOURS:
-        print(f"Dat {TARGET_HOURS}h — dung de copy ve CPU"); break
+        print(f"Dat {TARGET_HOURS}h — copy ve CPU"); break
     x, y = get_batch("train")
     x, y = x.to(model_engine.device), y.to(model_engine.device)
     _, loss = model_engine(x, y)
@@ -156,12 +171,12 @@ api.create_repo(repo, repo_type="model", exist_ok=True, private=True)
 pt = "/root/ai-agent/nanoGPT/model_fp32.pt"
 if os.path.exists(pt):
     api.upload_file(path_or_fileobj=pt, path_in_repo="model_fp32.pt", repo_id=repo, repo_type="model")
-    print("uploaded HF model_fp32.pt")
 PY
 else
-  echo "Bo qua Hugging Face (khong co HF_TOKEN). Checkpoint van ve VPS CPU."
+  echo "Bo qua Hugging Face. Checkpoint ve VPS CPU."
 fi
 
-rsync -avP --delete "$CKPT_DIR/" "${RSYNC_URL}/nanoGPT/out-code-7b/" || true
-[[ -f $WORKDIR/nanoGPT/model_fp32.pt ]] && rsync -avP "$WORKDIR/nanoGPT/model_fp32.pt" "${RSYNC_URL}/nanoGPT/" || true
-echo "== XONG. File nam o VPS CPU: ~/ai-agent/nanoGPT/out-code-7b va model_fp32.pt =="
+"${SSH_RUN[@]}" "$REMOTE" "mkdir -p ~/ai-agent/nanoGPT/out-code-7b ~/ai-agent/nanoGPT"
+rsync -avP --delete -e "$RSYNC_SSH" "$CKPT_DIR/" "$REMOTE:~/ai-agent/nanoGPT/out-code-7b/" || true
+[[ -f $WORKDIR/nanoGPT/model_fp32.pt ]] && rsync -avP -e "$RSYNC_SSH" "$WORKDIR/nanoGPT/model_fp32.pt" "$REMOTE:~/ai-agent/nanoGPT/" || true
+echo "== XONG. File o VPS CPU: ~/ai-agent/nanoGPT/out-code-7b va model_fp32.pt =="
