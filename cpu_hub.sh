@@ -1,58 +1,65 @@
 #!/usr/bin/env bash
-# VPS CU (khong GPU) — dan 1 lenh. May nay GIU data + checkpoint.
-# Tuy chon:
-#   export GPU_PUBKEY="ssh-ed25519 AAAA... root@gpu"
-#   export PREPARE_MORE=1
-#   export TARGET_MORE_TOKENS=200000000
+# VPS CPU — 1 lenh. GIU terminal mo.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
-
 PREPARE_MORE="${PREPARE_MORE:-1}"
 TARGET_MORE_TOKENS="${TARGET_MORE_TOKENS:-200000000}"
+SYNC_PASS="${SYNC_PASS:-huyen-sync-7b}"
 WORKDIR="${WORKDIR:-$HOME/ai-agent}"
 DATA3="$WORKDIR/nanoGPT/data/code_3b"
 DATA7="$WORKDIR/nanoGPT/data/code_7b"
 NEXT="$WORKDIR/nanoGPT/data/next_shard"
 CKPT="$WORKDIR/nanoGPT/out-code-7b"
 
-echo "== [CPU] Cai goi =="
 sudo apt-get update -y
-sudo apt-get install -y python3 python3-pip git rsync openssh-server curl ca-certificates
-sudo systemctl enable --now ssh || sudo service ssh start || true
-mkdir -p "$DATA3" "$DATA7" "$NEXT" "$CKPT" "$HOME/.ssh"
-chmod 700 "$HOME/.ssh"
-touch "$HOME/.ssh/authorized_keys"
-chmod 600 "$HOME/.ssh/authorized_keys"
-
-if [[ -n "${GPU_PUBKEY:-}" ]]; then
-  grep -qxF "$GPU_PUBKEY" "$HOME/.ssh/authorized_keys" || echo "$GPU_PUBKEY" >> "$HOME/.ssh/authorized_keys"
-  echo "Da them GPU_PUBKEY vao authorized_keys"
-fi
-
-echo "== [CPU] authorized_keys + IP =="
-cat "$HOME/.ssh/authorized_keys" || true
-hostname -I || true
-curl -s ifconfig.me || true
-echo
+sudo apt-get install -y python3 python3-pip git rsync curl ca-certificates
+mkdir -p "$DATA3" "$DATA7" "$NEXT" "$CKPT" "$WORKDIR/incoming"
 
 if [[ -f "$DATA3/train.bin" && ! -f "$DATA7/train.bin" ]]; then
   ln -f "$DATA3/train.bin" "$DATA7/train.bin" 2>/dev/null || cp -a "$DATA3/train.bin" "$DATA7/train.bin"
-  if [[ -f "$DATA3/val.bin" ]]; then
-    ln -f "$DATA3/val.bin" "$DATA7/val.bin" 2>/dev/null || cp -a "$DATA3/val.bin" "$DATA7/val.bin"
-  fi
+  [[ -f "$DATA3/val.bin" ]] && { ln -f "$DATA3/val.bin" "$DATA7/val.bin" 2>/dev/null || cp -a "$DATA3/val.bin" "$DATA7/val.bin"; }
 fi
 
+# rsync daemon — GPU keo/day file khong can SSH key
+SECRETS=/tmp/huyen.rsync.secrets
+CONF=/tmp/huyen.rsyncd.conf
+printf 'huyen:%s\n' "$SYNC_PASS" | sudo tee "$SECRETS" >/dev/null
+sudo chmod 600 "$SECRETS"
+cat > "$CONF" << EOF
+pid file = /tmp/huyen-rsyncd.pid
+lock file = /tmp/huyen-rsyncd.lock
+log file = /tmp/huyen-rsyncd.log
+port = 8730
+use chroot = no
+[huyen]
+path = $WORKDIR
+comment = huyen train hub
+read only = false
+list = yes
+auth users = huyen
+secrets file = $SECRETS
+uid = $(id -u)
+gid = $(id -g)
+EOF
+sudo pkill -f 'rsync --daemon --config=/tmp/huyen.rsyncd.conf' 2>/dev/null || true
+sudo rsync --daemon --config="$CONF"
+
+IP=$(curl -s --max-time 8 ifconfig.me || hostname -I | awk '{print $1}')
+echo "========================================"
+echo "VPS CPU SAN SANG"
+echo "IP public: $IP"
+echo "rsync: rsync://huyen@$IP:8730/huyen/"
+echo "Dien IP nay vao CPU_IP o lenh GPU"
+echo "========================================"
 if [[ -f "$DATA7/train.bin" ]]; then
   python3 - << PY
 import os
 p="$DATA7/train.bin"
-print(f"[CPU] train.bin: {os.path.getsize(p)/1e9:.3f} GB (~{os.path.getsize(p)//2:,} token)")
+print(f"train.bin: {os.path.getsize(p)/1e9:.3f} GB (~{os.path.getsize(p)//2:,} token)")
 PY
 else
-  echo "CHUA CO train.bin. Chay step1_prepare_data.sh neu can build data."
+  echo "CHUA CO train.bin tai $DATA7 — GPU se khong train duoc."
 fi
-
-echo "== [CPU] Lang nghe SSH/rsync. GIU terminal nay mo."
 
 if [[ "$PREPARE_MORE" == "1" ]]; then
   pip3 install --break-system-packages numpy tiktoken datasets tqdm || true
@@ -76,7 +83,7 @@ def write(tr, va, text):
     arr = np.array(ids, dtype=np.uint16)
     (tr if np.random.random() < 0.98 else va).write(arr.tobytes())
     total += len(ids)
-print(f"Tai them toi da {target:,} token vao {out_dir}")
+print(f"Tai them toi da {target:,} token")
 with open(train_p, "ab") as tr, open(val_p, "ab") as va:
     try:
         fw = load_dataset("HuggingFaceFW/fineweb-edu", name="sample-10BT", split="train", streaming=True)
@@ -99,32 +106,19 @@ with open(train_p, "ab") as tr, open(val_p, "ab") as va:
             write(tr, va, f"Question: {x['question']}\nAnswer: {x['answer']}\n")
     except Exception as e:
         print("gsm8k:", e)
-    try:
-        apps = load_dataset("codeparrot/apps", split="train")
-        for x in apps:
-            if total >= target: break
-            try:
-                sols = json.loads(x["solutions"]) if x["solutions"] else []
-            except Exception:
-                sols = []
-            if sols:
-                write(tr, va, f"Problem ({x['difficulty']}): {x['question']}\nSolution:\n{sols[0]}\n")
-    except Exception as e:
-        print("apps:", e)
-print(f"XONG shard moi: {total:,} token -> {train_p}")
+print(f"XONG shard moi: {total:,} token")
 PY
   NEXT_DIR="$NEXT" TARGET_MORE_TOKENS="$TARGET_MORE_TOKENS" python3 "$WORKDIR/nanoGPT/prepare_next_shard.py" > "$WORKDIR/prepare_next.log" 2>&1 &
-  echo "PID tai them data: $! log=$WORKDIR/prepare_next.log"
+  echo "Dang tai them data PID=$! log=$WORKDIR/prepare_next.log"
 fi
 
+echo "GIU terminal nay. Mo firewall TCP 8730 neu nha cung cap chan."
 last=0
 while true; do
-  if [[ -d "$CKPT" ]]; then
-    sz=$(du -sb "$CKPT" 2>/dev/null | awk '{print $1}')
-    if [[ "${sz:-0}" -ne "$last" ]]; then
-      echo "[$(date -Is)] checkpoint dir = $((sz/1024/1024)) MB"
-      last=$sz
-    fi
+  sz=$(du -sb "$CKPT" 2>/dev/null | awk '{print $1}')
+  if [[ "${sz:-0}" -ne "$last" ]]; then
+    echo "[$(date -Is)] checkpoint = $((sz/1024/1024)) MB"
+    last=$sz
   fi
-  sleep 600
+  sleep 300
 done
