@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# VPS GPU — chay duoc ca root lan ezycloudx-admin.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 CPU_IP="${CPU_IP:-103.77.173.42}"
 CPU_USER="${CPU_USER:-root}"
 CPU_PORT="${CPU_PORT:-7110}"
 CPU_PASS="${CPU_PASS:-}"
-HF_TOKEN="${HF_TOKEN:-}"
-HF_REPO="${HF_REPO:-hytmk2912/huyen-code-7b}"
 TARGET_HOURS="${TARGET_HOURS:-5.0}"
 WORKDIR="${WORKDIR:-$HOME/ai-agent}"
 DATA_DIR="$WORKDIR/nanoGPT/data/code_7b"
@@ -15,22 +12,15 @@ CKPT_DIR="$WORKDIR/nanoGPT/out-code-7b"
 OFFLOAD="$WORKDIR/nvme_offload"
 REMOTE="${CPU_USER}@${CPU_IP}"
 SUDO=""
-if [[ "$(id -u)" -ne 0 ]]; then
-  SUDO="sudo"
-  $SUDO -n true 2>/dev/null || $SUDO true
-fi
-
-[[ -n "$CPU_IP" ]] || { echo THIEU CPU_IP; exit 1; }
+[[ "$(id -u)" -eq 0 ]] || SUDO="sudo"
 
 $SUDO apt-get update -y
 $SUDO apt-get install -y python3 python3-pip python3-venv git rsync openssh-client sshpass build-essential python3-dev libaio-dev curl ca-certificates
 if [[ ! -f /swapfile_train ]]; then
   $SUDO fallocate -l 64G /swapfile_train || $SUDO dd if=/dev/zero of=/swapfile_train bs=1M count=65536
-  $SUDO chmod 600 /swapfile_train
-  $SUDO mkswap /swapfile_train
+  $SUDO chmod 600 /swapfile_train; $SUDO mkswap /swapfile_train
 fi
 $SUDO swapon /swapfile_train || true
-$SUDO sysctl -w vm.swappiness=60 || true
 
 if [[ -n "$CPU_PASS" ]]; then
   export SSHPASS="$CPU_PASS"
@@ -41,15 +31,26 @@ else
   SSH_RUN=(ssh -p "$CPU_PORT" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30)
 fi
 
-mkdir -p "$WORKDIR" "$DATA_DIR" "$CKPT_DIR" "$OFFLOAD" "$HOME/.ssh"
+mkdir -p "$WORKDIR" "$OFFLOAD" "$HOME/.ssh"
 cd "$WORKDIR"
-python3 -m venv .venv
-# shellcheck disable=SC1091
+if [[ ! -d .venv ]]; then python3 -m venv .venv; fi
 source .venv/bin/activate
 pip install -U pip wheel setuptools
-pip install torch --index-url https://download.pytorch.org/whl/cu128 || pip install torch --index-url https://download.pytorch.org/whl/cu126 || pip install torch --index-url https://download.pytorch.org/whl/cu121
+python3 - << 'PY' || pip install torch --index-url https://download.pytorch.org/whl/cu121
+import torch
+print("torch", torch.__version__, "cuda", torch.cuda.is_available())
+assert torch.cuda.is_available()
+PY
 pip install numpy transformers datasets tiktoken tqdm deepspeed huggingface_hub safetensors
-[[ -d $WORKDIR/nanoGPT/.git ]] || git clone https://github.com/karpathy/nanoGPT.git "$WORKDIR/nanoGPT"
+
+# nanoGPT: tai moi, hoac dung lai neu da co model.py
+if [[ ! -f "$WORKDIR/nanoGPT/model.py" ]]; then
+  if [[ -e "$WORKDIR/nanoGPT" ]]; then
+    mv "$WORKDIR/nanoGPT" "$WORKDIR/nanoGPT.bak.$(date +%s)"
+  fi
+  git clone https://github.com/karpathy/nanoGPT.git "$WORKDIR/nanoGPT"
+fi
+mkdir -p "$DATA_DIR" "$CKPT_DIR"
 cd "$WORKDIR/nanoGPT"
 
 echo "== SSH toi VPS CPU $REMOTE:$CPU_PORT =="
@@ -58,7 +59,7 @@ for i in $(seq 1 20); do
   if "${SSH_RUN[@]}" -o ConnectTimeout=8 "$REMOTE" "echo ssh_ok" >/dev/null 2>&1; then ok=1; break; fi
   echo "chua SSH duoc CPU ($i/20)"; sleep 6
 done
-[[ "$ok" == 1 ]] || { echo "KHONG SSH duoc $REMOTE:$CPU_PORT — sai CPU_PASS hoac firewall"; exit 1; }
+[[ "$ok" == 1 ]] || { echo "KHONG SSH duoc $REMOTE:$CPU_PORT"; exit 1; }
 
 "${SSH_RUN[@]}" "$REMOTE" "mkdir -p ~/ai-agent/nanoGPT/data/code_7b ~/ai-agent/nanoGPT/data/code_3b ~/ai-agent/nanoGPT/out-code-7b"
 rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/data/code_7b/" "$DATA_DIR/" || true
@@ -67,7 +68,7 @@ if [[ ! -f $DATA_DIR/train.bin ]]; then
   rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/data/code_3b/val.bin" "$DATA_DIR/" || true
 fi
 rsync -avP -e "$RSYNC_SSH" "$REMOTE:~/ai-agent/nanoGPT/out-code-7b/" "$CKPT_DIR/" || true
-[[ -f $DATA_DIR/train.bin ]] || { echo "KHONG CO train.bin tren VPS CPU $REMOTE"; exit 1; }
+[[ -f $DATA_DIR/train.bin ]] || { echo "KHONG CO train.bin tren VPS CPU"; exit 1; }
 python3 - << PY
 import os
 p="$DATA_DIR/train.bin"
@@ -77,13 +78,11 @@ PY
 curl -fsSL https://raw.githubusercontent.com/hytmk2912/Huyen/main/ds_config_7b.json -o ds_config_7b.json
 python3 - << PY
 import json
-p="ds_config_7b.json"
-cfg=json.load(open(p))
+cfg=json.load(open("ds_config_7b.json"))
 off="$OFFLOAD"
 cfg["zero_optimization"]["offload_param"]["nvme_path"]=off
 cfg["zero_optimization"]["offload_optimizer"]["nvme_path"]=off
-json.dump(cfg, open(p,"w"), indent=2)
-print("nvme_offload ->", off)
+json.dump(cfg, open("ds_config_7b.json","w"), indent=2)
 PY
 
 cat > train_7b.py << 'PY'
@@ -172,7 +171,6 @@ for p in tags[:-2]:
     shutil.rmtree(p, ignore_errors=True)
 print("giu", tags[-2:])
 PY
-
 "${SSH_RUN[@]}" "$REMOTE" "mkdir -p ~/ai-agent/nanoGPT/out-code-7b ~/ai-agent/nanoGPT"
 rsync -avP --delete -e "$RSYNC_SSH" "$CKPT_DIR/" "$REMOTE:~/ai-agent/nanoGPT/out-code-7b/" || true
 [[ -f $WORKDIR/nanoGPT/model_fp32.pt ]] && rsync -avP -e "$RSYNC_SSH" "$WORKDIR/nanoGPT/model_fp32.pt" "$REMOTE:~/ai-agent/nanoGPT/" || true
