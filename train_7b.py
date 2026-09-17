@@ -2,17 +2,19 @@ import os, time, glob, shutil
 import numpy as np
 import torch
 import deepspeed
+from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 from model import GPTConfig, GPT
 
 DATA_DIR = os.environ.get("DATA_DIR", "data/code_7b")
 CKPT_DIR = os.environ.get("CKPT_DIR", "out-code-7b")
-BLOCK_SIZE = int(os.environ.get("BLOCK_SIZE", "1024"))
+BLOCK_SIZE = int(os.environ.get("BLOCK_SIZE", "512"))
 MICRO_BATCH = int(os.environ.get("MICRO_BATCH", "1"))
 GRAD_ACCUM = 32
 TARGET_HOURS = float(os.environ.get("TARGET_HOURS", "100"))
 LOG_EVERY = 5
 SAVE_EVERY_SEC = 900
 KEEP = 2
+DS_CFG = os.environ.get("DS_CFG", "ds_config_7b.json")
 
 def get_batch(split):
     path = os.path.join(DATA_DIR, f"{split}.bin")
@@ -38,19 +40,23 @@ def rotate():
 os.makedirs(CKPT_DIR, exist_ok=True)
 train_size = os.path.getsize(os.path.join(DATA_DIR, "train.bin")) // 2
 tps = MICRO_BATCH * BLOCK_SIZE * GRAD_ACCUM
-print(f"FP32 | tokens={train_size:,} | tokens/step={tps:,}")
+print(f"FP32 | tokens={train_size:,} | tokens/step={tps:,} | block={BLOCK_SIZE}")
+print("GPU", torch.cuda.get_device_name(0), "VRAM", round(torch.cuda.get_device_properties(0).total_memory/1e9, 2), "GB")
 
 cfg = GPTConfig(
     block_size=BLOCK_SIZE, vocab_size=50304,
     n_layer=32, n_head=32, n_embd=4096,
     dropout=0.0, bias=False,
 )
-n = sum(p.numel() for p in GPT(cfg).parameters())
-print(f"GPT {n/1e9:.2f}B (khong phai Llama)")
-model = GPT(cfg)
+print("khoi tao GPT duoi ZeRO-3 (khong load full 7B len VRAM)")
+with deepspeed.zero.Init(config_dict_or_path=DS_CFG, enabled=True):
+    model = GPT(cfg)
+print("GPT 7B-class (khong phai Llama) — ZeRO partition xong")
+
 engine, _, _, _ = deepspeed.initialize(
-    model=model, model_parameters=model.parameters(), config="ds_config_7b.json"
+    model=model, model_parameters=model.parameters(), config=DS_CFG
 )
+print("deepspeed ready", flush=True)
 
 it = seen = 0
 try:
@@ -75,9 +81,9 @@ while (time.time() - t0) / 3600 < TARGET_HOURS:
     engine.step()
     it += 1
     seen += tps
-    if it == 3 and not cal:
-        s = (time.time() - t0) / 3
-        print(f"[TOC DO] {s:.1f}s/step {tps/s:.0f} tok/s", flush=True)
+    if it == 2 and not cal:
+        s = (time.time() - t0) / 2
+        print(f"[TOC DO] {s:.1f}s/step {tps/max(s,0.01):.0f} tok/s", flush=True)
         cal = True
     if it % LOG_EVERY == 0:
         print(f"iter {it} {(time.time()-t0)/3600:.2f}h loss={loss.item():.4f} seen={seen:,}", flush=True)
@@ -86,6 +92,7 @@ while (time.time() - t0) / 3600 < TARGET_HOURS:
         engine.save_checkpoint(CKPT_DIR, tag="latest", client_state={"it": it, "tokens_seen": seen})
         rotate()
         last = time.time()
+        torch.cuda.empty_cache()
 
 engine.save_checkpoint(CKPT_DIR, tag=f"step_{it}", client_state={"it": it, "tokens_seen": seen})
 engine.save_checkpoint(CKPT_DIR, tag="latest", client_state={"it": it, "tokens_seen": seen})
