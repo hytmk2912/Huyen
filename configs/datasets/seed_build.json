@@ -1,0 +1,1 @@
+{"seed": 17, "mix_weights": {"coding": 0.1, "software_engineering": 0.1, "math_logic": 0.1, "reasoning": 0.1, "planning": 0.1, "tool_use": 0.1, "agent": 0.1, "research": 0.1, "trading": 0.1, "debugging": 0.1}, "formats": ["sft", "preference", "tool_use", "trajectory", "reasoning"]}

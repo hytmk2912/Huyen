@@ -1,0 +1,10 @@
+{"id": "seed-se-1", "messages": [{"content": "Name one regression test for a password reset endpoint.", "role": "user"}, {"content": "Test that an expired reset token is rejected.", "role": "assistant"}]}
+{"id": "seed-math-1", "messages": [{"content": "2 + 3 * 4", "role": "user"}, {"content": "14", "role": "assistant"}]}
+{"id": "seed-agent-1", "messages": [{"content": "Find the sum of 2 and 5, then double it.", "role": "user"}, {"content": "14", "role": "assistant"}]}
+{"id": "seed-reasoning-1", "messages": [{"content": "All deploys are changes. This is a deploy. What follows?", "role": "user"}, {"content": "This is a change.", "role": "assistant"}]}
+{"id": "seed-coding-1", "messages": [{"content": "Write a function add(a, b).", "role": "user"}, {"content": "def add(a, b):\n    return a + b", "role": "assistant"}]}
+{"id": "seed-trading-1", "messages": [{"content": "What data is needed before backtesting a strategy?", "role": "user"}, {"content": "Documented historical market data with its source, timeframe, and adjustment policy.", "role": "assistant"}]}
+{"id": "seed-debug-1", "messages": [{"content": "What is wrong with: if x = 1: ?", "role": "user"}, {"content": "Use == for comparison: if x == 1:", "role": "assistant"}]}
+{"id": "seed-planning-1", "messages": [{"content": "Plan a safe database migration.", "role": "user"}, {"content": "1. Back up. 2. Apply migration. 3. Verify. 4. Roll back if needed.", "role": "assistant"}]}
+{"id": "seed-research-1", "messages": [{"content": "What must a research answer record when using an external source?", "role": "user"}, {"content": "The source URL and its usage/license metadata.", "role": "assistant"}]}
+{"id": "seed-tool-1", "messages": [{"content": "Calculate 6 * 7.", "role": "user"}, {"content": "42", "role": "assistant"}]}
