@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -25,6 +26,8 @@ class ModelConfig:
     capabilities: frozenset[ModelCapability] = field(default_factory=frozenset)
     offline: bool = False
     quantization: str | None = None
+    gguf_file: str | None = None
+    gguf_outtype: str | None = None
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "ModelConfig":
@@ -50,6 +53,12 @@ class HuggingFaceModelAdapter:
         except ImportError as error: raise RuntimeError("Hãy cài torch và transformers để nạp model Hugging Face") from error
         dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}.get(self.config.dtype)
         if dtype is None: raise ValueError(f"Không hỗ trợ dtype: {self.config.dtype}")
+        gguf = Path(self.config.gguf_file) if self.config.gguf_file else None
+        if gguf is not None and gguf.exists():
+            # File GGUF đã xuất cục bộ: transformers giải nén về dtype đã cấu hình.
+            self.tokenizer = AutoTokenizer.from_pretrained(str(gguf.parent), gguf_file=gguf.name)
+            self.model = AutoModelForCausalLM.from_pretrained(str(gguf.parent), gguf_file=gguf.name, torch_dtype=dtype, device_map=self.config.device_map)
+            return
         kwargs = {"revision": self.config.revision, "local_files_only": self.config.offline}
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_source or self.config.source, revision=self.config.tokenizer_revision or self.config.revision, local_files_only=self.config.offline)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.source, torch_dtype=dtype, device_map=self.config.device_map, **kwargs)

@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from local_ai.data.core import build_dataset, deduplicate, load_records, statistics, validate_records, verify_math, verify_python, verify_tool_call, write_jsonl
-from local_ai.data.corpus import DOMAINS, Registry, Source, Tokenizer, build_one, scan_secrets
+from local_ai.data.corpus import Registry, Source, Tokenizer, build_one, check_source_domains, domain_mixture, domain_targets, scan_secrets
 
 
 def main() -> None:
@@ -16,7 +16,7 @@ def main() -> None:
     build = commands.add_parser("build"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
     generate = commands.add_parser("generate"); generate.add_argument("teacher_output", help="Các bản ghi JSONL do TeacherModel đã sinh ra"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
     hf = commands.add_parser("hf-sft", help="Tải dataset từ Hugging Face, kiểm tra rồi xuất sft.jsonl"); hf.add_argument("--config", required=True); hf.add_argument("--dataset", help="Ghi đè hf_dataset.name"); hf.add_argument("--output"); hf.add_argument("--limit", type=int)
-    for name in ("sources", "acquire", "build-corpus", "resume", "progress", "tokenizer-info", "secret-scan"):
+    for name in ("sources", "mixture", "acquire", "build-corpus", "resume", "progress", "tokenizer-info", "secret-scan"):
         item = commands.add_parser(name); item.add_argument("--config", required=name not in {"secret-scan"}); item.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.command == "hf-sft":
@@ -25,20 +25,22 @@ def main() -> None:
         if args.dataset: config["hf_dataset"]["name"] = args.dataset
         if args.limit: config["hf_dataset"]["limit"] = args.limit
         print(json.dumps(prepare_hf_sft(config, args.output), indent=2)); return
-    if args.command in {"sources", "acquire", "build-corpus", "resume", "progress", "tokenizer-info"}:
+    if args.command in {"sources", "mixture", "acquire", "build-corpus", "resume", "progress", "tokenizer-info"}:
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
         sources = [Source.from_dict(item) for item in config.get("sources", [])]
+        if args.command == "mixture": print(json.dumps({"target_tokens": config["target_tokens"], "domain_mixture": domain_mixture(config), "domain_targets": domain_targets(config)}, indent=2)); return
+        check_source_domains(sources, config)
         if args.command == "sources": print(json.dumps([source.__dict__ for source in sources], indent=2)); return
         if args.command == "tokenizer-info": print(json.dumps(Tokenizer(config["tokenizer"]).info(), indent=2)); return
         registry = Registry(Path(config["storage_root"]))
-        if args.command == "progress": print(json.dumps(registry.progress(config["target_tokens"]), indent=2)); return
+        if args.command == "progress": print(json.dumps(registry.progress(config["target_tokens"], domain_mixture(config)), indent=2)); return
         if args.command == "resume":
             incomplete = registry.db.execute("SELECT shard_id, status FROM shards WHERE status != 'COMPLETE'").fetchall()
             results = [build_one(source, config, args.dry_run) for source in sources] if incomplete else []
             print(json.dumps({"incomplete_shards": incomplete, "resumed": results}, indent=2)); return
         selected = sources[:1] if args.command == "acquire" else sources
         results = [build_one(source, config, args.dry_run) for source in selected]
-        print(json.dumps({"results": results, "progress": registry.progress(config["target_tokens"])}, indent=2)); return
+        print(json.dumps({"results": results, "progress": registry.progress(config["target_tokens"], domain_mixture(config))}, indent=2)); return
     if args.command == "secret-scan":
         findings = scan_secrets(Path(".")); print(json.dumps({"findings": findings}, indent=2));
         if findings: raise SystemExit("Phát hiện có thể lộ thông tin bí mật. Hãy đổi các khóa bị lộ và xóa chúng khỏi repo trước khi tiếp tục.")

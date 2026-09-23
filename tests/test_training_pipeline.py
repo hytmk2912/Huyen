@@ -32,7 +32,7 @@ class MultiModelConfigTests(unittest.TestCase):
         self.assertEqual(len({config.name for config in configs}), len(configs))
         for config in configs:
             self.assertTrue(config.source and config.dtype and config.capabilities)
-        self.assertEqual(find_model_config("configs/models/platform.json", "smoke").name, "smoke")
+        self.assertEqual(find_model_config("configs/models/platform.json", "huihui-qwen3-4b").name, "huihui-qwen3-4b")
         with self.assertRaises(LookupError): find_model_config("configs/models/platform.json", "missing")
 
     def test_duplicate_model_names_are_rejected(self):

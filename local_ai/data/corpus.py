@@ -14,8 +14,28 @@ from pathlib import Path
 from typing import Any
 
 TARGET_TOKENS = 10_000_000_000_000
-DOMAINS = {"general_web_knowledge": .35, "long_form_technical": .10, "code": .20, "science_math": .10, "reasoning": .05, "software_engineering": .05, "agent_tool_use": .03, "quant_finance_trading": .05, "multilingual": .05, "verified_synthetic": .02}
+# Tỷ lệ mặc định của corpus 10T token: 10% code, 20% trading, 10% suy luận, 10% tiếng Việt, 50% dữ liệu tự do.
+DOMAINS = {"code": .10, "trading": .20, "reasoning": .10, "vietnamese": .10, "general": .50}
 SECRET = re.compile(r"(?:hf_[A-Za-z0-9]{20,}|(?:api[_-]?key|password|secret)\s*[=:]\s*[^\s]{8,})", re.I)
+
+
+def domain_mixture(config: dict[str, Any]) -> dict[str, float]:
+    mixture = config.get("domain_mixture") or DOMAINS
+    if any(weight < 0 for weight in mixture.values()) or abs(sum(mixture.values()) - 1.0) > 1e-9:
+        raise ValueError("domain_mixture phải có tỷ lệ không âm và tổng bằng 1.0")
+    return dict(mixture)
+
+
+def domain_targets(config: dict[str, Any]) -> dict[str, int]:
+    """Số token mục tiêu cho từng nhóm dữ liệu = target_tokens × tỷ lệ."""
+    target = config.get("target_tokens", TARGET_TOKENS)
+    return {domain: round(target * weight) for domain, weight in domain_mixture(config).items()}
+
+
+def check_source_domains(sources: list["Source"], config: dict[str, Any]) -> None:
+    mixture = domain_mixture(config)
+    unknown = sorted({source.domain for source in sources if source.domain not in mixture})
+    if unknown: raise ValueError(f"Nguồn thuộc nhóm không có trong domain_mixture: {', '.join(unknown)}; các nhóm hợp lệ: {', '.join(mixture)}")
 
 
 def utcnow() -> str: return datetime.now(timezone.utc).isoformat()
@@ -56,7 +76,7 @@ CREATE TABLE IF NOT EXISTS experiments(experiment_id TEXT PRIMARY KEY, detail TE
         self.db.commit()
     def existing(self, shard_id: str) -> str | None:
         row = self.db.execute("SELECT status FROM shards WHERE shard_id=?", (shard_id,)).fetchone(); return row[0] if row else None
-    def progress(self, target: int) -> dict[str, Any]:
+    def progress(self, target: int, mixture: dict[str, float] | None = None) -> dict[str, Any]:
         total = lambda statuses: self.db.execute(f"SELECT COALESCE(SUM(token_count),0) FROM shards WHERE status IN ({','.join('?' for _ in statuses)})", statuses).fetchone()[0]
         acquired = total(("PLANNED", "VALIDATED", "UPLOADING", "REMOTE_VERIFIED", "COMPLETE", "FAILED"))
         validated = total(("VALIDATED", "UPLOADING", "REMOTE_VERIFIED", "COMPLETE"))
@@ -65,7 +85,9 @@ CREATE TABLE IF NOT EXISTS experiments(experiment_id TEXT PRIMARY KEY, detail TE
         domains = dict(self.db.execute("SELECT domain, SUM(token_count) FROM shards WHERE status='COMPLETE' GROUP BY domain").fetchall())
         failed = self.db.execute("SELECT COUNT(*) FROM shards WHERE status='FAILED'").fetchone()[0]
         pending = self.db.execute("SELECT COUNT(*) FROM shards WHERE status NOT IN ('COMPLETE','FAILED')").fetchone()[0]
-        return {"target_tokens": target, "acquired_tokens": acquired, "validated_tokens": validated, "approved_tokens": validated, "uploaded_tokens": uploaded, "remotely_verified_tokens": verified, "rejected_tokens": 0, "remaining_tokens": max(target - verified, 0), "percentage_complete": verified / target * 100, "by_domain": domains, "failed_shards": failed, "pending_shards": pending}
+        targets = {domain: round(target * weight) for domain, weight in (mixture or {}).items()}
+        by_target = {domain: {"weight": mixture[domain], "target_tokens": goal, "verified_tokens": domains.get(domain, 0), "remaining_tokens": max(goal - domains.get(domain, 0), 0), "percentage_complete": domains.get(domain, 0) / goal * 100 if goal else 0.0} for domain, goal in targets.items()}
+        return {"target_tokens": target, "acquired_tokens": acquired, "validated_tokens": validated, "approved_tokens": validated, "uploaded_tokens": uploaded, "remotely_verified_tokens": verified, "rejected_tokens": 0, "remaining_tokens": max(target - verified, 0), "percentage_complete": verified / target * 100, "by_domain": domains, "by_domain_target": by_target, "failed_shards": failed, "pending_shards": pending}
 
 
 class Tokenizer:
@@ -147,6 +169,7 @@ def clean_text(text: str) -> tuple[str | None, str | None]:
 
 
 def build_one(source: Source, config: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
+    check_source_domains([source], config)
     root = Path(config["storage_root"]); paths = storage_paths(root); registry = Registry(root)
     tokenizer = Tokenizer(config["tokenizer"]); registry.db.execute("INSERT OR REPLACE INTO tokenizer_versions VALUES(?,?,?)", (tokenizer.name, tokenizer.kind, tokenizer.info()["hash"])); registry.db.execute("INSERT OR REPLACE INTO dataset_versions VALUES(?,?,?,?)", (config["dataset_version"], config["target_tokens"], "building", utcnow())); registry.db.commit()
     raw = acquire(source, paths, registry, dry_run)

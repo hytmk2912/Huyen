@@ -7,3 +7,6 @@ data/processed/
 *.safetensors
 *.gguf
 *.pt
+
+models/gguf/
+llama.cpp/

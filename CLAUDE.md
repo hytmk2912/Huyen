@@ -8,6 +8,10 @@ Chủ repo không đọc được tiếng Anh. Mọi nội dung đẩy lên GitH
 
 Giữ nguyên tiếng Anh cho: tên hàm/biến/lớp, khóa JSON, giá trị trạng thái (ví dụ `"skipped"`), thuật ngữ kỹ thuật phổ biến (LoRA, checkpoint, dataset, token...) và các câu lệnh (prompt) gửi cho model.
 
+## Lộ trình (README.md, mục "Lộ trình")
+- Luôn giữ đúng 5 mục trong "Đang làm". Làm xong một mục thì chuyển xuống "Đã hoàn thành" (ghi ngắn gọn đã làm gì) và thêm ngay một mục mới chưa làm, phù hợp hướng dự án.
+- Mục cần phần cứng/khóa truy cập thật: làm phần code và test (tự bỏ qua khi thiếu GPU/thư viện), phần chạy thật ghi vào "Việc cần chạy trên máy thật". Không ghi là đã chạy thật khi chưa chạy.
+
 ## Kiểm tra trước khi đẩy
 ```bash
 python -m unittest discover -s tests -v

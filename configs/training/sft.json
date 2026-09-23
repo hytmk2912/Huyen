@@ -1,6 +1,6 @@
 {
   "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể.",
-  "base_model": "smoke",
+  "base_model": "huihui-qwen3-4b",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",
   "output_dir": ".runs/sft",

@@ -1,4 +1,5 @@
 {
+  "_comment": "Corpus 10T token. domain_mixture là tỷ lệ token theo nhóm: code 10%, trading 20%, reasoning (suy luận) 10%, vietnamese (tiếng Việt) 10%, general (dữ liệu tự do) 50%. Mỗi nguồn phải thuộc một nhóm có trong domain_mixture. Xem số token mục tiêu từng nhóm: python -m local_ai.data mixture --config configs/datasets/corpus_10t.json",
   "dataset_version": "10t-v1",
   "target_tokens": 10000000000000,
   "storage_root": "storage",
@@ -24,16 +25,11 @@
     "retries": 3
   },
   "domain_mixture": {
-    "general_web_knowledge": 0.35,
-    "long_form_technical": 0.1,
-    "code": 0.2,
-    "science_math": 0.1,
-    "reasoning": 0.05,
-    "software_engineering": 0.05,
-    "agent_tool_use": 0.03,
-    "quant_finance_trading": 0.05,
-    "multilingual": 0.05,
-    "verified_synthetic": 0.02
+    "code": 0.1,
+    "trading": 0.2,
+    "reasoning": 0.1,
+    "vietnamese": 0.1,
+    "general": 0.5
   },
   "sources": [
     {
@@ -43,7 +39,7 @@
       "url": "https://www.gutenberg.org/files/11/11-0.txt",
       "license": "Public Domain",
       "license_url": "https://www.gutenberg.org/policy/license.html",
-      "domain": "general_web_knowledge",
+      "domain": "general",
       "language": "en",
       "estimated_size": 150000,
       "estimated_tokens": 40000,
@@ -57,7 +53,7 @@
       "url": "https://www.gutenberg.org/files/84/84-0.txt",
       "license": "Public Domain",
       "license_url": "https://www.gutenberg.org/policy/license.html",
-      "domain": "long_form_technical",
+      "domain": "general",
       "language": "en",
       "estimated_size": 450000,
       "estimated_tokens": 110000,

@@ -11,12 +11,43 @@ Nền tảng AI chạy cục bộ, mọi thứ điều khiển bằng file cấu
 - `local_ai.evaluation`, `local_ai.experiments`: các thành phần đánh giá và tái lập thí nghiệm, chạy theo cấu hình.
 
 ## Corpus
-Mục tiêu là **10.000.000.000.000 token thật**. Đây chỉ là mục tiêu: token cục bộ hoặc token trong cấu hình không bao giờ được tính là tiến độ đã tải lên. Chỉ các shard production đã được xác minh trên máy chủ từ xa mới được tính. Bắt buộc có thông tin nguồn và giấy phép (license). Không có đợt thu thập dữ liệu lớn nào tự động chạy.
+Mục tiêu là **10.000.000.000.000 token thật**, chia theo tỷ lệ trong `domain_mixture` của `configs/datasets/corpus_10t.json`:
+
+| Nhóm (`domain`) | Tỷ lệ | Token mục tiêu |
+| --- | --- | --- |
+| `code` | 10% | 1.000 tỷ |
+| `trading` | 20% | 2.000 tỷ |
+| `reasoning` (suy luận) | 10% | 1.000 tỷ |
+| `vietnamese` (tiếng Việt) | 10% | 1.000 tỷ |
+| `general` (dữ liệu tự do) | 50% | 5.000 tỷ |
+
+Mỗi nguồn dữ liệu phải thuộc một nhóm có trong bảng; nguồn thuộc nhóm khác sẽ bị từ chối. `python -m local_ai.data mixture --config configs/datasets/corpus_10t.json` in số token mục tiêu từng nhóm, còn `progress` báo tiến độ từng nhóm so với mục tiêu (`by_domain_target`).
+
+ Đây chỉ là mục tiêu: token cục bộ hoặc token trong cấu hình không bao giờ được tính là tiến độ đã tải lên. Chỉ các shard production đã được xác minh trên máy chủ từ xa mới được tính. Bắt buộc có thông tin nguồn và giấy phép (license). Không có đợt thu thập dữ liệu lớn nào tự động chạy.
 
 Tokenizer production phải được nạp từ model chính trong cấu hình. Các tokenizer thử nghiệm cũ (theo byte và `cl100k_base`) chỉ dùng cho test, không được tính vào corpus production.
 
 ## Model
 `configs/models/platform.json` chứa danh sách model (`name`, `source` là tên trên Hugging Face, `dtype`, `capabilities`, và các thiết lập tùy chọn về revision/tokenizer/thiết bị). Mục đầu tiên là model chính. Muốn thêm model thì thêm một mục mới với `name` không trùng; router và khung huấn luyện đều gọi model theo tên.
+
+Ba model phụ là dòng Huihui Qwen3 bản FP32 (`dtype: float32`) kèm file GGUF f32:
+
+| Tên | Nguồn trên Hugging Face | Dung lượng GGUF f32 (ước tính) |
+| --- | --- | --- |
+| `huihui-qwen3-4b` | `huihui-ai/Huihui-Qwen3-4B-abliterated-v2` | ~16 GB |
+| `huihui-qwen3-8b` | `huihui-ai/Huihui-Qwen3-8B-abliterated-v2` | ~33 GB |
+| `huihui-qwen3-14b` | `huihui-ai/Huihui-Qwen3-14B-abliterated-v2` | ~59 GB |
+
+Dòng Qwen3 không có cỡ 3B và 7B nên dùng cỡ gần nhất là 4B và 8B. Trên Hugging Face chưa có bản GGUF f32 của các model này (cao nhất là f16), nên file GGUF f32 được xuất từ trọng số gốc bằng llama.cpp:
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp
+python -m pip install huggingface_hub -r llama.cpp/requirements.txt
+python -m local_ai.models.gguf --model huihui-qwen3-4b --llama-cpp llama.cpp --dry-run
+python -m local_ai.models.gguf --model huihui-qwen3-4b --llama-cpp llama.cpp
+```
+
+File được lưu vào đường dẫn `gguf_file` trong cấu hình (thư mục `models/gguf/`, không commit lên git). Khi file đã có, adapter nạp model trực tiếp từ GGUF.
 
 ## Huấn luyện (SFT)
 Phần huấn luyện mới là khung tùy chọn: mặc định không huấn luyện gì, và test không tải model hay dataset nào.
@@ -53,8 +84,17 @@ python -m compileall -q local_ai
 Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc tải dataset bị giới hạn truy cập); `HF_DATASET_REPO` có thể đặt ở biến môi trường hoặc trong cấu hình không chứa bí mật. Tuyệt đối không commit khóa/mật khẩu. Chạy `python -m local_ai.data secret-scan` trước khi thu thập dữ liệu.
 
 ## Lộ trình
+**Quy tắc:** lộ trình luôn có đúng **5 mục đang làm**. Làm xong mục nào thì chuyển mục đó xuống "Đã hoàn thành" và bổ sung ngay một mục mới chưa làm, để lộ trình luôn đủ 5 mục. Với mục cần phần cứng hoặc khóa truy cập thật, phần code và test được làm trong repo; phần phải chạy thật được ghi vào "Việc cần chạy trên máy thật".
+
+### Đang làm
 1. Cố định phiên bản và chạy thử model/tokenizer chính trên phần cứng đích.
 2. Hoàn tất xác minh từ xa có xác thực cho một shard.
-3. Thêm dần các adapter nguồn corpus đã được duyệt và có giấy phép.
+3. Thêm dần các adapter nguồn corpus đã được duyệt và có giấy phép, ưu tiên nhóm `trading` và `vietnamese` để bám đúng tỷ lệ.
 4. Triển khai huấn luyện phân tán BF16; FP8 vẫn chưa hỗ trợ cho đến khi đã chọn và thử nghiệm runtime cùng phần cứng.
 5. Mở rộng công cụ cho agent, cơ chế cách ly, bộ đánh giá và kiểm thử khả năng phục hồi.
+
+### Đã hoàn thành
+- Chưa có mục nào.
+
+### Việc cần chạy trên máy thật
+- Xuất GGUF f32 cho 3 model Huihui Qwen3 (cần llama.cpp và khoảng 110 GB ổ đĩa cho cả ba file).
