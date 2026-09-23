@@ -1,0 +1,15 @@
+{
+  "models": [
+    {
+      "name": "primary",
+      "source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated",
+      "revision": "main",
+      "tokenizer_source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated",
+      "tokenizer_revision": "main",
+      "dtype": "bfloat16",
+      "device_map": "auto",
+      "capabilities": ["chat", "reasoning", "coding", "tool_calling", "long_context"],
+      "offline": false
+    }
+  ]
+}

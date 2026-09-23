@@ -1,0 +1,5 @@
+{
+  "seed": 7,
+  "max_iterations": 3,
+  "models": [{"name": "demo-scripted", "backend": "scripted", "capabilities": ["planning", "tool_use", "reasoning"]}]
+}
