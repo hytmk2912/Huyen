@@ -6,7 +6,7 @@ from pathlib import Path
 from local_ai.agents.loop import AutonomousAgent
 from local_ai.config.settings import load_settings
 from local_ai.contracts import ToolCall
-from local_ai.datasets.manifest import DatasetManifest
+from local_ai.data.manifest import DatasetManifest
 from local_ai.demo import run_demo
 from local_ai.evaluation.benchmarks import BenchmarkCase, evaluate
 from local_ai.experiments.tracking import RunTracker, seed_everything
@@ -75,9 +75,31 @@ if __name__ == "__main__":
 
 class ModelConfigurationTests(unittest.TestCase):
     def test_primary_model_configuration_and_capability_routing(self):
-        from local_ai.config.platform import load_model_configs
+        from local_ai.config.settings import load_model_configs
         from local_ai.models.adapters import ModelCapability
         configs = load_model_configs("configs/models/platform.json")
         self.assertEqual(configs[0].source, "huihui-ai/Huihui-Qwen3.8-27B-abliterated")
         self.assertIn(ModelCapability.CODING, configs[0].capabilities)
         self.assertTrue(configs[0].configuration_hash)
+
+    def test_agent_runs_on_models_built_from_platform_config(self):
+        from local_ai.config.settings import load_model_configs
+        responses = [
+            "Use the calculator.",
+            '{"tool": "calculator", "arguments": {"expression": "6 * 7"}}',
+            '{"complete": true, "answer": "42"}',
+        ]
+        router = ModelRouter.from_configs(
+            load_model_configs("configs/models/platform.json"),
+            lambda config: ScriptedModelAdapter(config.name, responses, {item.value for item in config.capabilities}),
+        )
+        tools = ToolRegistry(); tools.register("calculator", calculator)
+        result = AutonomousAgent(router, tools, 2).run("Calculate 6 * 7")
+        self.assertTrue(result.completed)
+        self.assertEqual(result.answer, "42")
+
+    def test_agent_survives_malformed_model_json(self):
+        model = ScriptedModelAdapter("bad-json", ["plan", "not json", "still not json"])
+        result = AutonomousAgent(ModelRouter([model]), ToolRegistry(), 2).run("anything")
+        self.assertFalse(result.completed)
+        self.assertTrue(any(item.startswith("error:") for item in result.trace))
