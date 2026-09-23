@@ -42,7 +42,10 @@ def main() -> None:
             results = [build_one(source, config, args.dry_run) for source in sources] if incomplete else []
             print(json.dumps({"incomplete_shards": incomplete, "resumed": results}, indent=2)); return
         selected = sources[:1] if args.command == "acquire" else sources
-        results = [build_one(source, config, args.dry_run) for source in selected]
+        results = []
+        for source in selected:
+            results.append(build_one(source, config, args.dry_run))
+            if results[-1].get("status") == "paused": break  # hết chỗ trống: dừng gọn, chạy lại sau sẽ tải tiếp
         print(json.dumps({"results": results, "progress": registry.progress(config["target_tokens"], domain_mixture(config))}, indent=2)); return
     if args.command == "secret-scan":
         findings = scan_secrets(Path(".")); print(json.dumps({"findings": findings}, indent=2));

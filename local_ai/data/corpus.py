@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import sqlite3
 import time
 import urllib.request
@@ -54,8 +53,10 @@ def hf_dataset_id(url: str) -> str:
     return url[len(prefix):]
 
 
-def fetch_hf_text(source: "Source", target: Path, loader: Any = None) -> Path:
-    """Tải cột văn bản của một dataset Hugging Face (streaming) và ghi thành một file văn bản thô."""
+def fetch_hf_text(source: "Source", target: Path, loader: Any = None, budget: Any = None, throttle: Any = None) -> Path:
+    """Tải cột văn bản của một dataset Hugging Face (streaming) vào file .part; dừng giữa chừng thì lần sau tải tiếp từ dòng đã dừng."""
+    from local_ai.data.limits import StorageBudget, Throttle
+    budget = budget or StorageBudget(target.parent, None); throttle = throttle or Throttle(None)
     if loader is None:
         try:
             from datasets import load_dataset
@@ -63,9 +64,17 @@ def fetch_hf_text(source: "Source", target: Path, loader: Any = None) -> Path:
         loader = load_dataset
     options = source.options; field_name = options.get("text_field", "text")
     rows = loader(hf_dataset_id(source.url), options.get("subset"), split=options.get("split", "train"), revision=source.dataset_version, streaming=True, token=os.environ.get("HF_TOKEN") or None)
-    limit = options.get("max_rows")
-    texts = [str(row[field_name]).strip() for row in (islice(rows, limit) if limit else rows) if row.get(field_name)]
-    target.write_text("\n\n".join(texts), encoding="utf-8")
+    limit = options.get("max_rows"); partial = target.with_suffix(".part"); progress = target.with_suffix(".progress")
+    done = int(progress.read_text()) if progress.exists() and partial.exists() else 0
+    if not done: partial.write_text("", encoding="utf-8")
+    with partial.open("a", encoding="utf-8") as output:
+        for row in islice(rows, done, limit):
+            text = str(row.get(field_name) or "").strip()
+            if text:
+                data = ("\n\n" if partial.stat().st_size or output.tell() else "") + text
+                size = len(data.encode("utf-8")); budget.reserve(size); output.write(data); output.flush(); throttle.consume(size)
+            done += 1; progress.write_text(str(done))
+    partial.replace(target); progress.unlink(missing_ok=True)
     return target
 
 
@@ -185,13 +194,20 @@ def scan_secrets(root: Path) -> list[str]:
     return findings
 
 
-def acquire(source: Source, paths: dict[str, Path], registry: Registry, dry_run: bool, loader: Any = None) -> Path:
+def acquire(source: Source, paths: dict[str, Path], registry: Registry, dry_run: bool, loader: Any = None, limits: Any = None) -> Path:
+    from local_ai.data.limits import StorageBudget, Throttle, copy_limited
     registry.source(source); target = paths["raw"] / f"{source.source_id}.txt"
     if target.exists(): return target
     if dry_run: return target
-    if source.download_method == "hf_dataset": return fetch_hf_text(source, target, loader)
+    budget, throttle = limits or (StorageBudget(paths["raw"], None), Throttle(None))
+    if source.download_method == "hf_dataset": return fetch_hf_text(source, target, loader, budget, throttle)
     if source.download_method != "http": raise ValueError(f"Không hỗ trợ cách tải: {source.download_method}")
-    with urllib.request.urlopen(source.url, timeout=60) as response, target.open("wb") as output: shutil.copyfileobj(response, output)
+    partial = target.with_suffix(".part"); offset = partial.stat().st_size if partial.exists() else 0
+    request = urllib.request.Request(source.url, headers={"Range": f"bytes={offset}-"} if offset else {})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        resumed = offset and getattr(response, "status", 200) == 206  # máy chủ không hỗ trợ tải tiếp thì tải lại từ đầu
+        with partial.open("ab" if resumed else "wb") as output: copy_limited(response, output, budget, throttle)
+    partial.replace(target)
     return target
 
 
@@ -207,7 +223,11 @@ def build_one(source: Source, config: dict[str, Any], dry_run: bool = False, loa
     check_source_domains([source], config); check_source_licenses([source], config)
     root = Path(config["storage_root"]); paths = storage_paths(root); registry = Registry(root)
     tokenizer = Tokenizer(config["tokenizer"]); registry.db.execute("INSERT OR REPLACE INTO tokenizer_versions VALUES(?,?,?)", (tokenizer.name, tokenizer.kind, tokenizer.info()["hash"])); registry.db.execute("INSERT OR REPLACE INTO dataset_versions VALUES(?,?,?,?)", (config["dataset_version"], config["target_tokens"], "building", utcnow())); registry.db.commit()
-    raw = acquire(source, paths, registry, dry_run, loader)
+    from local_ai.data.limits import StorageLimitReached, limits_from_config
+    try:
+        raw = acquire(source, paths, registry, dry_run, loader, limits_from_config(config))
+    except StorageLimitReached as error:
+        return {"status": "paused", "source": source.source_id, "reason": "storage_limit", "detail": str(error)}
     if dry_run: return {"action": "would download/process/tokenize/upload", "source": source.source_id, "raw": str(raw)}
     text, reason = clean_text(raw.read_text(encoding="utf-8", errors="ignore"))
     if not text: (paths["rejected"] / f"{source.source_id}.reason").write_text(reason or "rejected"); return {"rejected": reason}

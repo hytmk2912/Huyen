@@ -87,13 +87,15 @@ Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc
 **Quy tắc:** lộ trình luôn có đúng **5 mục đang làm**. Làm xong mục nào thì chuyển mục đó xuống "Đã hoàn thành" và bổ sung ngay một mục mới chưa làm, để lộ trình luôn đủ 5 mục. Với mục cần phần cứng hoặc khóa truy cập thật, phần code và test được làm trong repo; phần phải chạy thật được ghi vào "Việc cần chạy trên máy thật".
 
 ### Đang làm
-1. Giới hạn tài nguyên khi thu thập corpus: dừng an toàn khi vượt `max_local_storage_gb`, tôn trọng `max_bandwidth_mbps`, và chạy tiếp được sau khi dừng.
-2. Ngân sách cho agent: giới hạn thời gian mỗi lần gọi công cụ và tổng thời gian/token của một nhiệm vụ, dừng gọn khi vượt.
-3. Tự động đánh giá sau huấn luyện: chạy bộ đánh giá theo nhóm sau mỗi lần fine-tune và lưu báo cáo cạnh checkpoint.
-4. Cố định revision (mã commit) cho các nguồn `hf_dataset` và đo số token thật của từng nguồn bằng tokenizer production thay cho số ước lượng.
-5. Tìm thêm nguồn trading thuần (tin thị trường, dữ liệu giá có giấy phép rõ) và nguồn cho nhóm `reasoning` để bám đủ tỷ lệ 20% và 10%.
+1. Tự động đánh giá sau huấn luyện: chạy bộ đánh giá theo nhóm sau mỗi lần fine-tune và lưu báo cáo cạnh checkpoint.
+2. Cố định revision (mã commit) cho các nguồn `hf_dataset` và đo số token thật của từng nguồn bằng tokenizer production thay cho số ước lượng.
+3. Tìm thêm nguồn trading thuần (tin thị trường, dữ liệu giá có giấy phép rõ) và nguồn cho nhóm `reasoning` để bám đủ tỷ lệ 20% và 10%.
+4. Kiểm thử đầu-cuối toàn bộ đường ống bằng dữ liệu giả, không cần mạng/GPU: build-corpus → verify-shard → hf-sft → finetune `--dry-run` → đánh giá theo nhóm.
+5. Báo cáo tiến độ corpus dễ đọc bằng tiếng Việt: bảng theo nhóm (đã có/mục tiêu/phần trăm), dung lượng đã dùng và ước tính dung lượng còn cần.
 
 ### Đã hoàn thành
+- **Giới hạn tài nguyên khi thu thập corpus**: `local_ai/data/limits.py` kiểm tra `max_local_storage_gb` trong lúc tải (vượt thì dừng an toàn, báo `paused` và `build-corpus` ngừng các nguồn còn lại) và giữ tốc độ tải theo `max_bandwidth_mbps`. File đang tải nằm ở `.part`: nguồn HTTP tải tiếp bằng header `Range` (máy chủ không hỗ trợ thì tải lại từ đầu), nguồn Hugging Face nhớ số dòng đã tải trong `.progress` để chạy lại thì tải tiếp.
+- **Ngân sách cho agent**: `AgentBudget` giới hạn tổng thời gian (`max_seconds`), thời gian mỗi lần gọi công cụ (`max_tool_seconds`) và số token model sinh ra (`max_generated_tokens`, mặc định ước lượng theo số từ). Vượt ngân sách thì agent dừng gọn và ghi lý do vào trace.
 - **Loại trùng gần đúng (near-dedup)**: `local_ai/data/dedup.py` dùng MinHash + LSH, chia văn bản thành từng đoạn, loại đoạn giống ≥ 80% với đoạn đã có ở bất kỳ nguồn nào (chỉ số lưu trong registry). Xây lại một nguồn không bị tự coi là trùng; nguồn trùng toàn bộ bị từ chối (`near_duplicate`). Cấu hình ở `near_dedup` trong `corpus_10t.json`.
 - **Nguồn thật cho trading và tiếng Việt** (đã khai báo, chưa tải): tiếng Việt lấy từ `HuggingFaceFW/fineweb-2` phần `vie_Latn` (ODC-By 1.0); trading lấy từ `PleIAs/SEC` (báo cáo 10-K, CC0-1.0). Báo cáo 10-K là dữ liệu tài chính doanh nghiệp, chưa phải dữ liệu giao dịch thuần, nên đã thêm mục tìm nguồn trading khác. Số token trong cấu hình chỉ là ước lượng, và mỗi lần xây đang giới hạn `max_rows` (20.000 dòng tiếng Việt, 500 báo cáo SEC).
 - **Công cụ, cách ly và phục hồi cho agent**: công cụ `read_file`/`list_files`/`write_file` chỉ hoạt động trong thư mục làm việc (chặn `../`, giới hạn kích thước, ghi file phải bật riêng). Sandbox Python không truyền biến môi trường của máy (không lộ `HF_TOKEN`) và giới hạn bộ nhớ/CPU. Agent và công cụ không bị dừng khi model hoặc công cụ gặp lỗi bất ngờ.

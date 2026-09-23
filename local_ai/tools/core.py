@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import concurrent.futures
 import operator
 from typing import Any, Callable
 
@@ -16,12 +17,21 @@ class ToolRegistry:
             raise ValueError(f"Công cụ đã được đăng ký: {name}")
         self._tools[name] = tool
 
-    def execute(self, call: ToolCall) -> ToolResult:
+    def execute(self, call: ToolCall, timeout_seconds: float | None = None) -> ToolResult:
         tool = self._tools.get(call.name)
         if tool is None:
             return ToolResult(call.name, "Unknown tool", False)
         try:
-            return ToolResult(call.name, str(tool(**call.arguments)), True)
+            if timeout_seconds is None:
+                return ToolResult(call.name, str(tool(**call.arguments)), True)
+            # Chạy trong luồng riêng để trả về đúng hạn; công cụ chạy quá hạn bị bỏ qua kết quả.
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            try:
+                return ToolResult(call.name, str(executor.submit(tool, **call.arguments).result(timeout=timeout_seconds)), True)
+            except concurrent.futures.TimeoutError:
+                return ToolResult(call.name, f"Tool timed out after {timeout_seconds} seconds", False)
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
         except (TypeError, ValueError) as error:
             return ToolResult(call.name, str(error), False)
         except Exception as error:  # phục hồi: lỗi bất ngờ của công cụ không được làm dừng agent
