@@ -2,3 +2,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .runs/
+storage/
+data/processed/
+*.safetensors
+*.gguf
+*.pt
