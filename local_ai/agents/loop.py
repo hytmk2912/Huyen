@@ -25,6 +25,15 @@ def _parse_json_object(text: str) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _safe_generate(model, messages: list[Message], trace: list[str]) -> str:
+    """Phục hồi khi model lỗi (mất kết nối, hết bộ nhớ...): ghi lỗi vào trace và trả về chuỗi rỗng."""
+    try:
+        return model.generate(messages)
+    except Exception as error:
+        trace.append(f"error: model failure: {type(error).__name__}: {error}")
+        return ""
+
+
 class AutonomousAgent:
     """Vòng lặp có giới hạn: lập kế hoạch → hành động → quan sát → đánh giá → sửa, do các model trong cấu hình điều khiển."""
 
@@ -34,14 +43,14 @@ class AutonomousAgent:
     def run(self, request: str) -> AgentResult:
         planner = self.router.select("reasoning")
         trace = [f"request: {request}"]
-        plan = planner.generate([Message("user", f"Plan this task: {request}")])
+        plan = _safe_generate(planner, [Message("user", f"Plan this task: {request}")], trace)
         trace.append(f"plan: {plan}")
         observation = ""
         for attempt in range(self.max_iterations):
-            decision = _parse_json_object(planner.generate([Message("user", json.dumps({
+            decision = _parse_json_object(_safe_generate(planner, [Message("user", json.dumps({
                 "request": request, "plan": plan, "observation": observation, "attempt": attempt,
                 "instruction": "Return JSON with tool, arguments, and expected fields.",
-            }))]))
+            }))], trace))
             if not isinstance(decision.get("tool"), str):
                 observation = "Invalid decision: the model must return JSON with a tool name."
                 trace.append(f"error: {observation}")
@@ -49,10 +58,10 @@ class AutonomousAgent:
             result = self.tools.execute(ToolCall(decision["tool"], decision.get("arguments", {})))
             observation = result.output
             trace.append(f"tool[{result.name}]: {observation}")
-            verdict = planner.generate([Message("user", json.dumps({
+            verdict = _safe_generate(planner, [Message("user", json.dumps({
                 "request": request, "observation": observation,
                 "instruction": "Return JSON with complete boolean and answer or correction.",
-            }))])
+            }))], trace)
             evaluation = _parse_json_object(verdict)
             trace.append(f"evaluation: {verdict}")
             if evaluation.get("complete") and result.success and "answer" in evaluation:

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 
-BENCHMARK_SUITES = ("coding", "reasoning", "tool_use", "planning", "trading", "autonomous_task_completion")
+BENCHMARK_SUITES = ("coding", "reasoning", "tool_use", "planning", "trading", "vietnamese", "autonomous_task_completion")
 
 
 @dataclass(frozen=True)

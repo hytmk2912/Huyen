@@ -87,13 +87,15 @@ Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc
 **Quy tắc:** lộ trình luôn có đúng **5 mục đang làm**. Làm xong mục nào thì chuyển mục đó xuống "Đã hoàn thành" và bổ sung ngay một mục mới chưa làm, để lộ trình luôn đủ 5 mục. Với mục cần phần cứng hoặc khóa truy cập thật, phần code và test được làm trong repo; phần phải chạy thật được ghi vào "Việc cần chạy trên máy thật".
 
 ### Đang làm
-1. Mở rộng công cụ cho agent, cơ chế cách ly, bộ đánh giá và kiểm thử khả năng phục hồi.
-2. Bộ đánh giá riêng cho nhóm tiếng Việt và trading (bộ câu hỏi, cách chấm, báo cáo theo nhóm).
-3. Loại trùng gần đúng (near-dedup, MinHash) cho corpus để không đếm trùng token giữa các nguồn.
-4. Chọn và khai báo nguồn thật cho nhóm `trading` và `vietnamese` (giấy phép rõ ràng, nằm trong danh sách đã duyệt) để bắt đầu bám tỷ lệ.
-5. Giới hạn tài nguyên khi thu thập corpus: dừng an toàn khi vượt `max_local_storage_gb`, tôn trọng `max_bandwidth_mbps`, và chạy tiếp được sau khi dừng.
+1. Loại trùng gần đúng (near-dedup, MinHash) cho corpus để không đếm trùng token giữa các nguồn.
+2. Chọn và khai báo nguồn thật cho nhóm `trading` và `vietnamese` (giấy phép rõ ràng, nằm trong danh sách đã duyệt) để bắt đầu bám tỷ lệ.
+3. Giới hạn tài nguyên khi thu thập corpus: dừng an toàn khi vượt `max_local_storage_gb`, tôn trọng `max_bandwidth_mbps`, và chạy tiếp được sau khi dừng.
+4. Ngân sách cho agent: giới hạn thời gian mỗi lần gọi công cụ và tổng thời gian/token của một nhiệm vụ, dừng gọn khi vượt.
+5. Tự động đánh giá sau huấn luyện: chạy bộ đánh giá theo nhóm sau mỗi lần fine-tune và lưu báo cáo cạnh checkpoint.
 
 ### Đã hoàn thành
+- **Công cụ, cách ly và phục hồi cho agent**: công cụ `read_file`/`list_files`/`write_file` chỉ hoạt động trong thư mục làm việc (chặn `../`, giới hạn kích thước, ghi file phải bật riêng). Sandbox Python không truyền biến môi trường của máy (không lộ `HF_TOKEN`) và giới hạn bộ nhớ/CPU. Agent và công cụ không bị dừng khi model hoặc công cụ gặp lỗi bất ngờ.
+- **Bộ đánh giá tiếng Việt và trading**: `local_ai/evaluation/suites.py` chấm theo 3 cách (khớp đúng, chứa đáp án, so số có sai số; hiểu cả số kiểu Việt Nam như `1.000.000` hay `12,5`), báo cáo độ chính xác theo từng nhóm. Bộ câu hỏi mẫu `data/eval/vi_trading_eval.jsonl` (4 câu tiếng Việt, 4 câu trading). Chạy: `python -m local_ai.evaluation.suites --model <tên>`.
 - **Adapter nguồn corpus đã duyệt**: nguồn mới có thể lấy từ dataset Hugging Face (`download_method: "hf_dataset"`, `url: "hf://datasets/org/name"`, tải dạng streaming, chọn cột văn bản bằng `options.text_field`). `allowed_licenses` trong `corpus_10t.json` là danh sách giấy phép đã duyệt; nguồn có giấy phép khác bị từ chối. Chưa khai báo nguồn thật nào cho trading/tiếng Việt (đã đưa thành mục mới).
 - **Huấn luyện phân tán BF16** (phần code): cấu hình `distributed` với `ddp` hoặc `fsdp`, huấn luyện phân tán luôn dùng bfloat16, FP8 bị từ chối. Mẫu `configs/training/sft_fsdp.json` (full fine-tune 14B trên 8 GPU); `--print-launch` in lệnh `torchrun` để chạy. Thiếu GPU hoặc không đủ số GPU thì báo `skipped`.
 - **Cố định phiên bản và chạy thử model/tokenizer** (phần code): `python -m local_ai.models.smoke pin --model <tên>` ghi mã commit Hugging Face vào `revision`/`tokenizer_revision`; `python -m local_ai.models.smoke run --model <tên>` nạp model, sinh thử một câu và ghi báo cáo vào `.runs/smoke/`. Thiếu GPU/thư viện thì báo `skipped`.
@@ -103,4 +105,5 @@ Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc
 - Xuất GGUF f32 cho 3 model Huihui Qwen3 (cần llama.cpp và khoảng 110 GB ổ đĩa cho cả ba file).
 - Cố định phiên bản rồi chạy thử model chính trên GPU: `python -m local_ai.models.smoke pin --model primary`, sau đó `python -m local_ai.models.smoke run --model primary` (cần GPU đủ bộ nhớ cho model 27B BF16).
 - Chạy thử huấn luyện phân tán: `python -m local_ai.training.finetune --config configs/training/sft_fsdp.json --print-launch`, rồi chạy lệnh `torchrun` in ra trên máy có 8 GPU (cần chuẩn bị `sft.jsonl` trước).
+- Chạy bộ đánh giá tiếng Việt/trading trên GPU: `python -m local_ai.evaluation.suites --model primary --report .runs/eval/primary.json`.
 - Xác minh một shard thật: đặt `HF_TOKEN` và `HF_DATASET_REPO` trong biến môi trường, chạy `build-corpus` rồi `python -m local_ai.data verify-shard --config configs/datasets/corpus_10t.json`.

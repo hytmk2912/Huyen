@@ -24,6 +24,8 @@ class ToolRegistry:
             return ToolResult(call.name, str(tool(**call.arguments)), True)
         except (TypeError, ValueError) as error:
             return ToolResult(call.name, str(error), False)
+        except Exception as error:  # phục hồi: lỗi bất ngờ của công cụ không được làm dừng agent
+            return ToolResult(call.name, f"Tool error: {type(error).__name__}: {error}", False)
 
 
 _ALLOWED_OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
