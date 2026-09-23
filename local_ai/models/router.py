@@ -7,7 +7,7 @@ from local_ai.models.adapters import ModelConfig
 class ScriptedModelAdapter:
     def __init__(self, name: str, responses: list[str], capabilities: set[str] | None = None):
         self.name, self.responses = name, iter(responses)
-        self.capabilities = capabilities or {"chat", "planning", "tool_use", "reasoning"}
+        self.capabilities = capabilities or {"chat", "reasoning", "tool_calling"}
     def generate(self, messages: list[Message]) -> str: return next(self.responses)
 
 
