@@ -1,0 +1,21 @@
+{
+  "_comment": "Bước dữ liệu SFT từ Hugging Face. Điền hf_dataset.name (dạng org/name) và license lấy từ trang giới thiệu dataset. Dùng messages_field (cột dạng hội thoại) hoặc mapping.input + mapping.expected_output. HF_TOKEN chỉ đọc từ biến môi trường.",
+  "dataset_version": "hf-sft-v1",
+  "seed": 17,
+  "output_dir": "data/processed/hf_sft",
+  "formats": ["sft"],
+  "eval_sources": ["data/eval/seed_eval.jsonl"],
+  "hf_dataset": {
+    "name": "",
+    "subset": null,
+    "split": "train",
+    "revision": "main",
+    "streaming": false,
+    "limit": null,
+    "domain": "reasoning",
+    "task": "sft",
+    "license": {"name": "", "url": ""},
+    "messages_field": null,
+    "mapping": {"id": null, "input": "prompt", "expected_output": "response", "context": null, "reasoning": null}
+  }
+}

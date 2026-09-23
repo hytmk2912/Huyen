@@ -36,25 +36,25 @@ class ModelConfig:
 
 
 class HuggingFaceModelAdapter:
-    """Optional local Hugging Face runtime adapter; dependencies load only on use."""
+    """Adapter tùy chọn để chạy model Hugging Face cục bộ; thư viện chỉ được nạp khi dùng tới."""
     def __init__(self, config: ModelConfig): self.config, self.model, self.tokenizer = config, None, None
     @property
     def name(self) -> str: return self.config.name
     @property
     def capabilities(self) -> set[str]: return {capability.value for capability in self.config.capabilities}
     def load(self) -> None:
-        if self.config.dtype == "fp8": raise RuntimeError("FP8 is not implemented for this adapter; select a tested runtime first")
+        if self.config.dtype == "fp8": raise RuntimeError("Adapter này chưa hỗ trợ FP8; hãy chọn một runtime đã được thử nghiệm trước")
         try:
             import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
-        except ImportError as error: raise RuntimeError("Install torch and transformers to load a Hugging Face model") from error
+        except ImportError as error: raise RuntimeError("Hãy cài torch và transformers để nạp model Hugging Face") from error
         dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}.get(self.config.dtype)
-        if dtype is None: raise ValueError(f"Unsupported dtype: {self.config.dtype}")
+        if dtype is None: raise ValueError(f"Không hỗ trợ dtype: {self.config.dtype}")
         kwargs = {"revision": self.config.revision, "local_files_only": self.config.offline}
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.tokenizer_source or self.config.source, revision=self.config.tokenizer_revision or self.config.revision, local_files_only=self.config.offline)
         self.model = AutoModelForCausalLM.from_pretrained(self.config.source, torch_dtype=dtype, device_map=self.config.device_map, **kwargs)
     def tokenizer_metadata(self) -> dict[str, str]:
-        if self.tokenizer is None: raise RuntimeError("Load the model before requesting tokenizer metadata")
+        if self.tokenizer is None: raise RuntimeError("Hãy nạp model trước khi lấy thông tin tokenizer")
         source = self.config.tokenizer_source or self.config.source; revision = self.config.tokenizer_revision or self.config.revision
         payload = {"model_id": self.config.source, "model_revision": self.config.revision, "tokenizer_id": source, "tokenizer_revision": revision, "tokenizer_class": self.tokenizer.__class__.__name__}
         return {**payload, "configuration_hash": hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()}

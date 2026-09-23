@@ -18,6 +18,6 @@ class ModelRouter:
         for model in self._models.values():
             if capability in model.capabilities: return model
         if self._default and self._default in self._models: return self._models[self._default]
-        raise LookupError(f"No model configured for capability: {capability}")
+        raise LookupError(f"Không có model nào được cấu hình cho khả năng: {capability}")
     @classmethod
     def from_configs(cls, configs: list[ModelConfig], factory): return cls([factory(config) for config in configs])

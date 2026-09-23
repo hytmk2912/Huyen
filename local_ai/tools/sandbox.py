@@ -15,7 +15,7 @@ class SandboxResult:
 
 
 class PythonSandbox:
-    """Temporary-process executor; use container/OS isolation for untrusted code."""
+    """Chạy code trong tiến trình tạm; với code không tin cậy hãy cách ly bằng container/hệ điều hành."""
 
     def run(self, code: str, timeout_seconds: float = 5) -> SandboxResult:
         with tempfile.TemporaryDirectory(prefix="local-ai-") as directory:

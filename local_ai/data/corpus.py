@@ -32,7 +32,7 @@ class Source:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Source":
         missing = [key for key in cls.__dataclass_fields__ if data.get(key) in (None, "")]
-        if missing: raise ValueError(f"Source manifest missing required fields: {', '.join(missing)}")
+        if missing: raise ValueError(f"Manifest nguồn thiếu các trường bắt buộc: {', '.join(missing)}")
         return cls(**{key: data[key] for key in cls.__dataclass_fields__})
 
 
@@ -69,20 +69,20 @@ CREATE TABLE IF NOT EXISTS experiments(experiment_id TEXT PRIMARY KEY, detail TE
 
 
 class Tokenizer:
-    """Token accounting is always derived from this configured tokenizer, never character estimates."""
+    """Số token luôn được đếm bằng tokenizer đã cấu hình, không bao giờ ước lượng theo số ký tự."""
     def __init__(self, config: dict[str, Any]):
         self.name = config["name"]; self.kind = config["kind"]; self.revision = config.get("revision", "unspecified")
         if self.kind == "huggingface":
             try:
                 from transformers import AutoTokenizer
-            except ImportError as error: raise RuntimeError("Install transformers for the configured production tokenizer") from error
+            except ImportError as error: raise RuntimeError("Hãy cài transformers để dùng tokenizer production đã cấu hình") from error
             self.encoder = AutoTokenizer.from_pretrained(config["source"], revision=config.get("revision", "main"), local_files_only=config.get("offline", False))
         elif self.kind == "tiktoken":
             try:
                 import tiktoken
-            except ImportError as error: raise RuntimeError("Install tiktoken for this configured tokenizer") from error
+            except ImportError as error: raise RuntimeError("Hãy cài tiktoken để dùng tokenizer đã cấu hình này") from error
             self.encoder = tiktoken.get_encoding(config["encoding"])
-        elif self.kind != "utf8_bytes": raise ValueError("Supported tokenizer kinds: huggingface, tiktoken, utf8_bytes")
+        elif self.kind != "utf8_bytes": raise ValueError("Các loại tokenizer được hỗ trợ: huggingface, tiktoken, utf8_bytes")
     def encode(self, text: str) -> list[int]:
         if self.kind == "huggingface": return self.encoder.encode(text, add_special_tokens=False)
         return self.encoder.encode(text) if self.kind == "tiktoken" else list(text.encode("utf-8"))
@@ -94,13 +94,13 @@ class Tokenizer:
 class HuggingFaceUploader:
     def __init__(self, repo: str | None, enabled: bool, retries: int = 3):
         self.enabled, self.repo, self.retries = enabled, repo, retries
-        if enabled and not os.environ.get("HF_TOKEN"): raise RuntimeError("HF_TOKEN is required when Hugging Face upload is enabled")
-        if enabled and not repo: raise RuntimeError("HF_DATASET_REPO or upload.repo is required when upload is enabled")
+        if enabled and not os.environ.get("HF_TOKEN"): raise RuntimeError("Cần HF_TOKEN khi bật tải lên Hugging Face")
+        if enabled and not repo: raise RuntimeError("Cần HF_DATASET_REPO hoặc upload.repo khi bật tải lên")
     def upload_verify(self, local: Path, remote: str, checksum: str) -> str:
         if not self.enabled: return "LOCAL_VALIDATED"
         try:
             from huggingface_hub import HfApi
-        except ImportError as error: raise RuntimeError("Install huggingface_hub to enable uploads") from error
+        except ImportError as error: raise RuntimeError("Hãy cài huggingface_hub để bật tải lên") from error
         api = HfApi(token=os.environ["HF_TOKEN"])
         for attempt in range(self.retries):
             try:
@@ -110,7 +110,7 @@ class HuggingFaceUploader:
             except Exception:
                 if attempt + 1 == self.retries: raise
                 time.sleep(2 ** attempt)
-        raise RuntimeError("Remote verification failed")
+        raise RuntimeError("Xác minh trên máy chủ từ xa thất bại")
 
 
 def storage_paths(root: Path) -> dict[str, Path]:
@@ -133,7 +133,7 @@ def acquire(source: Source, paths: dict[str, Path], registry: Registry, dry_run:
     registry.source(source); target = paths["raw"] / f"{source.source_id}.txt"
     if target.exists(): return target
     if dry_run: return target
-    if source.download_method != "http": raise ValueError(f"Unsupported download method: {source.download_method}")
+    if source.download_method != "http": raise ValueError(f"Không hỗ trợ cách tải: {source.download_method}")
     with urllib.request.urlopen(source.url, timeout=60) as response, target.open("wb") as output: shutil.copyfileobj(response, output)
     return target
 

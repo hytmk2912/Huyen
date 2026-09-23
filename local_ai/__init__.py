@@ -1,1 +1,1 @@
-"""Extensible foundation for local autonomous AI experiments."""
+"""Nền tảng mở rộng được cho các thử nghiệm AI tự động chạy cục bộ."""

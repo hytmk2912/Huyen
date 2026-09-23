@@ -1,0 +1,5 @@
+{"uid": "r1", "prompt": "fixture prompt one", "response": "fixture answer one"}
+{"uid": "r2", "prompt": "fixture prompt two", "response": "fixture answer two"}
+{"uid": "r3", "prompt": "fixture prompt one", "response": "fixture answer one"}
+{"uid": "r4", "prompt": "", "response": "fixture answer without prompt"}
+{"uid": "r5", "messages": [{"role": "user", "content": "fixture chat prompt"}, {"role": "assistant", "content": "fixture chat answer"}]}

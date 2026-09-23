@@ -16,4 +16,4 @@ class TrainingPlan:
 
     def validate(self) -> None:
         if not self.dataset_manifest or not self.base_model or not self.output_dir:
-            raise ValueError("Training plan requires dataset, base model, and output directory")
+            raise ValueError("Kế hoạch huấn luyện cần có dataset, model gốc và thư mục đầu ra")

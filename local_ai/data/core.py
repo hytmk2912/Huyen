@@ -46,9 +46,9 @@ def load_records(path: str | Path) -> list[dict[str, Any]]:
         try:
             import pyarrow.parquet as pq  # type: ignore[import-not-found]
         except ImportError as error:
-            raise RuntimeError("Parquet support requires optional pyarrow; install it to load parquet files") from error
+            raise RuntimeError("Đọc file parquet cần thư viện tùy chọn pyarrow; hãy cài nó để nạp file parquet") from error
         return pq.read_table(path).to_pylist()
-    raise ValueError(f"Unsupported dataset format: {path.suffix}")
+    raise ValueError(f"Không hỗ trợ định dạng dữ liệu: {path.suffix}")
 
 
 def write_jsonl(path: str | Path, records: Iterable[dict[str, Any]]) -> None:
@@ -110,7 +110,7 @@ def statistics(records: list[dict[str, Any]], duplicate_count: int = 0, rejected
 
 def mix_records(records: list[dict[str, Any]], weights: dict[str, float], seed: int) -> list[dict[str, Any]]:
     if not weights or abs(sum(weights.values()) - 1.0) > 1e-9 or any(weight < 0 for weight in weights.values()):
-        raise ValueError("Mix weights must be non-negative and sum to 1.0")
+        raise ValueError("Trọng số trộn phải không âm và có tổng bằng 1.0")
     groups = {domain: [record for record in records if record["domain"] == domain] for domain in weights}
     total = min((len(groups[domain]) / weight for domain, weight in weights.items() if weight), default=0)
     rng = random.Random(seed); selected: list[dict[str, Any]] = []
@@ -125,7 +125,7 @@ def prepare_format(records: list[dict[str, Any]], kind: str) -> list[dict[str, A
     if kind == "tool_use": return [r for r in records if r.get("tools_used")]
     if kind == "trajectory": return [r for r in records if r.get("trajectory")]
     if kind == "reasoning": return [r for r in records if r.get("reasoning")]
-    raise ValueError(f"Unsupported training format: {kind}")
+    raise ValueError(f"Không hỗ trợ định dạng huấn luyện: {kind}")
 
 
 def verify_math(record: dict[str, Any]) -> dict[str, Any]:
@@ -168,7 +168,7 @@ def build_dataset(sources: list[str | Path], output_dir: str | Path, version: st
     valid, rejected = validate_records(raw); unique, duplicates = deduplicate(valid)
     eval_ids = {record["id"] for source in (eval_sources or []) for record in load_records(source)}
     overlap = sorted(record["id"] for record in unique if record["id"] in eval_ids)
-    if overlap: raise ValueError(f"Training/evaluation overlap: {', '.join(overlap)}")
+    if overlap: raise ValueError(f"Dữ liệu train trùng với dữ liệu eval (overlap): {', '.join(overlap)}")
     for record in unique: record["quality_score"] = quality_score(record)
     if config.get("mix_weights"): unique = mix_records(unique, config["mix_weights"], config.get("seed", 0))
     output = Path(output_dir); write_jsonl(output / "train.jsonl", unique); write_jsonl(output / "rejected.jsonl", rejected + duplicates)

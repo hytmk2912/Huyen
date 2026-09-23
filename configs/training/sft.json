@@ -1,0 +1,21 @@
+{
+  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể.",
+  "base_model": "smoke",
+  "models_config": "configs/models/platform.json",
+  "dataset_path": "data/processed/hf_sft/sft.jsonl",
+  "output_dir": ".runs/sft",
+  "method": "lora",
+  "lora": {"r": 16, "alpha": 32, "dropout": 0.05, "target_modules": "all-linear"},
+  "seed": 17,
+  "epochs": 1,
+  "learning_rate": 0.0002,
+  "per_device_batch_size": 1,
+  "gradient_accumulation_steps": 8,
+  "max_length": 2048,
+  "gradient_checkpointing": true,
+  "save_steps": 200,
+  "save_total_limit": 3,
+  "logging_steps": 10,
+  "resume": true,
+  "require_gpu": true
+}

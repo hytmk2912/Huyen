@@ -12,7 +12,7 @@ class ResearchTool(Protocol):
 
 
 class TradingAnalysisTool(Protocol):
-    """Analysis-only interface; execution/order placement is deliberately excluded."""
+    """Giao diện chỉ để phân tích; cố ý không có chức năng thực hiện/đặt lệnh."""
     def analyze(self, symbol: str, timeframe: str) -> str: ...
 
 

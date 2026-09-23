@@ -14,10 +14,17 @@ def main() -> None:
     for name in ("inspect", "validate", "deduplicate", "stats"):
         item = commands.add_parser(name); item.add_argument("path")
     build = commands.add_parser("build"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
-    generate = commands.add_parser("generate"); generate.add_argument("teacher_output", help="JSONL records already emitted by a TeacherModel"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
+    generate = commands.add_parser("generate"); generate.add_argument("teacher_output", help="Các bản ghi JSONL do TeacherModel đã sinh ra"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
+    hf = commands.add_parser("hf-sft", help="Tải dataset từ Hugging Face, kiểm tra rồi xuất sft.jsonl"); hf.add_argument("--config", required=True); hf.add_argument("--dataset", help="Ghi đè hf_dataset.name"); hf.add_argument("--output"); hf.add_argument("--limit", type=int)
     for name in ("sources", "acquire", "build-corpus", "resume", "progress", "tokenizer-info", "secret-scan"):
         item = commands.add_parser(name); item.add_argument("--config", required=name not in {"secret-scan"}); item.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    if args.command == "hf-sft":
+        from local_ai.data.hub import prepare_hf_sft
+        config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+        if args.dataset: config["hf_dataset"]["name"] = args.dataset
+        if args.limit: config["hf_dataset"]["limit"] = args.limit
+        print(json.dumps(prepare_hf_sft(config, args.output), indent=2)); return
     if args.command in {"sources", "acquire", "build-corpus", "resume", "progress", "tokenizer-info"}:
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
         sources = [Source.from_dict(item) for item in config.get("sources", [])]
@@ -34,7 +41,7 @@ def main() -> None:
         print(json.dumps({"results": results, "progress": registry.progress(config["target_tokens"])}, indent=2)); return
     if args.command == "secret-scan":
         findings = scan_secrets(Path(".")); print(json.dumps({"findings": findings}, indent=2));
-        if findings: raise SystemExit("Potential secret found. Rotate exposed credentials and remove them before proceeding.")
+        if findings: raise SystemExit("Phát hiện có thể lộ thông tin bí mật. Hãy đổi các khóa bị lộ và xóa chúng khỏi repo trước khi tiếp tục.")
         return
     if args.command == "generate":
         verifier = {"math": verify_math, "python": verify_python, "tool_call": verify_tool_call}[args.verifier]

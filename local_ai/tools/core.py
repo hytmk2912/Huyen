@@ -13,7 +13,7 @@ class ToolRegistry:
 
     def register(self, name: str, tool: Callable[..., str]) -> None:
         if name in self._tools:
-            raise ValueError(f"Tool already registered: {name}")
+            raise ValueError(f"Công cụ đã được đăng ký: {name}")
         self._tools[name] = tool
 
     def execute(self, call: ToolCall) -> ToolResult:
