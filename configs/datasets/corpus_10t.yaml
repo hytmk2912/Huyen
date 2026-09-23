@@ -3,9 +3,10 @@
   "target_tokens": 10000000000000,
   "storage_root": "storage",
   "tokenizer": {
-    "kind": "tiktoken",
-    "name": "cl100k_base",
-    "encoding": "cl100k_base"
+    "kind": "huggingface",
+    "name": "huihui-qwen3.8-27b-tokenizer",
+    "source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated",
+    "revision": "main"
   },
   "shard_size_gb": 5,
   "max_download_workers": 2,

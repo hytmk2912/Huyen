@@ -72,3 +72,12 @@ class FoundationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ModelConfigurationTests(unittest.TestCase):
+    def test_primary_model_configuration_and_capability_routing(self):
+        from local_ai.config.platform import load_model_configs
+        from local_ai.models.adapters import ModelCapability
+        configs = load_model_configs("configs/models/platform.json")
+        self.assertEqual(configs[0].source, "huihui-ai/Huihui-Qwen3.8-27B-abliterated")
+        self.assertIn(ModelCapability.CODING, configs[0].capabilities)
+        self.assertTrue(configs[0].configuration_hash)

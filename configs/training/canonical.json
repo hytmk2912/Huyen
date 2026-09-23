@@ -1,0 +1,1 @@
+{"method":"continued_pretraining","precision":"bf16","distributed":{"enabled":false},"checkpointing":{"resume":true},"fp8":{"enabled":false,"required_runtime":null}}

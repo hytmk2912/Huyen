@@ -72,13 +72,20 @@ class Tokenizer:
     """Token accounting is always derived from this configured tokenizer, never character estimates."""
     def __init__(self, config: dict[str, Any]):
         self.name = config["name"]; self.kind = config["kind"]; self.revision = config.get("revision", "unspecified")
-        if self.kind == "tiktoken":
+        if self.kind == "huggingface":
+            try:
+                from transformers import AutoTokenizer
+            except ImportError as error: raise RuntimeError("Install transformers for the configured production tokenizer") from error
+            self.encoder = AutoTokenizer.from_pretrained(config["source"], revision=config.get("revision", "main"), local_files_only=config.get("offline", False))
+        elif self.kind == "tiktoken":
             try:
                 import tiktoken
             except ImportError as error: raise RuntimeError("Install tiktoken for this configured tokenizer") from error
             self.encoder = tiktoken.get_encoding(config["encoding"])
-        elif self.kind != "utf8_bytes": raise ValueError("Supported tokenizer kinds: tiktoken, utf8_bytes")
-    def encode(self, text: str) -> list[int]: return self.encoder.encode(text) if self.kind == "tiktoken" else list(text.encode("utf-8"))
+        elif self.kind != "utf8_bytes": raise ValueError("Supported tokenizer kinds: huggingface, tiktoken, utf8_bytes")
+    def encode(self, text: str) -> list[int]:
+        if self.kind == "huggingface": return self.encoder.encode(text, add_special_tokens=False)
+        return self.encoder.encode(text) if self.kind == "tiktoken" else list(text.encode("utf-8"))
     def info(self) -> dict[str, str]:
         details = {"name": self.name, "kind": self.kind, "revision": self.revision}
         return {**details, "hash": hashlib.sha256(json.dumps(details, sort_keys=True).encode()).hexdigest()}

@@ -82,6 +82,8 @@ class CorpusTests(unittest.TestCase):
             self.assertEqual(progress["uploaded_tokens"], 0)
 
     def test_production_tokenizer_is_deterministic(self):
+        try: import tiktoken
+        except ImportError: self.skipTest("optional tiktoken smoke dependency is unavailable")
         from local_ai.data.corpus import Tokenizer
         tokenizer = Tokenizer({"kind": "tiktoken", "name": "cl100k_base", "encoding": "cl100k_base", "revision": "tiktoken-0.14.0"})
         self.assertEqual(tokenizer.encode("deterministic token test"), tokenizer.encode("deterministic token test"))
@@ -97,7 +99,7 @@ class UploadTests(unittest.TestCase):
             def file_exists(self, repo, path, repo_type): return path in remote
             def upload_file(self, **kwargs): calls["upload"] += 1; remote.add(kwargs["path_in_repo"])
         old_module, old_token = sys.modules.get("huggingface_hub"), __import__("os").environ.get("HF_TOKEN")
-        sys.modules["huggingface_hub"] = types.SimpleNamespace(HfApi=Api); __import__("os").environ["HF_TOKEN"] = "hf_test_token_value_that_is_not_real"
+        sys.modules["huggingface_hub"] = types.SimpleNamespace(HfApi=Api); __import__("os").environ["HF_TOKEN"] = "test-token"
         try:
             with tempfile.TemporaryDirectory() as directory:
                 shard = Path(directory) / "shard.jsonl"; shard.write_text("data")
@@ -118,7 +120,7 @@ class UploadTests(unittest.TestCase):
             def file_exists(self, *args, **kwargs): return False
             def upload_file(self, **kwargs): raise OSError("network down")
         old_module, old_token = sys.modules.get("huggingface_hub"), __import__("os").environ.get("HF_TOKEN")
-        sys.modules["huggingface_hub"] = types.SimpleNamespace(HfApi=Api); __import__("os").environ["HF_TOKEN"] = "hf_test_token_value_that_is_not_real"
+        sys.modules["huggingface_hub"] = types.SimpleNamespace(HfApi=Api); __import__("os").environ["HF_TOKEN"] = "test-token"
         try:
             with tempfile.TemporaryDirectory() as directory:
                 shard = Path(directory) / "shard.jsonl"; shard.write_text("data")
