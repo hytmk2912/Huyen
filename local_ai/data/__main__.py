@@ -15,9 +15,16 @@ def main() -> None:
         item = commands.add_parser(name); item.add_argument("path")
     build = commands.add_parser("build"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
     generate = commands.add_parser("generate"); generate.add_argument("teacher_output", help="JSONL records already emitted by a TeacherModel"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
+    hf = commands.add_parser("hf-sft", help="Download a Hugging Face dataset, validate it and export sft.jsonl"); hf.add_argument("--config", required=True); hf.add_argument("--dataset", help="Override hf_dataset.name"); hf.add_argument("--output"); hf.add_argument("--limit", type=int)
     for name in ("sources", "acquire", "build-corpus", "resume", "progress", "tokenizer-info", "secret-scan"):
         item = commands.add_parser(name); item.add_argument("--config", required=name not in {"secret-scan"}); item.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    if args.command == "hf-sft":
+        from local_ai.data.hub import prepare_hf_sft
+        config = json.loads(Path(args.config).read_text(encoding="utf-8"))
+        if args.dataset: config["hf_dataset"]["name"] = args.dataset
+        if args.limit: config["hf_dataset"]["limit"] = args.limit
+        print(json.dumps(prepare_hf_sft(config, args.output), indent=2)); return
     if args.command in {"sources", "acquire", "build-corpus", "resume", "progress", "tokenizer-info"}:
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
         sources = [Source.from_dict(item) for item in config.get("sources", [])]

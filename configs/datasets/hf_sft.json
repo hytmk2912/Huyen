@@ -1,0 +1,21 @@
+{
+  "_comment": "Hugging Face SFT dataset step. Set hf_dataset.name (org/name) and license from the dataset card. Use either messages_field (chat-format column) or mapping.input + mapping.expected_output. HF_TOKEN is read from the environment only.",
+  "dataset_version": "hf-sft-v1",
+  "seed": 17,
+  "output_dir": "data/processed/hf_sft",
+  "formats": ["sft"],
+  "eval_sources": ["data/eval/seed_eval.jsonl"],
+  "hf_dataset": {
+    "name": "",
+    "subset": null,
+    "split": "train",
+    "revision": "main",
+    "streaming": false,
+    "limit": null,
+    "domain": "reasoning",
+    "task": "sft",
+    "license": {"name": "", "url": ""},
+    "messages_field": null,
+    "mapping": {"id": null, "input": "prompt", "expected_output": "response", "context": null, "reasoning": null}
+  }
+}
