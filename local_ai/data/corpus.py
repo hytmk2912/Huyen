@@ -8,7 +8,9 @@ import shutil
 import sqlite3
 import time
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from dataclasses import MISSING as dataclass_missing
+from itertools import islice
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -38,6 +40,35 @@ def check_source_domains(sources: list["Source"], config: dict[str, Any]) -> Non
     if unknown: raise ValueError(f"Nguồn thuộc nhóm không có trong domain_mixture: {', '.join(unknown)}; các nhóm hợp lệ: {', '.join(mixture)}")
 
 
+def check_source_licenses(sources: list["Source"], config: dict[str, Any]) -> None:
+    """Khi cấu hình có allowed_licenses (danh sách giấy phép đã duyệt), từ chối nguồn có giấy phép khác."""
+    allowed = config.get("allowed_licenses")
+    if not allowed: return
+    rejected = sorted({f"{source.source_id} ({source.license})" for source in sources if source.license not in allowed})
+    if rejected: raise ValueError(f"Nguồn có giấy phép chưa được duyệt: {', '.join(rejected)}; giấy phép đã duyệt: {', '.join(allowed)}")
+
+
+def hf_dataset_id(url: str) -> str:
+    prefix = "hf://datasets/"
+    if not url.startswith(prefix) or url.count("/") < 4: raise ValueError(f"URL nguồn hf_dataset phải có dạng hf://datasets/org/name, nhận được: {url}")
+    return url[len(prefix):]
+
+
+def fetch_hf_text(source: "Source", target: Path, loader: Any = None) -> Path:
+    """Tải cột văn bản của một dataset Hugging Face (streaming) và ghi thành một file văn bản thô."""
+    if loader is None:
+        try:
+            from datasets import load_dataset
+        except ImportError as error: raise RuntimeError("Hãy cài gói tùy chọn `datasets` để tải nguồn hf_dataset") from error
+        loader = load_dataset
+    options = source.options; field_name = options.get("text_field", "text")
+    rows = loader(hf_dataset_id(source.url), options.get("subset"), split=options.get("split", "train"), revision=source.dataset_version, streaming=True, token=os.environ.get("HF_TOKEN") or None)
+    limit = options.get("max_rows")
+    texts = [str(row[field_name]).strip() for row in (islice(rows, limit) if limit else rows) if row.get(field_name)]
+    target.write_text("\n\n".join(texts), encoding="utf-8")
+    return target
+
+
 def utcnow() -> str: return datetime.now(timezone.utc).isoformat()
 def digest(path: Path) -> str:
     value = hashlib.sha256()
@@ -49,11 +80,14 @@ def digest(path: Path) -> str:
 @dataclass(frozen=True)
 class Source:
     source_id: str; dataset_name: str; dataset_version: str; url: str; license: str; license_url: str; domain: str; language: str; estimated_size: int; estimated_tokens: int; download_method: str; processing_recipe: str
+    # Tùy chọn cho download_method="hf_dataset": text_field, subset, split, max_rows.
+    options: dict[str, Any] = field(default_factory=dict)
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Source":
-        missing = [key for key in cls.__dataclass_fields__ if data.get(key) in (None, "")]
+        required = [key for key, spec in cls.__dataclass_fields__.items() if spec.default_factory is dataclass_missing]
+        missing = [key for key in required if data.get(key) in (None, "")]
         if missing: raise ValueError(f"Manifest nguồn thiếu các trường bắt buộc: {', '.join(missing)}")
-        return cls(**{key: data[key] for key in cls.__dataclass_fields__})
+        return cls(**{key: data[key] for key in cls.__dataclass_fields__ if key in data})
 
 
 class Registry:
@@ -151,10 +185,11 @@ def scan_secrets(root: Path) -> list[str]:
     return findings
 
 
-def acquire(source: Source, paths: dict[str, Path], registry: Registry, dry_run: bool) -> Path:
+def acquire(source: Source, paths: dict[str, Path], registry: Registry, dry_run: bool, loader: Any = None) -> Path:
     registry.source(source); target = paths["raw"] / f"{source.source_id}.txt"
     if target.exists(): return target
     if dry_run: return target
+    if source.download_method == "hf_dataset": return fetch_hf_text(source, target, loader)
     if source.download_method != "http": raise ValueError(f"Không hỗ trợ cách tải: {source.download_method}")
     with urllib.request.urlopen(source.url, timeout=60) as response, target.open("wb") as output: shutil.copyfileobj(response, output)
     return target
@@ -168,11 +203,11 @@ def clean_text(text: str) -> tuple[str | None, str | None]:
     return text, None
 
 
-def build_one(source: Source, config: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
-    check_source_domains([source], config)
+def build_one(source: Source, config: dict[str, Any], dry_run: bool = False, loader: Any = None) -> dict[str, Any]:
+    check_source_domains([source], config); check_source_licenses([source], config)
     root = Path(config["storage_root"]); paths = storage_paths(root); registry = Registry(root)
     tokenizer = Tokenizer(config["tokenizer"]); registry.db.execute("INSERT OR REPLACE INTO tokenizer_versions VALUES(?,?,?)", (tokenizer.name, tokenizer.kind, tokenizer.info()["hash"])); registry.db.execute("INSERT OR REPLACE INTO dataset_versions VALUES(?,?,?,?)", (config["dataset_version"], config["target_tokens"], "building", utcnow())); registry.db.commit()
-    raw = acquire(source, paths, registry, dry_run)
+    raw = acquire(source, paths, registry, dry_run, loader)
     if dry_run: return {"action": "would download/process/tokenize/upload", "source": source.source_id, "raw": str(raw)}
     text, reason = clean_text(raw.read_text(encoding="utf-8", errors="ignore"))
     if not text: (paths["rejected"] / f"{source.source_id}.reason").write_text(reason or "rejected"); return {"rejected": reason}

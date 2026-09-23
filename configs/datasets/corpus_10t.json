@@ -1,5 +1,5 @@
 {
-  "_comment": "Corpus 10T token. domain_mixture là tỷ lệ token theo nhóm: code 10%, trading 20%, reasoning (suy luận) 10%, vietnamese (tiếng Việt) 10%, general (dữ liệu tự do) 50%. Mỗi nguồn phải thuộc một nhóm có trong domain_mixture. Xem số token mục tiêu từng nhóm: python -m local_ai.data mixture --config configs/datasets/corpus_10t.json",
+  "_comment": "Corpus 10T token. domain_mixture là tỷ lệ token theo nhóm: code 10%, trading 20%, reasoning (suy luận) 10%, vietnamese (tiếng Việt) 10%, general (dữ liệu tự do) 50%. Mỗi nguồn phải thuộc một nhóm có trong domain_mixture. Xem số token mục tiêu từng nhóm: python -m local_ai.data mixture --config configs/datasets/corpus_10t.json allowed_licenses là danh sách giấy phép đã duyệt; nguồn có giấy phép khác bị từ chối. Nguồn từ dataset Hugging Face: download_method \"hf_dataset\", url \"hf://datasets/org/name\", dataset_version là revision, options {\"text_field\": \"text\", \"subset\": null, \"split\": \"train\", \"max_rows\": null}.",
   "dataset_version": "10t-v1",
   "target_tokens": 10000000000000,
   "storage_root": "storage",
@@ -31,6 +31,16 @@
     "vietnamese": 0.1,
     "general": 0.5
   },
+  "allowed_licenses": [
+    "Public Domain",
+    "CC0-1.0",
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "CC-BY-4.0",
+    "CC-BY-SA-4.0",
+    "ODC-By-1.0"
+  ],
   "sources": [
     {
       "source_id": "gutenberg-alice",

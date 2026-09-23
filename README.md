@@ -87,17 +87,20 @@ Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc
 **Quy tắc:** lộ trình luôn có đúng **5 mục đang làm**. Làm xong mục nào thì chuyển mục đó xuống "Đã hoàn thành" và bổ sung ngay một mục mới chưa làm, để lộ trình luôn đủ 5 mục. Với mục cần phần cứng hoặc khóa truy cập thật, phần code và test được làm trong repo; phần phải chạy thật được ghi vào "Việc cần chạy trên máy thật".
 
 ### Đang làm
-1. Thêm dần các adapter nguồn corpus đã được duyệt và có giấy phép, ưu tiên nhóm `trading` và `vietnamese` để bám đúng tỷ lệ.
-2. Triển khai huấn luyện phân tán BF16; FP8 vẫn chưa hỗ trợ cho đến khi đã chọn và thử nghiệm runtime cùng phần cứng.
-3. Mở rộng công cụ cho agent, cơ chế cách ly, bộ đánh giá và kiểm thử khả năng phục hồi.
-4. Bộ đánh giá riêng cho nhóm tiếng Việt và trading (bộ câu hỏi, cách chấm, báo cáo theo nhóm).
-5. Loại trùng gần đúng (near-dedup, MinHash) cho corpus để không đếm trùng token giữa các nguồn.
+1. Mở rộng công cụ cho agent, cơ chế cách ly, bộ đánh giá và kiểm thử khả năng phục hồi.
+2. Bộ đánh giá riêng cho nhóm tiếng Việt và trading (bộ câu hỏi, cách chấm, báo cáo theo nhóm).
+3. Loại trùng gần đúng (near-dedup, MinHash) cho corpus để không đếm trùng token giữa các nguồn.
+4. Chọn và khai báo nguồn thật cho nhóm `trading` và `vietnamese` (giấy phép rõ ràng, nằm trong danh sách đã duyệt) để bắt đầu bám tỷ lệ.
+5. Giới hạn tài nguyên khi thu thập corpus: dừng an toàn khi vượt `max_local_storage_gb`, tôn trọng `max_bandwidth_mbps`, và chạy tiếp được sau khi dừng.
 
 ### Đã hoàn thành
+- **Adapter nguồn corpus đã duyệt**: nguồn mới có thể lấy từ dataset Hugging Face (`download_method: "hf_dataset"`, `url: "hf://datasets/org/name"`, tải dạng streaming, chọn cột văn bản bằng `options.text_field`). `allowed_licenses` trong `corpus_10t.json` là danh sách giấy phép đã duyệt; nguồn có giấy phép khác bị từ chối. Chưa khai báo nguồn thật nào cho trading/tiếng Việt (đã đưa thành mục mới).
+- **Huấn luyện phân tán BF16** (phần code): cấu hình `distributed` với `ddp` hoặc `fsdp`, huấn luyện phân tán luôn dùng bfloat16, FP8 bị từ chối. Mẫu `configs/training/sft_fsdp.json` (full fine-tune 14B trên 8 GPU); `--print-launch` in lệnh `torchrun` để chạy. Thiếu GPU hoặc không đủ số GPU thì báo `skipped`.
 - **Cố định phiên bản và chạy thử model/tokenizer** (phần code): `python -m local_ai.models.smoke pin --model <tên>` ghi mã commit Hugging Face vào `revision`/`tokenizer_revision`; `python -m local_ai.models.smoke run --model <tên>` nạp model, sinh thử một câu và ghi báo cáo vào `.runs/smoke/`. Thiếu GPU/thư viện thì báo `skipped`.
 - **Xác minh một shard trên máy chủ có xác thực** (phần code): `python -m local_ai.data verify-shard --config <file>` tải lên một shard `VALIDATED`, kiểm tra checksum, xác minh trên Hugging Face rồi đánh dấu `COMPLETE`. Thiếu `HF_TOKEN`/`HF_DATASET_REPO` thì báo `skipped`.
 
 ### Việc cần chạy trên máy thật
 - Xuất GGUF f32 cho 3 model Huihui Qwen3 (cần llama.cpp và khoảng 110 GB ổ đĩa cho cả ba file).
 - Cố định phiên bản rồi chạy thử model chính trên GPU: `python -m local_ai.models.smoke pin --model primary`, sau đó `python -m local_ai.models.smoke run --model primary` (cần GPU đủ bộ nhớ cho model 27B BF16).
+- Chạy thử huấn luyện phân tán: `python -m local_ai.training.finetune --config configs/training/sft_fsdp.json --print-launch`, rồi chạy lệnh `torchrun` in ra trên máy có 8 GPU (cần chuẩn bị `sft.jsonl` trước).
 - Xác minh một shard thật: đặt `HF_TOKEN` và `HF_DATASET_REPO` trong biến môi trường, chạy `build-corpus` rồi `python -m local_ai.data verify-shard --config configs/datasets/corpus_10t.json`.

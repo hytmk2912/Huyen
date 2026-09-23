@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from local_ai.data.core import build_dataset, deduplicate, load_records, statistics, validate_records, verify_math, verify_python, verify_tool_call, write_jsonl
-from local_ai.data.corpus import Registry, Source, Tokenizer, build_one, check_source_domains, domain_mixture, domain_targets, scan_secrets, verify_one_shard
+from local_ai.data.corpus import Registry, Source, Tokenizer, build_one, check_source_domains, check_source_licenses, domain_mixture, domain_targets, scan_secrets, verify_one_shard
 
 
 def main() -> None:
@@ -32,7 +32,7 @@ def main() -> None:
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
         sources = [Source.from_dict(item) for item in config.get("sources", [])]
         if args.command == "mixture": print(json.dumps({"target_tokens": config["target_tokens"], "domain_mixture": domain_mixture(config), "domain_targets": domain_targets(config)}, indent=2)); return
-        check_source_domains(sources, config)
+        check_source_domains(sources, config); check_source_licenses(sources, config)
         if args.command == "sources": print(json.dumps([source.__dict__ for source in sources], indent=2)); return
         if args.command == "tokenizer-info": print(json.dumps(Tokenizer(config["tokenizer"]).info(), indent=2)); return
         registry = Registry(Path(config["storage_root"]))

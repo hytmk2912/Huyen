@@ -1,0 +1,32 @@
+{
+  "_comment": "Mẫu huấn luyện phân tán BF16 bằng FSDP trên 8 GPU (full fine-tune model 14B). Chạy: python -m local_ai.training.finetune --config configs/training/sft_fsdp.json --print-launch rồi chạy lệnh torchrun in ra.",
+  "base_model": "huihui-qwen3-14b",
+  "models_config": "configs/models/platform.json",
+  "dataset_path": "data/processed/hf_sft/sft.jsonl",
+  "output_dir": ".runs/sft-fsdp",
+  "method": "full",
+  "lora": {
+    "r": 16,
+    "alpha": 32,
+    "dropout": 0.05,
+    "target_modules": "all-linear"
+  },
+  "seed": 17,
+  "epochs": 1,
+  "learning_rate": 1e-05,
+  "per_device_batch_size": 1,
+  "gradient_accumulation_steps": 8,
+  "max_length": 2048,
+  "gradient_checkpointing": true,
+  "save_steps": 200,
+  "save_total_limit": 3,
+  "logging_steps": 10,
+  "resume": true,
+  "require_gpu": true,
+  "train_dtype": "bfloat16",
+  "distributed": {
+    "strategy": "fsdp",
+    "num_processes": 8,
+    "num_nodes": 1
+  }
+}
