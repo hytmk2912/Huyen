@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from local_ai.data.core import build_dataset, deduplicate, load_records, statistics, validate_records, verify_math, verify_python, verify_tool_call, write_jsonl
-from local_ai.data.corpus import Registry, Source, Tokenizer, build_one, check_source_domains, domain_mixture, domain_targets, scan_secrets
+from local_ai.data.corpus import Registry, Source, Tokenizer, build_one, check_source_domains, domain_mixture, domain_targets, scan_secrets, verify_one_shard
 
 
 def main() -> None:
@@ -16,9 +16,12 @@ def main() -> None:
     build = commands.add_parser("build"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
     generate = commands.add_parser("generate"); generate.add_argument("teacher_output", help="Các bản ghi JSONL do TeacherModel đã sinh ra"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
     hf = commands.add_parser("hf-sft", help="Tải dataset từ Hugging Face, kiểm tra rồi xuất sft.jsonl"); hf.add_argument("--config", required=True); hf.add_argument("--dataset", help="Ghi đè hf_dataset.name"); hf.add_argument("--output"); hf.add_argument("--limit", type=int)
+    verify = commands.add_parser("verify-shard", help="Tải lên và xác minh một shard trên Hugging Face (cần HF_TOKEN)"); verify.add_argument("--config", required=True); verify.add_argument("--shard", help="Mã shard cụ thể; mặc định lấy shard VALIDATED cũ nhất")
     for name in ("sources", "mixture", "acquire", "build-corpus", "resume", "progress", "tokenizer-info", "secret-scan"):
         item = commands.add_parser(name); item.add_argument("--config", required=name not in {"secret-scan"}); item.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    if args.command == "verify-shard":
+        print(json.dumps(verify_one_shard(json.loads(Path(args.config).read_text(encoding="utf-8")), args.shard), indent=2, ensure_ascii=False)); return
     if args.command == "hf-sft":
         from local_ai.data.hub import prepare_hf_sft
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))

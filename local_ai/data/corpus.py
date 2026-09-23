@@ -193,3 +193,23 @@ def build_one(source: Source, config: dict[str, Any], dry_run: bool = False) -> 
     if complete == "COMPLETE" and config.get("retention", {}).get("raw_retention") == "delete": raw.unlink(missing_ok=True)
     manifest = {**payload, "checksum": checksum, "byte_size": local.stat().st_size, "upload_status": status, "hf_path": remote}; (paths["manifests"] / f"{shard_id}.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
     return {key: value for key, value in manifest.items() if key != "tokens"}
+
+
+def verify_one_shard(config: dict[str, Any], shard_id: str | None = None) -> dict[str, Any]:
+    """Tải lên và xác minh đúng một shard đã VALIDATED bằng HF_TOKEN; thiếu token/repo thì trả về "skipped"."""
+    repo = config.get("upload", {}).get("repo") or os.getenv("HF_DATASET_REPO")
+    missing = [name for name, value in (("HF_TOKEN", os.environ.get("HF_TOKEN")), ("HF_DATASET_REPO", repo)) if not value]
+    if missing: return {"status": "skipped", "missing": missing}
+    registry = Registry(Path(config["storage_root"]))
+    query = "SELECT shard_id, path, checksum, hf_path FROM shards WHERE status='VALIDATED'" + (" AND shard_id=?" if shard_id else "") + " ORDER BY created_at LIMIT 1"
+    row = registry.db.execute(query, (shard_id,) if shard_id else ()).fetchone()
+    if row is None: return {"status": "no_shard", "detail": "Không có shard VALIDATED nào để xác minh; hãy chạy build-corpus trước"}
+    shard, local, checksum, remote = row; local = Path(local)
+    if not local.exists() or digest(local) != checksum: raise ValueError(f"Shard {shard} bị thiếu hoặc sai checksum ở {local}")
+    registry.status(shard, "UPLOADING", remote)
+    try:
+        status = HuggingFaceUploader(repo, True, config.get("upload", {}).get("retries", 3)).upload_verify(local, remote, checksum)
+    except Exception:
+        registry.status(shard, "FAILED", remote); raise
+    registry.status(shard, "REMOTE_VERIFIED", remote); registry.status(shard, "COMPLETE", remote)
+    return {"status": status, "shard_id": shard, "repo": repo, "hf_path": remote, "checksum": checksum}
