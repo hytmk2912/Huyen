@@ -1,5 +1,5 @@
 {
-  "_comment": "Model registry. The first entry is the primary model. Add a model by appending an object with at least name, source (Hugging Face repo id), dtype and capabilities; names must be unique. Optional: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization.",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype và capabilities; name không được trùng. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization.",
   "models": [
     {
       "name": "primary",

@@ -1,5 +1,5 @@
 {
-  "_comment": "SFT harness config. base_model is a model name from models_config. method: full | lora. resume: true (latest checkpoint-N in output_dir), false, or an explicit checkpoint path.",
+  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể.",
   "base_model": "smoke",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",

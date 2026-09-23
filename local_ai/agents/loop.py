@@ -17,7 +17,7 @@ class AgentResult:
 
 
 def _parse_json_object(text: str) -> dict[str, Any]:
-    """Real models often return malformed JSON; treat that as an empty reply instead of crashing."""
+    """Model thật hay trả về JSON lỗi; coi đó là câu trả lời rỗng thay vì làm chương trình dừng."""
     try:
         value = json.loads(text)
     except json.JSONDecodeError:
@@ -26,7 +26,7 @@ def _parse_json_object(text: str) -> dict[str, Any]:
 
 
 class AutonomousAgent:
-    """Bounded plan-act-observe-evaluate-correct loop driven by configured models."""
+    """Vòng lặp có giới hạn: lập kế hoạch → hành động → quan sát → đánh giá → sửa, do các model trong cấu hình điều khiển."""
 
     def __init__(self, router: ModelRouter, tools: ToolRegistry, max_iterations: int = 3):
         self.router, self.tools, self.max_iterations = router, tools, max_iterations
@@ -58,4 +58,4 @@ class AutonomousAgent:
             if evaluation.get("complete") and result.success and "answer" in evaluation:
                 return AgentResult(str(evaluation["answer"]), tuple(trace), True)
             plan = evaluation.get("correction", plan)
-        return AgentResult("Unable to complete task within the configured retry limit.", tuple(trace), False)
+        return AgentResult("Không hoàn thành được nhiệm vụ trong số lần thử lại cho phép.", tuple(trace), False)

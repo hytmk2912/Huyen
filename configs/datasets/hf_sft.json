@@ -1,5 +1,5 @@
 {
-  "_comment": "Hugging Face SFT dataset step. Set hf_dataset.name (org/name) and license from the dataset card. Use either messages_field (chat-format column) or mapping.input + mapping.expected_output. HF_TOKEN is read from the environment only.",
+  "_comment": "Bước dữ liệu SFT từ Hugging Face. Điền hf_dataset.name (dạng org/name) và license lấy từ trang giới thiệu dataset. Dùng messages_field (cột dạng hội thoại) hoặc mapping.input + mapping.expected_output. HF_TOKEN chỉ đọc từ biến môi trường.",
   "dataset_version": "hf-sft-v1",
   "seed": 17,
   "output_dir": "data/processed/hf_sft",

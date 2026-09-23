@@ -1,4 +1,4 @@
-"""Hugging Face dataset step: download rows, map them onto the dataset schema, then validate and export SFT data."""
+"""Bước dữ liệu Hugging Face: tải các dòng, chuyển sang schema dữ liệu của repo, rồi kiểm tra và xuất dữ liệu SFT."""
 from __future__ import annotations
 
 import os
@@ -13,24 +13,24 @@ RowLoader = Callable[..., Iterable[dict[str, Any]]]
 
 
 def hf_token() -> str | None:
-    """HF_TOKEN is read only from the environment; public datasets work without it."""
+    """HF_TOKEN chỉ được đọc từ biến môi trường; dataset công khai thì không cần."""
     return os.environ.get("HF_TOKEN") or None
 
 
 def validate_spec(spec: dict[str, Any]) -> None:
-    if not spec.get("name"): raise ValueError("hf_dataset.name must name a Hugging Face dataset (org/name)")
-    if not spec.get("license", {}).get("name"): raise ValueError("hf_dataset.license.name is required; check the dataset card before use")
+    if not spec.get("name"): raise ValueError("hf_dataset.name phải là tên một dataset trên Hugging Face (dạng org/name)")
+    if not spec.get("license", {}).get("name"): raise ValueError("Bắt buộc có hf_dataset.license.name; hãy xem trang giới thiệu dataset (dataset card) trước khi dùng")
     mapping = spec.get("mapping", {})
     if not spec.get("messages_field") and not (mapping.get("input") and mapping.get("expected_output")):
-        raise ValueError("Set hf_dataset.messages_field or hf_dataset.mapping.input and mapping.expected_output")
+        raise ValueError("Hãy đặt hf_dataset.messages_field, hoặc hf_dataset.mapping.input và mapping.expected_output")
 
 
 def load_hf_rows(spec: dict[str, Any], loader: RowLoader | None = None) -> list[dict[str, Any]]:
-    """Load rows via `datasets.load_dataset` (or an injected loader with the same keyword interface)."""
+    """Tải các dòng bằng `datasets.load_dataset` (hoặc một hàm tải được truyền vào, có cùng tham số)."""
     if loader is None:
         try:
             from datasets import load_dataset
-        except ImportError as error: raise RuntimeError("Install the optional `datasets` package to download Hugging Face datasets") from error
+        except ImportError as error: raise RuntimeError("Hãy cài gói tùy chọn `datasets` để tải dataset từ Hugging Face") from error
         loader = load_dataset
     rows = loader(spec["name"], spec.get("subset"), split=spec.get("split", "train"), revision=spec.get("revision", "main"), streaming=spec.get("streaming", False), token=hf_token())
     limit = spec.get("limit")
@@ -45,7 +45,7 @@ def _from_messages(messages: Any) -> tuple[str | None, str | None]:
 
 
 def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> list[dict[str, Any]]:
-    """Map arbitrary HF columns onto DatasetExample records; invalid rows are left for validation to reject."""
+    """Chuyển các cột HF bất kỳ thành bản ghi DatasetExample; dòng không hợp lệ để bước kiểm tra loại bỏ."""
     validate_spec(spec)
     mapping = spec.get("mapping", {}); slug = re.sub(r"[^a-z0-9]+", "-", spec["name"].lower()).strip("-")
     source = {"name": spec["name"], "url": f"https://huggingface.co/datasets/{spec['name']}", "revision": spec.get("revision", "main")}
@@ -62,7 +62,7 @@ def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> 
 
 
 def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None, loader: RowLoader | None = None) -> dict[str, Any]:
-    """Download -> map -> validate/deduplicate/export via build_dataset. Writes raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json."""
+    """Tải -> chuyển đổi -> kiểm tra/loại trùng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json."""
     spec = config["hf_dataset"]; validate_spec(spec)
     version = config.get("dataset_version", "hf-v1"); output = Path(output_dir or config.get("output_dir", "data/processed/hf_sft"))
     raw = output / "raw.jsonl"; write_jsonl(raw, map_rows(load_hf_rows(spec, loader), spec, version))

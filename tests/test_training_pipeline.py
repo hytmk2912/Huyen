@@ -40,7 +40,7 @@ class MultiModelConfigTests(unittest.TestCase):
             path = Path(directory) / "models.json"
             model = {"name": "same", "source": "org/model", "capabilities": ["chat"]}
             path.write_text(json.dumps({"models": [model, model]}))
-            with self.assertRaisesRegex(ValueError, "Duplicate"): load_model_configs(path)
+            with self.assertRaisesRegex(ValueError, "trùng"): load_model_configs(path)
 
 
 class HuggingFaceDatasetStepTests(unittest.TestCase):

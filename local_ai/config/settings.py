@@ -19,14 +19,14 @@ def load_model_configs(path: str | Path) -> list[ModelConfig]:
     configs = [ModelConfig.from_dict(item) for item in raw["models"]]
     names = [config.name for config in configs]
     duplicates = sorted({name for name in names if names.count(name) > 1})
-    if duplicates: raise ValueError(f"Duplicate model names in {path}: {', '.join(duplicates)}")
+    if duplicates: raise ValueError(f"Tên model bị trùng trong {path}: {', '.join(duplicates)}")
     return configs
 
 
 def find_model_config(path: str | Path, name: str) -> ModelConfig:
     for config in load_model_configs(path):
         if config.name == name: return config
-    raise LookupError(f"Model '{name}' is not configured in {path}")
+    raise LookupError(f"Model '{name}' chưa được khai báo trong {path}")
 
 
 def load_settings(path: str | Path) -> RunSettings:

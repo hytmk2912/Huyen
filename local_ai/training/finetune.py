@@ -1,7 +1,7 @@
-"""Configuration-driven SFT harness (full or LoRA) on transformers + trl + peft.
+"""Khung huấn luyện SFT (full hoặc LoRA) chạy theo cấu hình, dùng transformers + trl + peft.
 
-This is a scaffold: heavy dependencies import only inside `train`, and the run is skipped
-(not failed) when a GPU or an optional library is missing. Nothing trains by default.
+Đây mới là khung: các thư viện nặng chỉ được import bên trong `train`, và lượt chạy sẽ bị
+bỏ qua (không báo lỗi) khi thiếu GPU hoặc thư viện tùy chọn. Mặc định không huấn luyện gì.
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class FinetuneConfig:
         return cls(**{**value, "lora": LoraSettings(**value.get("lora", {}))})
 
     def validate(self) -> None:
-        if self.method not in ("full", "lora"): raise ValueError(f"Unsupported finetune method: {self.method}; use 'full' or 'lora'")
+        if self.method not in ("full", "lora"): raise ValueError(f"Không hỗ trợ method finetune: {self.method}; hãy dùng 'full' hoặc 'lora'")
         TrainingPlan("sft", self.dataset_path, self.base_model, self.seed, self.output_dir).validate()
 
 
@@ -71,7 +71,7 @@ def resolve_base_model(config: FinetuneConfig) -> ModelConfig:
 
 
 def missing_requirements(config: FinetuneConfig) -> list[str]:
-    """Names of absent optional libraries, plus 'cuda' when a GPU is required but unavailable."""
+    """Tên các thư viện tùy chọn còn thiếu, thêm 'cuda' nếu cần GPU mà không có."""
     packages = ["torch", "transformers", "trl", "datasets"] + (["peft"] if config.method == "lora" else [])
     missing = [name for name in packages if importlib.util.find_spec(name) is None]
     if config.require_gpu and "torch" not in missing:
@@ -102,8 +102,8 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     config.validate(); model_config = resolve_base_model(config)
     missing = missing_requirements(config)
     if missing: return {"status": "skipped", "missing": missing}
-    if model_config.dtype == "fp8": raise RuntimeError("FP8 training is unsupported until a runtime and hardware are tested")
-    if not Path(config.dataset_path).exists(): raise FileNotFoundError(f"SFT dataset not found: {config.dataset_path}; run `python -m local_ai.data hf-sft` first")
+    if model_config.dtype == "fp8": raise RuntimeError("Chưa hỗ trợ huấn luyện FP8 cho đến khi đã thử nghiệm runtime và phần cứng")
+    if not Path(config.dataset_path).exists(): raise FileNotFoundError(f"Không tìm thấy dataset SFT: {config.dataset_path}; hãy chạy `python -m local_ai.data hf-sft` trước")
     import torch
     from datasets import load_dataset
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -111,7 +111,7 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
 
     seed_everything(config.seed)
     dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}.get(model_config.dtype)
-    if dtype is None: raise ValueError(f"Unsupported dtype: {model_config.dtype}")
+    if dtype is None: raise ValueError(f"Không hỗ trợ dtype: {model_config.dtype}")
     tokenizer = AutoTokenizer.from_pretrained(model_config.tokenizer_source or model_config.source, revision=model_config.tokenizer_revision or model_config.revision, local_files_only=model_config.offline)
     if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(model_config.source, revision=model_config.revision, torch_dtype=dtype, device_map=model_config.device_map, local_files_only=model_config.offline)
@@ -133,8 +133,8 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m local_ai.training.finetune")
-    parser.add_argument("--config", required=True); parser.add_argument("--method", choices=("full", "lora")); parser.add_argument("--base-model"); parser.add_argument("--dataset-path"); parser.add_argument("--output-dir")
-    parser.add_argument("--no-resume", action="store_true"); parser.add_argument("--dry-run", action="store_true", help="Print the resolved plan without importing training libraries")
+    parser.add_argument("--config", required=True, help="File cấu hình huấn luyện (JSON)"); parser.add_argument("--method", choices=("full", "lora"), help="Ghi đè cách huấn luyện: full hoặc lora"); parser.add_argument("--base-model", help="Ghi đè tên model gốc trong danh sách model"); parser.add_argument("--dataset-path", help="Ghi đè đường dẫn sft.jsonl"); parser.add_argument("--output-dir", help="Ghi đè thư mục đầu ra")
+    parser.add_argument("--no-resume", action="store_true", help="Không chạy tiếp từ checkpoint cũ, bắt đầu lại từ đầu"); parser.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch đã phân giải, không import thư viện huấn luyện")
     args = parser.parse_args(argv)
     config = load_finetune_config(args.config, method=args.method, base_model=args.base_model, dataset_path=args.dataset_path, output_dir=args.output_dir, resume=False if args.no_resume else None)
     print(json.dumps(describe(config) if args.dry_run else train(config), indent=2, default=str))

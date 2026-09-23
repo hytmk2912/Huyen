@@ -1,24 +1,24 @@
-# Local Autonomous AI Architecture
+# Kiến trúc nền tảng AI tự động chạy cục bộ
 
-## Scope
-This repository provides orchestration infrastructure, not a trained model or live market/web integration. Model weights, retrieval indexes, datasets, and credentials remain external and are selected through configuration.
+## Phạm vi
+Repo này cung cấp hạ tầng điều phối, không phải một model đã huấn luyện, cũng không kết nối trực tiếp với thị trường hay web. Trọng số model, chỉ mục tìm kiếm, dataset và khóa truy cập đều nằm bên ngoài và được chọn qua cấu hình.
 
-## Layers
+## Các tầng
 
-1. **Configuration and reproducibility**: JSON configurations are loaded into immutable run settings. `seed_everything` records and seeds Python randomness; `RunTracker` writes config, metrics, events, and checkpoint references to a run directory.
-2. **Model access**: `ModelAdapter` is the backend-neutral protocol. `ScriptedModelAdapter` is a deterministic local development adapter. Add adapters for local inference engines without changing the agent.
-3. **Routing**: `ModelRouter` chooses a configured model by capability, with an optional default fallback.
-4. **Agent loop**: `AutonomousAgent` runs request → plan → tool selection → execution → observation → evaluation → correction/retry → final response. Planning and evaluation are intentionally structured interfaces so a model or deterministic policy can be substituted.
-5. **Tools and sandboxing**: `ToolRegistry` exposes declared tools. `PythonSandbox` runs supplied code in a temporary working directory, with timeout and output capture. It is an isolation boundary interface—not a security guarantee against hostile code; production deployments must use OS/container isolation.
-6. **Context and knowledge**: `MemoryStore` keeps bounded conversation records. `Retriever` is a protocol for external/RAG knowledge, keeping frequently changing facts out of weights.
-7. **Data, training, and evaluation**: Dataset manifests capture version/source/split metadata. Training plans support future SFT, preference optimization, and RFT runs. `local_ai.data.hub` maps Hugging Face dataset rows onto the dataset schema before the standard build; `local_ai.training.finetune` is an optional SFT harness (full or LoRA) that skips when GPU or libraries are absent. Benchmarks use a common evaluator and distinct capability suites.
+1. **Cấu hình và tái lập**: file cấu hình JSON được nạp thành thiết lập chạy bất biến. `seed_everything` ghi lại và cố định seed ngẫu nhiên của Python; `RunTracker` ghi cấu hình, chỉ số, sự kiện và tham chiếu checkpoint vào thư mục của lượt chạy.
+2. **Truy cập model**: `ModelAdapter` là giao thức không phụ thuộc backend. `ScriptedModelAdapter` là adapter tất định dùng khi phát triển cục bộ. Có thể thêm adapter cho các engine suy luận cục bộ mà không cần sửa agent.
+3. **Định tuyến**: `ModelRouter` chọn model đã cấu hình theo khả năng, có thể đặt model mặc định dự phòng.
+4. **Vòng lặp agent**: `AutonomousAgent` chạy yêu cầu → lập kế hoạch → chọn công cụ → thực thi → quan sát → đánh giá → sửa/thử lại → câu trả lời cuối. Bước lập kế hoạch và đánh giá được thiết kế thành giao diện có cấu trúc để có thể thay bằng model hoặc quy tắc tất định.
+5. **Công cụ và sandbox**: `ToolRegistry` cung cấp các công cụ đã khai báo. `PythonSandbox` chạy đoạn code được đưa vào trong một thư mục làm việc tạm, có giới hạn thời gian và thu lại đầu ra. Đây chỉ là giao diện ranh giới cách ly, không phải bảo đảm an toàn trước code độc hại; khi chạy thật phải cách ly bằng hệ điều hành/container.
+6. **Ngữ cảnh và tri thức**: `MemoryStore` lưu một số lượng giới hạn tin nhắn hội thoại. `Retriever` là giao thức cho nguồn tri thức bên ngoài/RAG, để các thông tin hay thay đổi không phải nằm trong trọng số.
+7. **Dữ liệu, huấn luyện và đánh giá**: manifest dataset ghi phiên bản, nguồn và cách chia tập. Kế hoạch huấn luyện hỗ trợ các lượt SFT, tối ưu theo sở thích (preference optimization) và RFT trong tương lai. `local_ai.data.hub` chuyển các dòng dataset Hugging Face sang schema của repo trước bước build chuẩn; `local_ai.training.finetune` là khung SFT tùy chọn (full hoặc LoRA), tự bỏ qua khi thiếu GPU hoặc thư viện. Bộ benchmark dùng chung một hàm đánh giá và chia theo từng nhóm khả năng.
 
-## Extension points
-- Implement `ModelAdapter.generate` for a local backend (for example a local server or in-process runtime).
-- Register capability-scoped models in `models` configuration.
-- Register audited tools via `ToolRegistry`; future interfaces include coding, reasoning, research, trading, retrieval, terminal execution, and file operations.
-- Implement `Retriever.search` for a vector index or live data provider.
-- `local_ai.training.finetune` is the first concrete trainer behind `TrainingPlan`; preference optimization and RFT remain future work.
+## Điểm mở rộng
+- Cài đặt `ModelAdapter.generate` cho một backend cục bộ (ví dụ máy chủ cục bộ hoặc runtime chạy trong tiến trình).
+- Khai báo model kèm khả năng trong phần `models` của cấu hình.
+- Đăng ký các công cụ đã được kiểm duyệt qua `ToolRegistry`; các giao diện dự kiến gồm lập trình, suy luận, nghiên cứu, giao dịch, truy xuất, chạy lệnh terminal và thao tác file.
+- Cài đặt `Retriever.search` cho chỉ mục vector hoặc nguồn dữ liệu trực tiếp.
+- `local_ai.training.finetune` là bộ huấn luyện cụ thể đầu tiên đứng sau `TrainingPlan`; preference optimization và RFT vẫn là việc của tương lai.
 
-## Safety and limits
-Tool access is explicit, bounded by iteration and timeout limits, and all tool results are observed before the next decision. The included demo uses only a deterministic model and calculator tool. Trading adapters are analysis interfaces only and do not place orders.
+## An toàn và giới hạn
+Quyền dùng công cụ được khai báo rõ ràng, bị giới hạn bởi số vòng lặp và thời gian chờ, và mọi kết quả công cụ đều được quan sát trước quyết định tiếp theo. Bản demo đi kèm chỉ dùng một model tất định và công cụ máy tính. Adapter giao dịch chỉ là giao diện phân tích và không đặt lệnh.
