@@ -17,9 +17,19 @@ Viết lại bằng thư viện chuẩn của Python, không cần FastAPI. Hàn
 
 Test: `tests/test_m8_runtime.py`. Vì repo Agent không có test, đây là test mới, viết theo đúng hành vi của bản gốc, cộng thêm các chỗ sửa để an toàn.
 
-## Phần để mốc M9
-- **Allowlist lệnh:** bản gốc là hằng `ALLOWED_PREFIXES` trong code (`pwd`, `ls`, `find`, `cat`, `head`, `tail`, `grep`, `git status`, `git log`, `python --version`, `node --version`, `npm --version`, `uname`, `whoami`, `date`). M9 chuyển vào `configs/tools/terminal.json` và thêm `TerminalTool`. Tool này tắt mặc định, ghi log từng lệnh, và được đăng ký vào `ToolRegistry`.
-- **Lớp HTTP (runtime `/v1/execute`, gateway `/v1/jobs`):** nếu đưa vào thì viết bằng `http.server` của thư viện chuẩn, tắt mặc định, chỉ nghe `127.0.0.1`, bắt buộc token.
+## Phần làm ở mốc M9 (đã xong)
+- **Allowlist lệnh:** bản gốc là hằng `ALLOWED_PREFIXES` trong code (`pwd`, `ls`, `find`, `cat`, `head`, `tail`, `grep`, `git status`, `git log`, `python --version`, `node --version`, `npm --version`, `uname`, `whoami`, `date`). Nay nằm trong `configs/tools/terminal.json`, dùng đúng danh sách này.
+- **`TerminalTool`** (`local_ai/runtime/terminal.py`):
+  - tắt mặc định;
+  - chặn ký tự điều khiển shell, lệnh ngoài allowlist, tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc;
+  - có timeout; ghi log JSONL từng lệnh, kể cả lệnh bị từ chối;
+  - đăng ký vào `ToolRegistry` bằng `register_terminal`.
+- **Gateway `/v1/jobs`** (`local_ai/runtime/gateway.py`, viết bằng `http.server`): tắt mặc định, chỉ nghe `127.0.0.1`, bắt buộc token dài ít nhất 16 ký tự đọc từ biến môi trường, giới hạn kích thước nội dung gửi lên.
+- **`/v1/execute` qua HTTP của runtime gốc không đưa vào:** chạy lệnh từ xa qua mạng là rủi ro lớn nhất, mà agent đã gọi `TerminalTool` ngay trong tiến trình nên không cần.
+- Test: `tests/test_m9_terminal.py`.
+- **Giới hạn còn lại:**
+  - `git status`/`git log` tự tìm repo git ở thư mục cha, nên đọc được lịch sử của repo chứa thư mục làm việc;
+  - mẫu tìm của `grep` có dấu `/` ở đầu bị coi là đường dẫn và bị từ chối (chặn thừa, nhưng an toàn).
 
 ## Phần bỏ
 - FastAPI, uvicorn, pydantic, python-dotenv: repo Huyen chỉ dùng thư viện chuẩn cho phần lõi; kiểm tra dữ liệu làm bằng dataclass và code thường.

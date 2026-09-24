@@ -14,7 +14,7 @@ Quy tắc riêng tuần 2:
 | Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
 | --- | --- | --- | --- | --- |
 | M8 | Gộp repo Agent, phần 1: đưa code runtime vào | **Xong** | 4/4 (100%) | `tests/test_m8_runtime.py` (14 test) |
-| M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | Chưa làm | 0/5 | — |
+| M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | **Xong** | 5/5 (100%) | `tests/test_m9_terminal.py` (11 test) |
 | M10 | Notebook train trên Colab free (0.5B) | Chưa làm | 0/5 | — |
 | M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | Chưa làm | 0/4 | — |
 | M12 | Chất lượng dữ liệu | Chưa làm | 0/3 | — |
@@ -28,11 +28,23 @@ Quy tắc riêng tuần 2:
 - [x] 4. Test cũ và test của runtime đều xanh: 133 test chạy qua; compileall và secret-scan sạch.
 
 ## M9: Gộp repo Agent, phần 2: tool chạy lệnh
-- [ ] 1. `TerminalTool` trên runtime vừa gộp: chỉ chạy lệnh có trong allowlist ở `configs/tools/terminal.json`, không dùng `shell=True`, tham số truyền dạng list, có timeout, ghi log từng lệnh.
-- [ ] 2. Tool tắt mặc định, muốn bật phải khai báo rõ.
-- [ ] 3. Gateway/mạng (nếu có) tắt mặc định, chỉ nghe 127.0.0.1, bắt buộc token.
-- [ ] 4. Đăng ký tool vào `ToolRegistry` cho agent.
-- [ ] 5. Test chặn command-injection (dấu `;` `&&` `|` `$()` backtick, xuống dòng), lệnh ngoài allowlist bị từ chối, timeout chạy đúng.
+- [x] 1. `TerminalTool` (`local_ai/runtime/terminal.py`) dựng trên `run_command` của M8:
+  - chỉ chạy lệnh có trong allowlist ở `configs/tools/terminal.json` (đúng danh sách `ALLOWED_PREFIXES` của Agent gốc);
+  - không dùng shell, tham số truyền dạng list, có timeout;
+  - ghi log JSONL từng lệnh, kể cả lệnh bị từ chối;
+  - chặn thêm tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc.
+
+  Bằng chứng: `AllowedCommandTests`, `InjectionTests.test_dangerous_options_and_paths_are_rejected`; test M8 kiểm tra bằng AST rằng không nơi nào trong `local_ai/` gọi với `shell=True`.
+- [x] 2. Tool tắt mặc định (`"enabled": false`). Muốn bật phải khai báo rõ: `enabled: true` trong cấu hình, hoặc `TerminalTool(enabled=True)`. Khi đang tắt, mọi lần gọi bị từ chối kèm lý do. Bằng chứng: `ConfigTests`, `AgentRegistrationTests.test_disabled_terminal_fails_safely`.
+- [x] 3. Gateway HTTP (`local_ai/runtime/gateway.py`, `configs/runtime/gateway.json`):
+  - tắt mặc định;
+  - chỉ nghe `127.0.0.1` (`0.0.0.0` hay `localhost` đều bị từ chối);
+  - bắt buộc token dài ít nhất 16 ký tự, đọc từ biến môi trường; thiếu token thì không bật;
+  - không có endpoint chạy lệnh qua mạng.
+
+  Bằng chứng: `GatewayTests` (2 test).
+- [x] 4. Đăng ký vào `ToolRegistry` bằng `register_terminal`; agent gọi `{"tool": "terminal", ...}` và hoàn thành việc; tool đang tắt thì agent nhận lỗi, không sập. Bằng chứng: `AgentRegistrationTests` (2 test).
+- [x] 5. Có test chặn chèn lệnh: `;` `&&` `&` `|` `$()` backtick, xuống dòng, `\r`, `<` `>`, cả dạng chuỗi lẫn dạng list, và không lệnh nào được chạy. Lệnh ngoài allowlist (`rm`, `curl`, `bash`, `/bin/ls`, `git push`...) bị từ chối. Timeout dừng lệnh `sleep 30` sau 0,5 giây. Bằng chứng: `InjectionTests` (3 test), `AllowedCommandTests.test_timeout_stops_the_command`.
 
 ## M10: Notebook train trên Colab free (0.5B)
 - [ ] 1. `notebooks/train_colab.ipynb`; README có nút "Open in Colab" trỏ tới notebook ở nhánh `main`.

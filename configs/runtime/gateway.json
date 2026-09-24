@@ -1,0 +1,8 @@
+{
+  "_comment": "Gateway HTTP hàng đợi job (từ gateway.py của repo Agent). TẮT mặc định. Chỉ được nghe 127.0.0.1 (địa chỉ khác bị từ chối). Bắt buộc token: đặt token (ít nhất 16 ký tự) vào biến môi trường có tên ghi ở token_env, không ghi token vào file này. Chạy: python -m local_ai.runtime.gateway --config <bản sao đã bật enabled>.",
+  "enabled": false,
+  "host": "127.0.0.1",
+  "port": 8765,
+  "token_env": "LOCAL_AI_GATEWAY_TOKEN",
+  "max_jobs": 1000
+}

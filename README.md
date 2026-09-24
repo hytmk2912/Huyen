@@ -25,7 +25,7 @@ Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ,
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`.
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
-- `local_ai/runtime`: runtime chạy việc gộp từ repo Agent (chạy lệnh dạng list, không qua shell, có timeout; hàng đợi job; kiểm tra token). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
+- `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc.
 - `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent, nhật ký tuần 1).
@@ -99,6 +99,29 @@ Nếu chạy `vllm serve ... --api-key "$LOCAL_LLM_API_KEY"` thì thêm `"api_ke
 `python -m local_ai.demo` (không có `--model`) chạy agent với model giả, không cần server.
 
 Khi server lỗi, agent dừng lại và báo lỗi bằng tiếng Việt, không bị sập. Các trường hợp lỗi: server chưa chạy, hết thời gian chờ, hoặc server trả mã lỗi HTTP. Model quá nhỏ có thể không trả JSON đúng định dạng; khi đó demo báo "không hoàn thành".
+
+## Công cụ chạy lệnh cho agent (TerminalTool) và gateway
+`TerminalTool` (`local_ai/runtime/terminal.py`) cho agent chạy lệnh thật trên máy, nhưng **tắt sẵn**. Cấu hình ở `configs/tools/terminal.json`:
+- chỉ các lệnh có trong `allowed_commands` được chạy: `pwd`, `ls`, `cat`, `head`, `tail`, `grep`, `find`, `git status`/`git log`, `python --version`, `uname`, `whoami`, `date`...;
+- lệnh chạy dạng list, **không qua shell**, trong thư mục `workspace`, có `timeout_s`;
+- mọi lệnh, kể cả lệnh bị từ chối, được ghi vào `log_path` (JSONL).
+
+Các trường hợp bị từ chối:
+- lệnh có ký tự điều khiển shell (`;` `&&` `|` `$()` backtick `<` `>`, xuống dòng);
+- lệnh ngoài allowlist;
+- tham số nguy hiểm (`find -exec`, `find -delete`, `git log --output`, `tail -f`...);
+- đường dẫn ra ngoài thư mục làm việc (`/etc/passwd`, `../..`).
+
+Muốn bật: tạo bản sao của file cấu hình với `"enabled": true`, hoặc bật trong code:
+```python
+from local_ai.runtime.terminal import TerminalTool, register_terminal
+register_terminal(registry, TerminalTool(enabled=True))   # agent gọi {"tool": "terminal", "arguments": {"command": "ls"}}
+```
+
+Gateway hàng đợi job (`python -m local_ai.runtime.gateway`) cũng **tắt sẵn** (`configs/runtime/gateway.json`):
+- chỉ nghe `127.0.0.1`;
+- bắt buộc token dài ít nhất 16 ký tự, đọc từ biến môi trường `LOCAL_AI_GATEWAY_TOKEN`;
+- không có endpoint nào chạy lệnh qua mạng.
 
 ## Bước 1: chuẩn bị dữ liệu
 

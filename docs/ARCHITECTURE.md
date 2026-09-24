@@ -78,7 +78,13 @@ Viết lại bằng thư viện chuẩn từ repo Agent (commit `78a3e25`; xem `
 - `jobs.JobQueue`: hàng đợi job trong bộ nhớ (tạo, xem, nhận, trả kết quả), có giới hạn số job;
 - `auth.require_token`: kiểm tra `Bearer <token>` bằng so sánh an toàn.
 
-Import không mở cổng mạng, không tạo thư mục. Allowlist lệnh và `TerminalTool` làm ở mốc M9.
+- `terminal.TerminalTool`: công cụ chạy lệnh cho agent.
+  - Tắt mặc định; allowlist nằm trong `configs/tools/terminal.json`.
+  - Chặn ký tự điều khiển shell, tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc; ghi log JSONL từng lệnh.
+  - Đăng ký vào `ToolRegistry` bằng `register_terminal`.
+- `gateway`: HTTP hàng đợi job bằng `http.server`. Tắt mặc định, chỉ nghe `127.0.0.1`, bắt buộc token; không chạy lệnh qua mạng.
+
+Import không mở cổng mạng, không tạo thư mục.
 
 ### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
 `AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
