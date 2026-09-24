@@ -49,7 +49,9 @@ class DataFactoryTests(unittest.TestCase):
             manifest = build_dataset([source], root / "out", "v2", {"seed": 1, "formats": ["sft"]}, [evaluation])
             self.assertEqual(manifest["version"], "v2"); self.assertTrue(manifest["checksum"]); self.assertTrue((root / "out" / "sft.jsonl").exists())
             write_jsonl(evaluation, [record("train")])
-            with self.assertRaisesRegex(ValueError, "overlap"): build_dataset([source], root / "blocked", "v2", {}, [evaluation])
+            blocked = build_dataset([source], root / "blocked", "v2", {}, [evaluation])
+            self.assertEqual(blocked["statistics"]["eval_overlap_removed"], 1)
+            self.assertEqual(load_records(root / "blocked" / "sft.jsonl"), [])
 
     def test_teacher_generation_requires_verification(self):
         accepted, rejected = generate_synthetic(FakeTeacher(), ["one", "two"], json.loads, lambda r: {"passed": r["input"] == "1 + 1"})

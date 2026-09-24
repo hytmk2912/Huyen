@@ -23,7 +23,7 @@ class TeacherModel(Protocol):
 
 
 def canonical_content(record: dict[str, Any]) -> str:
-    fields = {key: record.get(key, "") for key in ("domain", "task", "input", "context", "expected_output", "reasoning", "trajectory")}
+    fields = {key: record.get(key, "") for key in ("domain", "task", "input", "context", "expected_output", "reasoning", "trajectory", "messages")}
     return json.dumps(fields, sort_keys=True, separators=(",", ":"))
 
 
@@ -56,6 +56,55 @@ def write_jsonl(path: str | Path, records: Iterable[dict[str, Any]]) -> None:
     target.write_text("".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8")
 
 
+MESSAGE_ROLES = {"system", "user", "assistant"}
+
+
+def valid_messages(messages: Any) -> bool:
+    """Hội thoại hợp lệ: mỗi lượt có role (system/user/assistant) và content không rỗng, có ít nhất một lượt user, lượt cuối là assistant."""
+    if not isinstance(messages, list) or not messages:
+        return False
+    if not all(isinstance(m, dict) and m.get("role") in MESSAGE_ROLES and isinstance(m.get("content"), str) and m["content"].strip() for m in messages):
+        return False
+    return any(m["role"] == "user" for m in messages) and messages[-1]["role"] == "assistant"
+
+
+def sft_messages(record: dict[str, Any]) -> list[dict[str, str]]:
+    """Hội thoại cho sft.jsonl. Giữ nguyên messages nếu có; nếu không thì dựng từ input/expected_output,
+    đưa context vào trước câu hỏi và reasoning vào khối <think>...</think> (định dạng suy luận của Qwen3)."""
+    if record.get("messages"):
+        return [{"role": m["role"], "content": m["content"]} for m in record["messages"]]
+    question = f"{record['context']}\n\n{record['input']}" if record.get("context") else record["input"]
+    answer = f"<think>\n{record['reasoning']}\n</think>\n\n{record['expected_output']}" if record.get("reasoning") else record["expected_output"]
+    return [{"role": "user", "content": question}, {"role": "assistant", "content": answer}]
+
+
+def normalize_text(text: Any) -> str:
+    return " ".join(str(text or "").casefold().split())
+
+
+def eval_fingerprints(eval_records: list[dict[str, Any]]) -> tuple[set[str], set[str], set[str]]:
+    """Dấu vân tay của tập eval: ID, content_hash và câu hỏi đã chuẩn hóa (trường input hoặc prompt)."""
+    ids = {str(r["id"]) for r in eval_records if r.get("id")}
+    hashes = {content_hash(r) for r in eval_records}
+    questions = {normalize_text(r.get("input") or r.get("prompt")) for r in eval_records} - {""}
+    return ids, hashes, questions
+
+
+def split_eval_overlap(records: list[dict[str, Any]], eval_records: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Loại bản ghi train trùng với eval (cùng ID, cùng content_hash hoặc cùng câu hỏi), giữ lại phần còn lại."""
+    ids, hashes, questions = eval_fingerprints(eval_records)
+    kept: list[dict[str, Any]] = []; leaked: list[dict[str, Any]] = []
+    for record in records:
+        user_turns = [m.get("content") for m in record.get("messages") or [] if m.get("role") == "user"]
+        asked = {normalize_text(text) for text in [record.get("input"), *user_turns]} - {""}
+        reason = "id" if record["id"] in ids else "content_hash" if content_hash(record) in hashes else "question" if asked & questions else None
+        if reason is None:
+            kept.append(record); continue
+        copy = dict(record); copy["validation_status"] = "rejected"; copy["verification"] = {**copy.get("verification", {}), "eval_overlap": reason}
+        leaked.append(copy)
+    return kept, leaked
+
+
 def validate_record(record: dict[str, Any], seen_ids: set[str] | None = None) -> list[str]:
     errors = [f"missing:{key}" for key in REQUIRED if key not in record or record[key] in (None, "")]
     if errors: return errors
@@ -67,6 +116,7 @@ def validate_record(record: dict[str, Any], seen_ids: set[str] | None = None) ->
     if record.get("validation_status", "pending") not in VALID_STATUSES: errors.append("invalid:validation_status")
     if not isinstance(record.get("difficulty", 1), int) or not 1 <= record.get("difficulty", 1) <= 5: errors.append("invalid:difficulty")
     if record.get("quality_score") is not None and not 0 <= record["quality_score"] <= 1: errors.append("invalid:quality_score")
+    if record.get("messages") is not None and not valid_messages(record["messages"]): errors.append("invalid:messages")
     if len(canonical_content(record)) > MAX_CHARS: errors.append("invalid:too_large")
     if seen_ids is not None:
         if record["id"] in seen_ids: errors.append("duplicate:id")
@@ -120,7 +170,7 @@ def mix_records(records: list[dict[str, Any]], weights: dict[str, float], seed: 
 
 
 def prepare_format(records: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
-    if kind == "sft": return [{"id": r["id"], "messages": [{"role": "user", "content": r["input"]}, {"role": "assistant", "content": r["expected_output"]}]} for r in records]
+    if kind == "sft": return [{"id": r["id"], "messages": sft_messages(r)} for r in records]
     if kind == "preference": return [{"id": r["id"], "prompt": r["input"], "chosen": r["expected_output"], "rejected": r["metadata"]["rejected_output"]} for r in records if r.get("metadata", {}).get("rejected_output")]
     if kind == "tool_use": return [r for r in records if r.get("tools_used")]
     if kind == "trajectory": return [r for r in records if r.get("trajectory")]
@@ -166,14 +216,12 @@ def generate_synthetic(teacher: TeacherModel, prompts: list[str], parser: Callab
 def build_dataset(sources: list[str | Path], output_dir: str | Path, version: str, config: dict[str, Any], eval_sources: list[str | Path] | None = None) -> dict[str, Any]:
     raw = [record for source in sources for record in load_records(source)]
     valid, rejected = validate_records(raw); unique, duplicates = deduplicate(valid)
-    eval_ids = {record["id"] for source in (eval_sources or []) for record in load_records(source)}
-    overlap = sorted(record["id"] for record in unique if record["id"] in eval_ids)
-    if overlap: raise ValueError(f"Dữ liệu train trùng với dữ liệu eval (overlap): {', '.join(overlap)}")
+    unique, leaked = split_eval_overlap(unique, [record for source in (eval_sources or []) for record in load_records(source)])
     for record in unique: record["quality_score"] = quality_score(record)
     if config.get("mix_weights"): unique = mix_records(unique, config["mix_weights"], config.get("seed", 0))
-    output = Path(output_dir); write_jsonl(output / "train.jsonl", unique); write_jsonl(output / "rejected.jsonl", rejected + duplicates)
+    output = Path(output_dir); write_jsonl(output / "train.jsonl", unique); write_jsonl(output / "rejected.jsonl", rejected + duplicates + leaked)
     for kind in config.get("formats", ["sft"]): write_jsonl(output / f"{kind}.jsonl", prepare_format(unique, kind))
     checksum = hashlib.sha256((output / "train.jsonl").read_bytes()).hexdigest()
-    manifest = {"version": version, "generated_at": datetime.now(timezone.utc).isoformat(), "source_manifest": [str(path) for path in sources], "configuration": config, "checksum": checksum, "statistics": statistics(unique, len(duplicates), len(rejected)), "eval_sources": [str(path) for path in (eval_sources or [])]}
+    manifest = {"version": version, "generated_at": datetime.now(timezone.utc).isoformat(), "source_manifest": [str(path) for path in sources], "configuration": config, "checksum": checksum, "statistics": {**statistics(unique, len(duplicates), len(rejected)), "eval_overlap_removed": len(leaked)}, "eval_sources": [str(path) for path in (eval_sources or [])]}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest

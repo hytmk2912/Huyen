@@ -37,11 +37,10 @@ def load_hf_rows(spec: dict[str, Any], loader: RowLoader | None = None) -> list[
     return [dict(row) for row in (islice(rows, limit) if limit else rows)]
 
 
-def _from_messages(messages: Any) -> tuple[str | None, str | None]:
-    if not isinstance(messages, list): return None, None
-    users = [m.get("content") for m in messages if isinstance(m, dict) and m.get("role") == "user"]
-    assistants = [m.get("content") for m in messages if isinstance(m, dict) and m.get("role") == "assistant"]
-    return (users[0] if users else None), (assistants[-1] if assistants else None)
+def _clean_messages(messages: Any) -> list[dict[str, str]] | None:
+    """Giữ nguyên toàn bộ hội thoại (system + mọi lượt), chỉ lấy role/content; dữ liệu sai dạng để bước kiểm tra loại bỏ."""
+    if not isinstance(messages, list): return None
+    return [{"role": m.get("role"), "content": m.get("content")} if isinstance(m, dict) else {"role": None, "content": None} for m in messages]
 
 
 def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> list[dict[str, Any]]:
@@ -51,10 +50,15 @@ def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> 
     source = {"name": spec["name"], "url": f"https://huggingface.co/datasets/{spec['name']}", "revision": spec.get("revision", "main")}
     records = []
     for index, row in enumerate(rows):
-        if spec.get("messages_field"): prompt, answer = _from_messages(row.get(spec["messages_field"]))
+        messages = _clean_messages(row.get(spec["messages_field"])) if spec.get("messages_field") else None
+        if spec.get("messages_field"):
+            # input/expected_output chỉ để kiểm tra, loại trùng và chặn rò rỉ eval; sft.jsonl dùng nguyên messages.
+            users = [m["content"] for m in messages or [] if m["role"] == "user"]
+            prompt, answer = (users[0] if users else None), (messages[-1]["content"] if messages else None)
         else: prompt, answer = row.get(mapping["input"]), row.get(mapping["expected_output"])
         identifier = row.get(mapping["id"]) if mapping.get("id") else None
         record = {"id": f"{slug}-{identifier if identifier not in (None, '') else index}", "domain": spec.get("domain", "reasoning"), "task": spec.get("task", "sft"), "input": prompt, "expected_output": answer, "source": source, "license": dict(spec["license"]), "dataset_version": version, "metadata": {"hf_split": spec.get("split", "train"), "hf_row": index}}
+        if messages is not None: record["messages"] = messages
         for field in ("context", "reasoning"):
             if mapping.get(field) and row.get(mapping[field]) not in (None, ""): record[field] = row[mapping[field]]
         records.append(record)

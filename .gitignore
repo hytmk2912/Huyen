@@ -1,12 +1,22 @@
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Bí mật: HF_TOKEN và khóa khác chỉ để trong biến môi trường hoặc file .env (không commit)
+.env
+.env.*
+
+# Kết quả chạy và dữ liệu sinh ra
 .runs/
 storage/
 data/processed/
+
+# Trọng số model
 *.safetensors
 *.gguf
 *.pt
-
-models/gguf/
-llama.cpp/
+*.bin
