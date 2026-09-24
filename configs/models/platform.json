@@ -1,20 +1,24 @@
 {
-  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype và capabilities; name không được trùng. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization.",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp).",
   "models": [
     {
       "name": "primary",
       "source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated",
+      "kind": "multimodal",
+      "params_b": 27.78,
       "revision": "main",
       "tokenizer_source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated",
       "tokenizer_revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
-      "capabilities": ["chat", "reasoning", "coding", "tool_calling", "long_context"],
+      "capabilities": ["chat", "reasoning", "coding", "tool_calling", "long_context", "vision"],
       "offline": false
     },
     {
       "name": "coder",
       "source": "Qwen/Qwen2.5-Coder-7B-Instruct",
+      "kind": "text",
+      "params_b": 7.62,
       "revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
@@ -24,6 +28,8 @@
     {
       "name": "light",
       "source": "Qwen/Qwen3-4B",
+      "kind": "text",
+      "params_b": 4.02,
       "revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
@@ -33,6 +39,8 @@
     {
       "name": "smoke",
       "source": "Qwen/Qwen2.5-0.5B-Instruct",
+      "kind": "text",
+      "params_b": 0.49,
       "revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",

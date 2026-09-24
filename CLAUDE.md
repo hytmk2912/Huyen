@@ -1,6 +1,8 @@
 # Quy ước cho repo này
 
 ## Nhiệm vụ 1 tuần
+**Đọc `memory.md` trước khi làm việc.**
+
 Kế hoạch nằm trong `TASKS.md`: 7 mốc, mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi gặp nằm trong `memory.md`. Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
 - Mỗi lượt làm tối đa **1 mốc**, theo thứ tự M1 → M7.
 - Chỉ đánh dấu một mốc là xong khi test xanh (kèm `compileall` và `secret-scan`) và mọi tiêu chí của mốc đã đạt.

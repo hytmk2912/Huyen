@@ -8,6 +8,7 @@ from typing import Any, Protocol
 class Message:
     role: str
     content: str
+    images: tuple[str, ...] = ()  # đường dẫn file ảnh cục bộ, chỉ model multimodal nhận được
 
 
 @dataclass(frozen=True)

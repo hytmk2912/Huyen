@@ -16,13 +16,13 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 | Mốc | Nội dung | Ngày gợi ý | Trạng thái | Tiến độ | Bằng chứng |
 | --- | --- | --- | --- | --- | --- |
 | M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | **Xong** | 9/9 (100%) | `tests/test_m1_agent_cleanup.py` (11 test) |
-| M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | Chưa làm | 0/7 (0%) | — |
+| M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | **Xong** | 8/8 (100%) | `tests/test_m2_models.py` (20 test) |
 | M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | Chưa làm | 0/7 (0%) | — |
 | M4 | Preset dataset Hugging Face | Ngày 4 | Chưa làm | 0/6 (0%) | — |
 | M5 | Đánh giá (eval) mở rộng | Ngày 5 | Chưa làm | 0/7 (0%) | — |
 | M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | Chưa làm | 0/6 (0%) | — |
 | M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **14%** (100% ÷ 7) | |
+| **Tổng** | | | | **29%** (200% ÷ 7) | |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -54,20 +54,19 @@ Dọn repo:
 
 ## M2: Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM
 
-**Hiện trạng:**
-- Hugging Face gắn nhãn `image-text-to-text` (kiến trúc `qwen3_5`) cho model chính `huihui-ai/Huihui-Qwen3.8-27B-abliterated`, nhưng adapter chỉ nạp bằng `AutoModelForCausalLM`. Chưa chạy thật để xác nhận model có nạp được không.
+**Hiện trạng trước M2:**
+- Hugging Face gắn nhãn `image-text-to-text` (kiến trúc `qwen3_5`, lớp `AutoModelForMultimodalLM`, 27,78 tỷ tham số) cho model chính `huihui-ai/Huihui-Qwen3.8-27B-abliterated`, nhưng adapter chỉ nạp bằng `AutoModelForCausalLM`.
 - Trường `quantization` trong `ModelConfig` có khai báo nhưng không code nào đọc. Chưa có QLoRA.
 
-**Tiêu chí xong**
-- [ ] 1. Cấu hình model khai báo được loại đầu vào (ví dụ `modality: "text"` hoặc `"image-text"`), và model chính được khai báo đúng loại theo thẻ trên Hugging Face.
-- [ ] 2. Adapter chọn đúng lớp nạp: `AutoModelForImageTextToText` + `AutoProcessor` cho model ảnh+chữ, `AutoModelForCausalLM` + `AutoTokenizer` cho model chữ. Có test dùng module `transformers` giả, không tải model.
-- [ ] 3. Gửi được tin nhắn gồm ảnh (đường dẫn file cục bộ) và chữ tới model ảnh+chữ. Gửi ảnh tới model chỉ có chữ thì báo lỗi rõ ràng bằng tiếng Việt. Có test.
-- [ ] 4. Khai báo `quantization: "nf4"` trong cấu hình model thì khi chạy suy luận, model được nạp 4-bit bằng bitsandbytes. Có test dùng module giả.
-- [ ] 5. `finetune` có `method: "qlora"`: nạp model 4-bit, chuẩn bị cho k-bit training rồi gắn LoRA. Thiếu GPU hoặc bitsandbytes thì trả về `"skipped"`. Có file cấu hình mẫu cho model chính và có test.
-- [ ] 6. Có lệnh ước tính VRAM (ví dụ `python -m local_ai.models.vram`) in bảng cho **mọi** model trong `configs/models/platform.json`. Bảng gồm số tham số, VRAM cho trọng số ở bf16 và 4-bit, và ước tính khi train LoRA/QLoRA. Lệnh chạy không cần mạng và ghi rõ đây là ước lượng.
-- [ ] 7. Có test kiểm tra số liệu ước tính, ví dụ model 27B: bf16 ≈ 54 GB, 4-bit ≈ 14–16 GB.
-
-Tham khảo: PR #4 (commit `59230b9`, chưa gộp) đã có code QLoRA và ước lượng bộ nhớ, có thể dùng lại.
+**Tiêu chí xong** (cập nhật ngày 24/9 theo yêu cầu mới của chủ repo: khóa `kind`/`params_b`, lớp `AutoModelForMultimodalLM`, nén `4bit`/`8bit`, tự chuyển fp16)
+- [x] 1. Mỗi model trong `configs/models/platform.json` có `kind` (`text` hoặc `multimodal`) và `params_b` (số tỷ tham số); model chính là `multimodal`, 27,78 tỷ, theo thẻ trên Hugging Face. Giá trị sai bị từ chối. Bằng chứng: `tests/test_m2_models.py` `ModelKindConfigTests` (2 test).
+- [x] 2. Adapter chọn đúng lớp nạp: `AutoProcessor` + `AutoModelForMultimodalLM` cho model multimodal (bản transformers không có lớp này thì dùng `AutoModelForImageTextToText`, không có cả hai thì báo lỗi rõ); `AutoTokenizer` + `AutoModelForCausalLM` cho model text. Test dùng module `transformers` giả. Bằng chứng: `ModelLoadingTests` (3 test).
+- [x] 3. Gửi được tin nhắn gồm ảnh (đường dẫn file cục bộ) và chữ tới model multimodal. Gửi ảnh tới model text, hoặc ảnh không tồn tại, thì báo lỗi rõ bằng tiếng Việt. Bằng chứng: `ImageMessageTests` (2 test).
+- [x] 4. `quantization: "4bit"` (NF4, double quant) hoặc `"8bit"` trong cấu hình model thì model được nạp nén bằng bitsandbytes; thiếu bitsandbytes thì báo lỗi rõ. Bằng chứng: `QuantizationTests` (2 test).
+- [x] 5. `finetune` hỗ trợ QLoRA: `method: "lora"` + `quantization: "4bit"` → nạp model 4bit, `prepare_model_for_kbit_training` rồi gắn LoRA. Full fine-tune trên model nén bị từ chối; thiếu GPU hoặc bitsandbytes thì trả `"skipped"`. Có cấu hình mẫu `configs/training/qlora_primary.json` cho model chính. (Không dùng `method: "qlora"` vì test cũ `test_config_resolves_base_model_and_overrides` yêu cầu method đó bị từ chối.) Bằng chứng: `QloraFinetuneTests` (5 test).
+- [x] 6. GPU không có bf16 (ví dụ T4) thì tự chuyển sang fp16 và in cảnh báo, cả khi nạp model lẫn khi train. Bằng chứng: `DtypeFallbackTests` (3 test), `QloraFinetuneTests.test_t4_trains_in_fp16`.
+- [x] 7. Lệnh `python -m local_ai.models.vram` in bảng cho **mọi** model trong `configs/models/platform.json`: số tham số, trọng số ở bf16/8bit/4bit, train LoRA/QLoRA. Không cần mạng, không import torch/transformers, ghi rõ là ước lượng. Bằng chứng: `VramEstimateTests.test_command_prints_every_model_without_loading`, `test_model_without_params_is_marked`.
+- [x] 8. Số liệu ước tính cho model 27B: bf16 = 54 GB, 4bit trong khoảng 14–16 GB, train QLoRA dưới 24 GB. Bằng chứng: `VramEstimateTests.test_numbers_for_27b`.
 
 ---
 
