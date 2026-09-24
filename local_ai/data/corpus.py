@@ -271,3 +271,35 @@ def verify_one_shard(config: dict[str, Any], shard_id: str | None = None) -> dic
         registry.status(shard, "FAILED", remote); raise
     registry.status(shard, "REMOTE_VERIFIED", remote); registry.status(shard, "COMPLETE", remote)
     return {"status": status, "shard_id": shard, "repo": repo, "hf_path": remote, "checksum": checksum}
+
+
+def pin_source_revisions(config_path: str | Path, api: Any = None) -> list[dict[str, str]]:
+    """Thay dataset_version kiểu "main" của các nguồn hf_dataset bằng mã commit cố định trên Hugging Face."""
+    path = Path(config_path); raw = json.loads(path.read_text(encoding="utf-8")); pinned = []
+    for item in raw.get("sources", []):
+        if item.get("download_method") != "hf_dataset" or re.fullmatch(r"[0-9a-f]{40}", str(item.get("dataset_version", ""))): continue
+        if api is None:
+            try:
+                from huggingface_hub import HfApi
+            except ImportError as error: raise RuntimeError("Hãy cài huggingface_hub để tra mã commit của dataset") from error
+            api = HfApi(token=os.environ.get("HF_TOKEN") or None)
+        sha = api.dataset_info(hf_dataset_id(item["url"]), revision=item.get("dataset_version") or "main").sha
+        pinned.append({"source_id": item["source_id"], "from": item.get("dataset_version", ""), "to": sha}); item["dataset_version"] = sha
+    path.write_text(json.dumps(raw, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return pinned
+
+
+def measure_source(source: "Source", config: dict[str, Any], sample_rows: int = 200, loader: Any = None, tokenizer: Any = None) -> dict[str, Any]:
+    """Đo token trên một mẫu dòng bằng tokenizer đã cấu hình; ước tính cho phần sẽ tải (max_rows) = trung bình × số dòng."""
+    if source.download_method != "hf_dataset": return {"source_id": source.source_id, "status": "skipped", "reason": "chỉ đo được nguồn hf_dataset"}
+    if loader is None:
+        try:
+            from datasets import load_dataset
+        except ImportError as error: raise RuntimeError("Hãy cài gói tùy chọn `datasets` để đo nguồn hf_dataset") from error
+        loader = load_dataset
+    tokenizer = tokenizer or Tokenizer(config["tokenizer"]); options = source.options; field_name = options.get("text_field", "text")
+    rows = loader(hf_dataset_id(source.url), options.get("subset"), split=options.get("split", "train"), revision=source.dataset_version, streaming=True, token=os.environ.get("HF_TOKEN") or None)
+    counts = [len(tokenizer.encode(str(row[field_name]))) for row in islice(rows, sample_rows) if row.get(field_name)]
+    if not counts: return {"source_id": source.source_id, "status": "empty"}
+    average = sum(counts) / len(counts); planned = options.get("max_rows")
+    return {"source_id": source.source_id, "status": "measured", "tokenizer": tokenizer.info()["name"], "sample_rows": len(counts), "avg_tokens_per_row": round(average, 1), "planned_rows": planned, "estimated_tokens": round(average * planned) if planned else None}

@@ -95,14 +95,14 @@
     {
       "source_id": "fineweb2-vie",
       "dataset_name": "FineWeb-2 (tiếng Việt, vie_Latn)",
-      "dataset_version": "main",
+      "dataset_version": "af9c13333eb981300149d5ca60a8e9d659b276b9",
       "url": "hf://datasets/HuggingFaceFW/fineweb-2",
       "license": "ODC-By-1.0",
       "license_url": "https://opendatacommons.org/licenses/by/1-0/",
       "domain": "vietnamese",
       "language": "vi",
       "estimated_size": 100000000,
-      "estimated_tokens": 25000000,
+      "estimated_tokens": 33985400,
       "download_method": "hf_dataset",
       "processing_recipe": "plain_text_v1",
       "options": {
@@ -115,14 +115,14 @@
     {
       "source_id": "sec-10k",
       "dataset_name": "SEC Annual Reports (Form 10-K) 1993-2024",
-      "dataset_version": "main",
+      "dataset_version": "b09d02e1f0f937d99e85130feeb08a702870733d",
       "url": "hf://datasets/PleIAs/SEC",
       "license": "CC0-1.0",
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "domain": "trading",
       "language": "en",
       "estimated_size": 150000000,
-      "estimated_tokens": 35000000,
+      "estimated_tokens": 12883345,
       "download_method": "hf_dataset",
       "processing_recipe": "plain_text_v1",
       "options": {

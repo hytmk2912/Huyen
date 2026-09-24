@@ -87,13 +87,15 @@ Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc
 **Quy tắc:** lộ trình luôn có đúng **5 mục đang làm**. Làm xong mục nào thì chuyển mục đó xuống "Đã hoàn thành" và bổ sung ngay một mục mới chưa làm, để lộ trình luôn đủ 5 mục. Với mục cần phần cứng hoặc khóa truy cập thật, phần code và test được làm trong repo; phần phải chạy thật được ghi vào "Việc cần chạy trên máy thật".
 
 ### Đang làm
-1. Tự động đánh giá sau huấn luyện: chạy bộ đánh giá theo nhóm sau mỗi lần fine-tune và lưu báo cáo cạnh checkpoint.
-2. Cố định revision (mã commit) cho các nguồn `hf_dataset` và đo số token thật của từng nguồn bằng tokenizer production thay cho số ước lượng.
-3. Tìm thêm nguồn trading thuần (tin thị trường, dữ liệu giá có giấy phép rõ) và nguồn cho nhóm `reasoning` để bám đủ tỷ lệ 20% và 10%.
-4. Kiểm thử đầu-cuối toàn bộ đường ống bằng dữ liệu giả, không cần mạng/GPU: build-corpus → verify-shard → hf-sft → finetune `--dry-run` → đánh giá theo nhóm.
-5. Báo cáo tiến độ corpus dễ đọc bằng tiếng Việt: bảng theo nhóm (đã có/mục tiêu/phần trăm), dung lượng đã dùng và ước tính dung lượng còn cần.
+1. Tìm thêm nguồn trading thuần (tin thị trường, dữ liệu giá có giấy phép rõ) và nguồn cho nhóm `reasoning` để bám đủ tỷ lệ 20% và 10%.
+2. Kiểm thử đầu-cuối toàn bộ đường ống bằng dữ liệu giả, không cần mạng/GPU: build-corpus → verify-shard → hf-sft → finetune `--dry-run` → đánh giá theo nhóm.
+3. Báo cáo tiến độ corpus dễ đọc bằng tiếng Việt: bảng theo nhóm (đã có/mục tiêu/phần trăm), dung lượng đã dùng và ước tính dung lượng còn cần.
+4. Chạy thử `build-corpus` thật ở quy mô nhỏ (vài trăm dòng mỗi nguồn đã cố định) trong môi trường có mạng, ghi lại số token, tỷ lệ loại trùng và lỗi gặp phải.
+5. Khai báo thêm nguồn cho nhóm `code` (mã nguồn giấy phép permissive, có cố định phiên bản) để bám tỷ lệ 10%.
 
 ### Đã hoàn thành
+- **Tự động đánh giá sau huấn luyện**: sau khi lưu adapter/model, `finetune.py` chạy bộ đánh giá theo nhóm (`eval_cases`, mặc định `data/eval/vi_trading_eval.jsonl`), ghi `eval_report.json` cạnh checkpoint và thêm độ chính xác từng nhóm vào metrics. Đặt `eval_cases` là `null` để tắt.
+- **Cố định phiên bản và đo token của nguồn Hugging Face** (đã chạy thật): lệnh `pin-sources` đã ghi mã commit cho FineWeb-2 (`af9c1333…`) và PleIAs/SEC (`b09d02e1…`). Lệnh `measure-sources` đã đo trên 200 dòng mẫu mỗi nguồn bằng tokenizer của model chính: tiếng Việt trung bình khoảng 1.699 token/dòng (khoảng 34 triệu token cho 20.000 dòng), báo cáo SEC khoảng 25.767 token/báo cáo (khoảng 12,9 triệu token cho 500 báo cáo). Đây là số đo trên mẫu, chưa phải toàn bộ dữ liệu.
 - **Giới hạn tài nguyên khi thu thập corpus**: `local_ai/data/limits.py` kiểm tra `max_local_storage_gb` trong lúc tải (vượt thì dừng an toàn, báo `paused` và `build-corpus` ngừng các nguồn còn lại) và giữ tốc độ tải theo `max_bandwidth_mbps`. File đang tải nằm ở `.part`: nguồn HTTP tải tiếp bằng header `Range` (máy chủ không hỗ trợ thì tải lại từ đầu), nguồn Hugging Face nhớ số dòng đã tải trong `.progress` để chạy lại thì tải tiếp.
 - **Ngân sách cho agent**: `AgentBudget` giới hạn tổng thời gian (`max_seconds`), thời gian mỗi lần gọi công cụ (`max_tool_seconds`) và số token model sinh ra (`max_generated_tokens`, mặc định ước lượng theo số từ). Vượt ngân sách thì agent dừng gọn và ghi lý do vào trace.
 - **Loại trùng gần đúng (near-dedup)**: `local_ai/data/dedup.py` dùng MinHash + LSH, chia văn bản thành từng đoạn, loại đoạn giống ≥ 80% với đoạn đã có ở bất kỳ nguồn nào (chỉ số lưu trong registry). Xây lại một nguồn không bị tự coi là trùng; nguồn trùng toàn bộ bị từ chối (`near_duplicate`). Cấu hình ở `near_dedup` trong `corpus_10t.json`.

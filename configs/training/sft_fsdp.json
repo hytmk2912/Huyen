@@ -28,5 +28,7 @@
     "strategy": "fsdp",
     "num_processes": 8,
     "num_nodes": 1
-  }
+  },
+  "eval_cases": "data/eval/vi_trading_eval.jsonl",
+  "eval_max_new_tokens": 128
 }

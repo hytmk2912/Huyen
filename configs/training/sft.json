@@ -1,5 +1,5 @@
 {
-  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể. train_dtype: ghi đè kiểu số khi huấn luyện (null = theo dtype của model). distributed.strategy: none | ddp | fsdp (phân tán luôn dùng bfloat16).",
+  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể. train_dtype: ghi đè kiểu số khi huấn luyện (null = theo dtype của model). distributed.strategy: none | ddp | fsdp (phân tán luôn dùng bfloat16). eval_cases: bộ câu hỏi chạy tự động sau huấn luyện (null để tắt), báo cáo ghi vào eval_report.json cạnh checkpoint.",
   "base_model": "huihui-qwen3-4b",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",
@@ -28,5 +28,7 @@
     "strategy": "none",
     "num_processes": 1,
     "num_nodes": 1
-  }
+  },
+  "eval_cases": "data/eval/vi_trading_eval.jsonl",
+  "eval_max_new_tokens": 128
 }

@@ -59,6 +59,8 @@ class FinetuneConfig:
     resume: bool | str = True
     require_gpu: bool = True
     train_dtype: str | None = None
+    eval_cases: str | None = "data/eval/vi_trading_eval.jsonl"
+    eval_max_new_tokens: int = 128
     distributed: DistributedSettings = field(default_factory=DistributedSettings)
 
     @classmethod
@@ -138,6 +140,24 @@ def describe(config: FinetuneConfig) -> dict[str, Any]:
     return {"method": config.method, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "dtype": model.dtype}, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "train_dtype": training_dtype(config, model), "distributed": asdict(config.distributed), "resume_from": resume_target(config), "config": asdict(config)}
 
 
+def evaluate_checkpoint(cases_path: str | Path, generate: Any, output_dir: str | Path) -> dict[str, Any]:
+    """Chạy bộ đánh giá theo nhóm cho model vừa huấn luyện và ghi eval_report.json cạnh checkpoint."""
+    from local_ai.evaluation.suites import load_cases, run_suites
+    report = {"cases_file": str(cases_path), **run_suites(load_cases(cases_path), generate)}
+    target = Path(output_dir) / "eval_report.json"; target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return report
+
+
+def _generator(model: Any, tokenizer: Any, max_new_tokens: int) -> Any:
+    def generate(prompt: str) -> str:
+        text = tokenizer.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(text, return_tensors="pt").to(model.device)
+        output = model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
+        return tokenizer.decode(output[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
+    return generate
+
+
 def train(config: FinetuneConfig) -> dict[str, Any]:
     config.validate(); model_config = resolve_base_model(config)
     missing = missing_requirements(config)
@@ -168,8 +188,14 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     result = trainer.train(resume_from_checkpoint=resume_target(config))
     final = Path(config.output_dir) / ("adapter" if config.method == "lora" else "final")
     trainer.save_model(str(final)); tokenizer.save_pretrained(str(final))
-    tracker.record_metrics({key: float(value) for key, value in result.metrics.items() if isinstance(value, (int, float))}); tracker.record_checkpoint(str(final))
-    return {"status": "completed", "output": str(final), "metrics": result.metrics}
+    metrics = {key: float(value) for key, value in result.metrics.items() if isinstance(value, (int, float))}
+    evaluation = None
+    if config.eval_cases and trainer.is_world_process_zero():
+        trainer.model.eval(); trainer.model.config.use_cache = True
+        evaluation = evaluate_checkpoint(config.eval_cases, _generator(trainer.model, tokenizer, config.eval_max_new_tokens), final)
+        metrics.update({f"eval_{suite}_accuracy": values["accuracy"] for suite, values in evaluation["suites"].items()})
+    tracker.record_metrics(metrics); tracker.record_checkpoint(str(final))
+    return {"status": "completed", "output": str(final), "metrics": result.metrics, "evaluation": evaluation}
 
 
 def main(argv: list[str] | None = None) -> None:
