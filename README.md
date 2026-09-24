@@ -83,13 +83,49 @@ Nếu chạy `vllm serve ... --api-key "$LOCAL_LLM_API_KEY"` thì thêm `"api_ke
 Khi server lỗi, agent dừng lại và báo lỗi bằng tiếng Việt, không bị sập. Các trường hợp lỗi: server chưa chạy, hết thời gian chờ, hoặc server trả mã lỗi HTTP. Model quá nhỏ có thể không trả JSON đúng định dạng; khi đó demo báo "không hoàn thành".
 
 ## Bước 1: chuẩn bị dữ liệu
-Sửa `configs/datasets/hf_sft.json`: điền `hf_dataset.name`, giấy phép lấy từ trang dataset, và chọn `messages_field` (cột hội thoại) hoặc `mapping.input` / `mapping.expected_output`.
+
+### Dùng preset có sẵn
+`configs/datasets/presets/` có 3 preset trỏ tới dataset công khai trên Hugging Face. Mỗi preset:
+- khóa cố định một commit (`revision`);
+- đọc kiểu streaming, tối đa 1000 dòng, nên không tải cả dataset.
+
+| Preset | Dataset | Nội dung | Giấy phép ghi trên Hugging Face |
+| --- | --- | --- | --- |
+| `code` | `bigcode/self-oss-instruct-sc2-exec-filter-50k` | Bài lập trình Python kèm lời giải đã chạy thử (tiếng Anh) | ODC-By |
+| `reasoning` | `open-r1/OpenR1-Math-220k` | Bài toán + lời giải (đưa vào khối `<think>`) + đáp án (tiếng Anh) | Apache-2.0 |
+| `vietnamese` | `5CD-AI/Vietnamese-Multi-turn-Chat-Alpaca` | Hội thoại tiếng Việt nhiều lượt, giữ nguyên mọi lượt | Apache-2.0 |
+
+**Trước khi dùng, hãy đọc lại giấy phép trên dataset card** (trang giới thiệu dataset). Giấy phép trong preset được ghi kèm trạng thái "cần kiểm tra lại trên dataset card", vì dữ liệu có thể được dịch hoặc sinh từ model khác, và giấy phép gốc có thể chặt hơn.
+
+```bash
+python -m local_ai.data list-presets                                          # xem các preset
+python -m local_ai.data hf-sft --config configs/datasets/presets/code.json    # một preset
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_mix
+```
+
+Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả chung vào một `sft.jsonl`:
+- Tỉ lệ được chuẩn hóa về tổng 1.
+- Nếu không ghi `--total`, lệnh lấy tổng số dòng lớn nhất sao cho không preset nào vượt `limit` của nó.
+- `--limit 20` thì mỗi preset chỉ đọc tối đa 20 dòng, hợp để chạy thử.
+- Tỉ lệ tính trên số dòng đọc vào. Dòng bị loại (trùng, sai dạng) làm tỉ lệ cuối lệch nhẹ; số dòng thật của từng nguồn ghi trong `manifest.json`.
+
+### Tự khai báo dataset
+Sửa `configs/datasets/hf_sft.json`: điền `hf_dataset.name`, giấy phép lấy từ trang dataset, và chọn `messages_field` (cột hội thoại, hiểu cả dạng role/content lẫn ShareGPT from/value) hoặc `mapping.input` / `mapping.expected_output` (tùy chọn thêm `mapping.context`, `mapping.reasoning`).
 
 ```bash
 python -m local_ai.data hf-sft --config configs/datasets/hf_sft.json [--dataset org/name] [--limit 1000]
 ```
 
-Kết quả nằm trong `output_dir`: `sft.jsonl` (dùng để train), `train.jsonl`, `rejected.jsonl`, `manifest.json`.
+Kết quả nằm trong `output_dir`:
+- `sft.jsonl`: dùng để train;
+- `train.jsonl`;
+- `rejected.jsonl`: dòng bị loại kèm lý do;
+- `manifest.json`.
+
+Trong `sft.jsonl`:
+- hội thoại nhiều lượt giữ nguyên mọi lượt, kể cả system;
+- `context` được đặt trước câu hỏi;
+- `reasoning` được đưa vào khối `<think>...</think>` trước câu trả lời (định dạng suy luận của Qwen3).
 
 ## Bước 2: fine-tune
 `configs/training/sft.json` chỉ định model gốc, đường dẫn `sft.jsonl`, thư mục đầu ra và siêu tham số; `method` là `full` hoặc `lora`; `quantization` (tùy chọn) ghi đè kiểu nén của model gốc.

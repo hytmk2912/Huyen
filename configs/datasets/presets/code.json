@@ -1,0 +1,35 @@
+{
+  "_comment": "Preset code: bài lập trình Python kèm lời giải đã được chạy thử (dùng để train StarCoder2-Instruct). Giấy phép ODC-By yêu cầu ghi nguồn. Đọc lại dataset card trước khi dùng.",
+  "description": "Code Python: yêu cầu + lời giải đã chạy thử (tiếng Anh)",
+  "dataset_version": "preset-code-v1",
+  "seed": 17,
+  "output_dir": "data/processed/presets/code",
+  "formats": [
+    "sft"
+  ],
+  "eval_sources": [
+    "data/eval/seed_eval.jsonl"
+  ],
+  "hf_dataset": {
+    "name": "bigcode/self-oss-instruct-sc2-exec-filter-50k",
+    "subset": null,
+    "split": "train",
+    "revision": "356bb069eee815daa6e23e9a282eeefe1490ad44",
+    "streaming": true,
+    "limit": 1000,
+    "domain": "coding",
+    "language": "en",
+    "task": "sft",
+    "license": {
+      "name": "ODC-By",
+      "url": "https://huggingface.co/datasets/bigcode/self-oss-instruct-sc2-exec-filter-50k",
+      "status": "cần kiểm tra lại trên dataset card"
+    },
+    "messages_field": null,
+    "mapping": {
+      "id": "id",
+      "input": "instruction",
+      "expected_output": "response"
+    }
+  }
+}

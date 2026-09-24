@@ -23,7 +23,7 @@ class TeacherModel(Protocol):
 
 
 def canonical_content(record: dict[str, Any]) -> str:
-    fields = {key: record.get(key, "") for key in ("domain", "task", "input", "context", "expected_output", "reasoning", "trajectory")}
+    fields = {key: record.get(key, "") for key in ("domain", "task", "input", "context", "expected_output", "reasoning", "trajectory", "messages")}
     return json.dumps(fields, sort_keys=True, separators=(",", ":"))
 
 
@@ -56,6 +56,25 @@ def write_jsonl(path: str | Path, records: Iterable[dict[str, Any]]) -> None:
     target.write_text("".join(json.dumps(record, sort_keys=True) + "\n" for record in records), encoding="utf-8")
 
 
+MESSAGE_ROLES = {"system", "user", "assistant"}
+
+
+def valid_messages(messages: Any) -> bool:
+    """Hội thoại hợp lệ: mỗi lượt có role (system/user/assistant) và content không rỗng, có ít nhất một lượt user, lượt cuối là assistant."""
+    if not isinstance(messages, list) or not messages: return False
+    if not all(isinstance(m, dict) and m.get("role") in MESSAGE_ROLES and isinstance(m.get("content"), str) and m["content"].strip() for m in messages): return False
+    return any(m["role"] == "user" for m in messages) and messages[-1]["role"] == "assistant"
+
+
+def sft_messages(record: dict[str, Any]) -> list[dict[str, str]]:
+    """Hội thoại cho sft.jsonl: giữ nguyên messages nếu có (kể cả system và mọi lượt); nếu không thì dựng từ
+    input/expected_output, đưa context lên trước câu hỏi và reasoning vào khối <think>...</think> (định dạng của Qwen3)."""
+    if record.get("messages"): return [{"role": m["role"], "content": m["content"]} for m in record["messages"]]
+    question = f"{record['context']}\n\n{record['input']}" if record.get("context") else record["input"]
+    answer = f"<think>\n{record['reasoning']}\n</think>\n\n{record['expected_output']}" if record.get("reasoning") else record["expected_output"]
+    return [{"role": "user", "content": question}, {"role": "assistant", "content": answer}]
+
+
 def validate_record(record: dict[str, Any], seen_ids: set[str] | None = None) -> list[str]:
     errors = [f"missing:{key}" for key in REQUIRED if key not in record or record[key] in (None, "")]
     if errors: return errors
@@ -67,6 +86,7 @@ def validate_record(record: dict[str, Any], seen_ids: set[str] | None = None) ->
     if record.get("validation_status", "pending") not in VALID_STATUSES: errors.append("invalid:validation_status")
     if not isinstance(record.get("difficulty", 1), int) or not 1 <= record.get("difficulty", 1) <= 5: errors.append("invalid:difficulty")
     if record.get("quality_score") is not None and not 0 <= record["quality_score"] <= 1: errors.append("invalid:quality_score")
+    if record.get("messages") is not None and not valid_messages(record["messages"]): errors.append("invalid:messages")
     if len(canonical_content(record)) > MAX_CHARS: errors.append("invalid:too_large")
     if seen_ids is not None:
         if record["id"] in seen_ids: errors.append("duplicate:id")
@@ -120,7 +140,7 @@ def mix_records(records: list[dict[str, Any]], weights: dict[str, float], seed: 
 
 
 def prepare_format(records: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
-    if kind == "sft": return [{"id": r["id"], "messages": [{"role": "user", "content": r["input"]}, {"role": "assistant", "content": r["expected_output"]}]} for r in records]
+    if kind == "sft": return [{"id": r["id"], "messages": sft_messages(r)} for r in records]
     if kind == "preference": return [{"id": r["id"], "prompt": r["input"], "chosen": r["expected_output"], "rejected": r["metadata"]["rejected_output"]} for r in records if r.get("metadata", {}).get("rejected_output")]
     if kind == "tool_use": return [r for r in records if r.get("tools_used")]
     if kind == "trajectory": return [r for r in records if r.get("trajectory")]

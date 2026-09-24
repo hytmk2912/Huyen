@@ -18,11 +18,11 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 | M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | **Xong** | 9/9 (100%) | `tests/test_m1_agent_cleanup.py` (11 test) |
 | M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | **Xong** | 8/8 (100%) | `tests/test_m2_models.py` (20 test) |
 | M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | **Xong** | 7/7 (100%) | `tests/test_m3_local_server.py` (17 test) |
-| M4 | Preset dataset Hugging Face | Ngày 4 | Chưa làm | 0/6 (0%) | — |
+| M4 | Preset dataset Hugging Face | Ngày 4 | **Xong** | 9/9 (100%) | `tests/test_m4_presets.py` (14 test) + chạy thật 20 dòng/preset |
 | M5 | Đánh giá (eval) mở rộng | Ngày 5 | Chưa làm | 0/7 (0%) | — |
 | M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | Chưa làm | 0/6 (0%) | — |
 | M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **43%** (300% ÷ 7) | |
+| **Tổng** | | | | **57%** (400% ÷ 7) | |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -87,15 +87,16 @@ Chưa làm (ngoài tiêu chí): gửi ảnh qua server local. Hiện adapter bá
 
 ## M4: Preset dataset Hugging Face (code, reasoning, tiếng Việt)
 
-**Tiêu chí xong**
-- [ ] 1. Có 2–3 file preset trong `configs/datasets/presets/` (code, reasoning, tiếng Việt). Mỗi file trỏ tới một dataset có thật trên Hugging Face (`org/name`, có `revision`).
-- [ ] 2. Mỗi preset ghi giấy phép theo trang dataset, kèm trạng thái `"cần kiểm tra lại"`. README nhắc kiểm tra lại giấy phép trước khi dùng.
-- [ ] 3. Mỗi preset bật `streaming: true` và có `limit` nhỏ (mặc định ≤ 1000 dòng): chỉ đọc đúng số dòng đó, không tải cả dataset.
-- [ ] 4. Chạy được bằng `python -m local_ai.data hf-sft --config configs/datasets/presets/<tên>.json`.
-- [ ] 5. File `sft.jsonl` được xuất ra đúng: hội thoại nhiều lượt giữ nguyên (kể cả system), reasoning và context không bị mất. Lỗi này hiện có trên `main`, xem mục "Lỗi gặp" trong `memory.md`.
-- [ ] 6. Có test dùng loader giả (không mạng) cho từng preset: ánh xạ cột đúng, bản ghi hợp lệ, loader nhận `streaming=True` và chỉ đọc `limit` dòng.
-
-Tham khảo: PR #4 (commit `2626c7d`, chưa gộp) đã sửa lỗi hội thoại nhiều lượt và lỗi mất reasoning/context.
+**Tiêu chí xong** (thêm tiêu chí 7–9 ngày 24/9 theo yêu cầu của chủ repo: trộn nhiều preset theo tỉ lệ, lệnh liệt kê preset, đọc thử 20 dòng thật)
+- [x] 1. Có 3 file preset trong `configs/datasets/presets/`: `code` (`bigcode/self-oss-instruct-sc2-exec-filter-50k`), `reasoning` (`open-r1/OpenR1-Math-220k`), `vietnamese` (`5CD-AI/Vietnamese-Multi-turn-Chat-Alpaca`). Mỗi file trỏ tới dataset có thật, `revision` là commit cố định. Bằng chứng: `tests/test_m4_presets.py` `PresetFileTests.test_three_presets_point_to_real_datasets`.
+- [x] 2. Mỗi preset ghi giấy phép theo trang dataset, kèm trạng thái `"cần kiểm tra lại trên dataset card"`. README nhắc đọc lại giấy phép trước khi dùng. Bằng chứng: `PresetFileTests.test_three_presets_point_to_real_datasets`, `ReadmeTests`.
+- [x] 3. Mỗi preset bật `streaming: true`, `limit` ≤ 1000; loader chỉ đọc đúng `limit` dòng. Bằng chứng: `PresetFileTests.test_presets_stream_with_small_limit`, `test_loader_reads_only_limit_rows`.
+- [x] 4. Chạy được `python -m local_ai.data hf-sft --config configs/datasets/presets/<tên>.json`. Bằng chứng: `CommandTests.test_hf_sft_accepts_config_or_several_presets`; đã chạy thật cả 3 preset với `--limit 20` (xem `memory.md`).
+- [x] 5. `sft.jsonl` xuất đúng: hội thoại nhiều lượt giữ nguyên (kể cả system, hiểu cả dạng ShareGPT from/value); reasoning vào khối `<think>`; context đặt trước câu hỏi. Hội thoại sai dạng (ví dụ kết thúc bằng câu hỏi) bị loại. Bằng chứng: `PresetMappingTests` (`test_multi_turn_conversation_is_kept_with_system`, `test_reasoning_is_kept_in_think_block`, `test_context_is_put_before_question`).
+- [x] 6. Test dùng loader giả (không mạng) cho từng preset: ánh xạ cột đúng, bản ghi hợp lệ, loader nhận đúng `name`/`subset`/`revision` và `streaming=True`. Bằng chứng: `PresetMappingTests.test_each_preset_maps_columns_and_calls_loader_with_streaming`, `test_code_rows`.
+- [x] 7. `hf-sft` nhận nhiều preset kèm tỉ lệ (`--preset code:0.4 --preset reasoning:0.3 ...`, `--total`, `--limit`), xuất chung một `sft.jsonl`, `manifest.json` ghi tỉ lệ và số dòng từng nguồn. Bằng chứng: `MixTests` (3 test), `CommandTests.test_hf_sft_accepts_config_or_several_presets`.
+- [x] 8. Lệnh `python -m local_ai.data list-presets` liệt kê preset: dataset, commit, domain, ngôn ngữ, số dòng tối đa, giấy phép và trạng thái. Bằng chứng: `CommandTests.test_list_presets_command`.
+- [x] 9. Đọc thử thật 20 dòng mỗi preset qua mạng (không nằm trong test), ghi kết quả vào `memory.md`.
 
 ---
 

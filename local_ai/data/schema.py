@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 
-VALID_DOMAINS = {"coding", "software_engineering", "math_logic", "reasoning", "planning", "tool_use", "agent", "research", "trading", "debugging"}
+VALID_DOMAINS = {"coding", "software_engineering", "math_logic", "reasoning", "planning", "tool_use", "agent", "research", "trading", "debugging", "chat"}
 VALID_STATUSES = {"pending", "valid", "rejected"}
 
 
@@ -21,6 +21,7 @@ class DatasetExample:
     context: str | None = None
     reasoning: str | None = None
     trajectory: list[dict[str, Any]] | None = None
+    messages: list[dict[str, str]] | None = None  # hội thoại nhiều lượt (system/user/assistant), dùng nguyên cho sft.jsonl
     tools_used: list[str] = field(default_factory=list)
     difficulty: int = 1
     quality_score: float | None = None

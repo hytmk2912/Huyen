@@ -1,0 +1,5 @@
+{"id": 11, "instruction": "Write a function `add(a, b)` that returns the sum.", "response": "def add(a, b):\n    return a + b", "seed": "", "concepts": ["functions"], "prompt": "", "sha1": "a", "fingerprint": null}
+{"id": 12, "instruction": "Write `is_even(n)`.", "response": "def is_even(n):\n    return n % 2 == 0", "seed": "", "concepts": [], "prompt": "", "sha1": "b", "fingerprint": null}
+{"id": 13, "instruction": "Reverse a string `s`.", "response": "def reverse(s):\n    return s[::-1]", "seed": "", "concepts": [], "prompt": "", "sha1": "c", "fingerprint": null}
+{"id": 14, "instruction": "Return the maximum of a list.", "response": "def largest(items):\n    return max(items)", "seed": "", "concepts": [], "prompt": "", "sha1": "d", "fingerprint": null}
+{"id": 15, "instruction": "", "response": "def broken():\n    pass", "seed": "", "concepts": [], "prompt": "", "sha1": "e", "fingerprint": null}
