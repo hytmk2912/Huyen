@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import random
+import unicodedata
 from collections import Counter
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -29,6 +30,29 @@ def canonical_content(record: dict[str, Any]) -> str:
 
 def content_hash(record: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_content(record).encode()).hexdigest()
+
+
+def normalize_text(text: Any) -> str:
+    """Chuẩn hóa để so sánh: Unicode NFC (chữ tiếng Việt dựng sẵn và tổ hợp coi như nhau), bỏ phân biệt hoa thường, gộp khoảng trắng."""
+    return " ".join(unicodedata.normalize("NFC", str(text or "")).casefold().split())
+
+
+def _questions(record: dict[str, Any]) -> set[str]:
+    """Các câu hỏi của một bản ghi: trường input hoặc prompt, và mọi lượt user trong messages."""
+    turns = [message.get("content") for message in record.get("messages") or [] if isinstance(message, dict) and message.get("role") == "user"]
+    return {normalize_text(text).strip(" .?!") for text in (record.get("input"), record.get("prompt"), *turns)} - {""}
+
+
+def find_eval_overlap(records: list[dict[str, Any]], eval_records: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """Bản ghi train trùng với eval: cùng id, cùng nội dung (content_hash) hoặc cùng câu hỏi sau khi chuẩn hóa. Trả về (id, lý do)."""
+    ids = {str(record["id"]) for record in eval_records if record.get("id")}
+    hashes = {content_hash(record) for record in eval_records}
+    questions = set().union(*(_questions(record) for record in eval_records)) if eval_records else set()
+    overlap = []
+    for record in records:
+        reason = "id" if str(record.get("id")) in ids else "nội dung" if content_hash(record) in hashes else "câu hỏi" if _questions(record) & questions else None
+        if reason: overlap.append((str(record.get("id")), reason))
+    return overlap
 
 
 def load_records(path: str | Path) -> list[dict[str, Any]]:
@@ -186,9 +210,8 @@ def generate_synthetic(teacher: TeacherModel, prompts: list[str], parser: Callab
 def build_dataset(sources: list[str | Path], output_dir: str | Path, version: str, config: dict[str, Any], eval_sources: list[str | Path] | None = None) -> dict[str, Any]:
     raw = [record for source in sources for record in load_records(source)]
     valid, rejected = validate_records(raw); unique, duplicates = deduplicate(valid)
-    eval_ids = {record["id"] for source in (eval_sources or []) for record in load_records(source)}
-    overlap = sorted(record["id"] for record in unique if record["id"] in eval_ids)
-    if overlap: raise ValueError(f"Dữ liệu train trùng với dữ liệu eval (overlap): {', '.join(overlap)}")
+    overlap = find_eval_overlap(unique, [record for source in (eval_sources or []) for record in load_records(source)])
+    if overlap: raise ValueError(f"Dữ liệu train trùng với dữ liệu eval (overlap): {', '.join(f'{identifier} (trùng {reason})' for identifier, reason in sorted(overlap))}")
     for record in unique: record["quality_score"] = quality_score(record)
     if config.get("mix_weights"): unique = mix_records(unique, config["mix_weights"], config.get("seed", 0))
     output = Path(output_dir); write_jsonl(output / "train.jsonl", unique); write_jsonl(output / "rejected.jsonl", rejected + duplicates)

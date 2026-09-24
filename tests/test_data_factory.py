@@ -43,7 +43,7 @@ class DataFactoryTests(unittest.TestCase):
 
     def test_build_versions_and_prevents_eval_leakage(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory); source = root / "source.jsonl"; evaluation = root / "eval.jsonl"; write_jsonl(source, [record("train")]); write_jsonl(evaluation, [record("eval")])
+            root = Path(directory); source = root / "source.jsonl"; evaluation = root / "eval.jsonl"; write_jsonl(source, [record("train")]); write_jsonl(evaluation, [record("eval", content="eval question")])  # M5: câu eval phải khác nội dung, vì trùng nội dung cũng bị chặn
             manifest = build_dataset([source], root / "out", "v2", {"seed": 1, "formats": ["sft"]}, [evaluation])
             self.assertEqual(manifest["version"], "v2"); self.assertTrue(manifest["checksum"]); self.assertTrue((root / "out" / "sft.jsonl").exists())
             write_jsonl(evaluation, [record("train")])

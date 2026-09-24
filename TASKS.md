@@ -19,10 +19,10 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 | M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | **Xong** | 8/8 (100%) | `tests/test_m2_models.py` (20 test) |
 | M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | **Xong** | 7/7 (100%) | `tests/test_m3_local_server.py` (17 test) |
 | M4 | Preset dataset Hugging Face | Ngày 4 | **Xong** | 9/9 (100%) | `tests/test_m4_presets.py` (14 test) + chạy thật 20 dòng/preset |
-| M5 | Đánh giá (eval) mở rộng | Ngày 5 | Chưa làm | 0/7 (0%) | — |
+| M5 | Đánh giá (eval) mở rộng | Ngày 5 | **Xong** | 8/8 (100%) | `tests/test_m5_eval.py` (20 test) |
 | M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | Chưa làm | 0/6 (0%) | — |
 | M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **57%** (400% ÷ 7) | |
+| **Tổng** | | | | **71%** (500% ÷ 7) | |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -102,18 +102,17 @@ Chưa làm (ngoài tiêu chí): gửi ảnh qua server local. Hiện adapter bá
 
 ## M5: Đánh giá (eval) mở rộng
 
-**Hiện trạng:** `local_ai/evaluation/benchmarks.py` mới chỉ chấm kiểu khớp đúng từng chữ.
+**Hiện trạng trước M5:** `local_ai/evaluation/benchmarks.py` chỉ chấm khớp đúng từng chữ; bước chặn rò rỉ eval chỉ so ID.
 
-**Tiêu chí xong**
-- [ ] 1. Chấm kiểu "chứa đáp án": không phân biệt chữ hoa/thường, có chuẩn hóa khoảng trắng và Unicode tiếng Việt.
-- [ ] 2. Chấm bằng regex.
-- [ ] 3. Chấm bài code bằng unit test: chạy code model viết cùng với test trong sandbox có giới hạn thời gian. Code sai cú pháp, lỗi khi chạy hoặc lặp vô hạn thì tính là không đạt, chương trình không sập.
-- [ ] 4. Có bộ khoảng 30 câu trong `data/eval/`, gồm cả tiếng Việt và tiếng Anh (mỗi thứ tiếng ít nhất 10 câu) và ít nhất 5 bài code có unit test. Mỗi câu ghi rõ ngôn ngữ, nhóm và cách chấm.
-- [ ] 5. Báo cáo kết quả theo nhóm và theo ngôn ngữ, liệt kê các câu sai.
-- [ ] 6. Có test cho từng cách chấm, cả trường hợp đạt và không đạt, kể cả code lặp vô hạn.
-- [ ] 7. Không có câu eval nào lọt vào dữ liệu train: kiểm tra trùng theo nội dung câu hỏi, không chỉ theo ID. Lỗi chỉ so ID hiện có trên `main`.
-
-Tham khảo: PR #4 (chưa gộp) có `local_ai/evaluation/suites.py` (chấm khớp đúng, chứa đáp án, so số) và phần chặn rò rỉ eval theo nội dung (commit `2626c7d`).
+**Tiêu chí xong** (thêm tiêu chí 8 ngày 24/9 theo yêu cầu của chủ repo: cách chấm `exact`, lệnh eval theo tên model, báo cáo JSON + Markdown trong `.runs/`)
+- [x] 1. Chấm `contains`: không phân biệt hoa thường, chuẩn hóa khoảng trắng và Unicode tiếng Việt (NFC). `exact` chuẩn hóa như vậy. Khối `<think>` bị bỏ trước khi chấm. Bằng chứng: `tests/test_m5_eval.py` `ScoringTests.test_contains_normalizes_case_space_and_vietnamese_unicode`, `test_exact`.
+- [x] 2. Chấm `regex`. Bằng chứng: `ScoringTests.test_regex`.
+- [x] 3. Chấm `python_tests`: chạy code của model cùng unit test trong `PythonSandbox`, có `timeout_s`. Code sai cú pháp, lỗi khi chạy hoặc lặp vô hạn đều tính là không đạt, chương trình không sập. Bằng chứng: `ScoringTests.test_python_tests_pass_and_fail`, `test_python_syntax_runtime_error_and_infinite_loop_do_not_crash`.
+- [x] 4. `data/eval/eval_v1.jsonl` có 30 câu: 15 tiếng Việt, 15 tiếng Anh; 8 `code` (có unit test), 14 `reasoning`, 8 `tool_use`. Mỗi câu ghi `language`, `group`, `scoring` và có `reference` (đáp án mẫu); mọi đáp án mẫu đều đạt. Bằng chứng: `CaseFileTests` (3 test).
+- [x] 5. Báo cáo theo nhóm và theo ngôn ngữ, liệt kê câu không đạt kèm lý do. Bằng chứng: `RunTests.test_report_by_group_and_language_lists_failures`.
+- [x] 6. Mỗi cách chấm có test cả trường hợp đạt và không đạt, kể cả code lặp vô hạn. Bằng chứng: `ScoringTests` (6 test).
+- [x] 7. Không câu eval nào lọt vào dữ liệu train: kiểm tra theo id, theo nội dung (content_hash) và theo câu hỏi đã chuẩn hóa (kể cả các lượt user trong hội thoại). Bước build dừng khi có trùng; mọi cấu hình dataset chặn cả `eval_v1.jsonl`. Lệnh eval có `--train-data` để từ chối chạy khi dữ liệu train chứa câu eval. Bằng chứng: `OverlapTests` (3 test), `CommandTests.test_training_data_overlapping_eval_is_blocked`. Test cũ `test_data_factory.test_build_versions_and_prevents_eval_leakage` được đổi nội dung bản ghi eval, vì trước đó nó dựa vào đúng lỗi này (train và eval cùng nội dung, chỉ khác id).
+- [x] 8. Lệnh `python -m local_ai.evaluation --model <tên>` (hoặc `--scripted`: chạy bằng ScriptedModelAdapter trả đáp án mẫu) ghi `report.json` và `report.md` vào `.runs/eval/<model>-<thời điểm>/`. Model lỗi thì dừng, báo `status: "error"`, không sập. README có hướng dẫn. Bằng chứng: `RunTests` (4 test), `CommandTests` (3 test), `ReadmeTests`.
 
 ---
 

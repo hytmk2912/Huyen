@@ -14,7 +14,7 @@ Kế hoạch làm việc hiện tại: xem `TASKS.md` (nhiệm vụ 1 tuần, 7 
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); quét khóa bí mật (`secrets.py`).
 - `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
-- `local_ai/evaluation`: chấm điểm model.
+- `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`.
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
 - `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ).
 
@@ -142,6 +142,40 @@ python -m local_ai.training.finetune --config configs/training/qlora_primary.jso
 ```
 
 Checkpoint lưu thành `checkpoint-N`; chạy lại sẽ tiếp tục từ checkpoint mới nhất (`--no-resume` để làm lại). Thiếu GPU hoặc thư viện (kể cả bitsandbytes khi dùng QLoRA) thì lệnh báo `"status": "skipped"`.
+
+## Bước 3: đánh giá (eval)
+Bộ câu hỏi `data/eval/eval_v1.jsonl` có 30 câu:
+- chia theo ngôn ngữ: 15 câu tiếng Việt, 15 câu tiếng Anh;
+- chia theo nhóm: 8 câu `code`, 14 câu `reasoning`, 8 câu `tool_use` (trả JSON gọi công cụ).
+
+Mỗi câu ghi `language`, `group` và cách chấm `scoring`:
+
+| scoring | Cách chấm |
+| --- | --- |
+| `exact` | Trả lời đúng bằng `expected`. Không phân biệt hoa thường, gộp khoảng trắng, chuẩn hóa Unicode tiếng Việt. |
+| `contains` | Câu trả lời chứa `expected`, chuẩn hóa như trên. |
+| `regex` | Câu trả lời khớp `pattern`. Không phân biệt hoa thường. |
+| `python_tests` | Lấy code trong câu trả lời, chạy cùng `tests` trong `PythonSandbox`, giới hạn `timeout_s` giây. Code sai cú pháp, lỗi khi chạy hoặc lặp vô hạn đều tính là không đạt. |
+
+Trước khi chấm, khối `<think>...</think>` trong câu trả lời được bỏ đi. Mỗi câu có `reference` là một câu trả lời đúng mẫu; test kiểm tra mọi `reference` đều đạt.
+
+```bash
+python -m local_ai.evaluation --scripted                  # chạy thử bằng đáp án mẫu (không cần model), kết quả 30/30
+python -m local_ai.evaluation --model ollama              # chấm một model trong configs/models/platform.json
+python -m local_ai.evaluation --model smoke --train-data data/processed/hf_mix/sft.jsonl
+```
+
+Báo cáo ghi vào `.runs/eval/<model>-<thời điểm>/`, hoặc thư mục ghi ở `--output`:
+- `report.json`: kết quả từng câu;
+- `report.md`: tỉ lệ đạt theo nhóm và theo ngôn ngữ, cùng danh sách câu không đạt kèm lý do.
+
+Nếu model lỗi (ví dụ server chưa chạy), lệnh dừng và ghi `status: "error"`. Model chạy bằng transformers mà máy thiếu torch hoặc transformers thì lệnh báo bỏ qua.
+
+**Chặn trùng train/eval** theo id, theo nội dung, và theo câu hỏi đã chuẩn hóa (kể cả các lượt user trong hội thoại):
+- Bước build dữ liệu (`hf-sft`, `build`) dừng và báo lỗi nếu dữ liệu train trùng với file trong `eval_sources`. Các cấu hình có sẵn đã chặn cả `seed_eval.jsonl` lẫn `eval_v1.jsonl`.
+- Lệnh eval với `--train-data <train.jsonl hoặc sft.jsonl>` từ chối chạy nếu dữ liệu train chứa câu eval.
+
+`PythonSandbox` chỉ chạy code trong một tiến trình riêng, có giới hạn thời gian. Nó không phải lớp cách ly an toàn. Nếu chấm code của model lạ, hãy chạy trong container.
 
 ## Lộ trình
 Theo `TASKS.md`: M1 agent chịu lỗi và dọn repo → M2 model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM → M3 adapter server local (Ollama, llama.cpp) → M4 preset dataset → M5 eval mở rộng → M6 test chạy thật trên CPU → M7 tổng kết. Tiến độ từng mốc ghi trong bảng ở `TASKS.md`.

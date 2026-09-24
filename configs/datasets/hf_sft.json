@@ -4,7 +4,7 @@
   "seed": 17,
   "output_dir": "data/processed/hf_sft",
   "formats": ["sft"],
-  "eval_sources": ["data/eval/seed_eval.jsonl"],
+  "eval_sources": ["data/eval/seed_eval.jsonl", "data/eval/eval_v1.jsonl"],
   "hf_dataset": {
     "name": "",
     "subset": null,
