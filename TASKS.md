@@ -20,9 +20,9 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 | M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | **Xong** | 7/7 (100%) | `tests/test_m3_local_server.py` (17 test) |
 | M4 | Preset dataset Hugging Face | Ngày 4 | **Xong** | 9/9 (100%) | `tests/test_m4_presets.py` (14 test) + chạy thật 20 dòng/preset |
 | M5 | Đánh giá (eval) mở rộng | Ngày 5 | **Xong** | 8/8 (100%) | `tests/test_m5_eval.py` (20 test) |
-| M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | Chưa làm | 0/6 (0%) | — |
+| M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | **Xong** | 7/7 (100%) | `tests/test_m6_cpu_pipeline.py` (3 test, chạy thật khoảng 6 giây) |
 | M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **71%** (500% ÷ 7) | |
+| **Tổng** | | | | **86%** (600% ÷ 7) | |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -118,13 +118,14 @@ Chưa làm (ngoài tiêu chí): gửi ảnh qua server local. Hiện adapter bá
 
 ## M6: Test chạy thật trên CPU với model tí hon
 
-**Tiêu chí xong**
-- [ ] 1. Test tự tạo tokenizer và model tí hon khởi tạo ngẫu nhiên (ví dụ 2 lớp, kích thước ẩn 32), không tải model, tokenizer hay dataset nào. Test chạy với `HF_HUB_OFFLINE=1` để chắc chắn điều đó.
-- [ ] 2. Phần dữ liệu: từ file mẫu trong repo, qua bước build, ra `sft.jsonl`.
-- [ ] 3. Train LoRA đúng 2 bước trên CPU qua `local_ai.training.finetune` (có cấu hình cho phép chạy không cần GPU) và tạo ra adapter.
-- [ ] 4. Phần eval: chạy bộ đánh giá với model vừa train và ghi `eval_report.json`. Điểm thấp là bình thường.
-- [ ] 5. Toàn bộ test chạy dưới 3 phút trên CPU; tự bỏ qua (skip, không báo lỗi) khi máy thiếu torch, transformers, peft hoặc trl.
-- [ ] 6. Đã chạy thật ít nhất một lần trên máy có đủ thư viện, và ghi thời gian chạy cùng loss vào `memory.md`.
+**Tiêu chí xong** (thêm tiêu chí 7 ngày 24/9 theo yêu cầu của chủ repo: nạp lại adapter rồi eval)
+- [x] 1. Test tự tạo tokenizer (BPE byte-level, có `chat_template`) và model tí hon khởi tạo ngẫu nhiên (Llama 2 lớp, hidden 64), không tải model, tokenizer hay dataset nào. Test chạy với `HF_HUB_OFFLINE=1`; đã chạy lại khi chặn hẳn mạng (proxy sai) và vẫn xanh. Bằng chứng: `tests/test_m6_cpu_pipeline.py` `CpuPipelineTests.test_fixture_to_lora_to_reload_to_eval`.
+- [x] 2. Phần dữ liệu: từ fixture của 3 preset trong repo, qua bước build (`prepare_hf_mix`), ra `sft.jsonl` (8 dòng). Bằng chứng: như trên.
+- [x] 3. Train LoRA đúng 2 bước trên CPU qua `local_ai.training.finetune` (`require_gpu: false`, khóa mới `max_steps`) và tạo ra adapter (`adapter_config.json`, `adapter_model.safetensors`). Bằng chứng: như trên (`result["steps"] == 2`).
+- [x] 4. Phần eval: chạy bộ eval 30 câu với model vừa train và ghi `report.json` và `report.md`. Điểm thấp là bình thường. Bằng chứng: như trên.
+- [x] 5. Toàn bộ test M6 chạy khoảng 6 giây trên CPU (dưới 3 phút). Máy thiếu torch, transformers, peft, trl hoặc datasets thì test tự bỏ qua (đã kiểm tra bằng venv trống: `OK (skipped=1)`).
+- [x] 6. Đã chạy thật trên máy có đủ thư viện (torch 2.14.0+cpu, transformers 5.17.0, trl 1.13.0, peft 0.21.0, datasets 5.0.1); thời gian chạy và loss ghi trong `memory.md`.
+- [x] 7. Nạp lại được model gốc cùng adapter qua khóa mới `adapter_path` trong danh sách model (model thành `PeftModelForCausalLM`) để eval. Lệnh `python -m local_ai.training.finetune` và `python -m local_ai.evaluation --model <tên có adapter_path>` chạy được trên model tí hon. Bằng chứng: `CpuPipelineTests`, `AdapterPathTests` (2 test, dùng module giả nên chạy được cả khi thiếu thư viện).
 
 ---
 

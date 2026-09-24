@@ -52,6 +52,7 @@ class FinetuneConfig:
     logging_steps: int = 10
     resume: bool | str = True
     require_gpu: bool = True
+    max_steps: int = -1  # > 0 thì dừng sau đúng số bước này (ví dụ chạy thử 2 bước), bỏ qua epochs
     quantization: str | None = None  # None: theo danh sách model; "4bit" | "8bit": nén khi nạp (QLoRA); "none": không nén
 
     @classmethod
@@ -142,14 +143,14 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
         from peft import LoraConfig
         peft_config = LoraConfig(r=config.lora.r, lora_alpha=config.lora.alpha, lora_dropout=config.lora.dropout, target_modules=config.lora.target_modules, task_type="CAUSAL_LM")
     dataset = load_dataset("json", data_files=config.dataset_path, split="train").select_columns(["messages"])
-    args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[])
+    args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, max_steps=config.max_steps, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[])
     tracker = RunTracker(config.output_dir, describe(config))
     trainer = SFTTrainer(model=model, args=args, train_dataset=dataset, processing_class=tokenizer, peft_config=peft_config)
     result = trainer.train(resume_from_checkpoint=resume_target(config))
     final = Path(config.output_dir) / ("adapter" if config.method == "lora" else "final")
     trainer.save_model(str(final)); tokenizer.save_pretrained(str(final))
     tracker.record_metrics({key: float(value) for key, value in result.metrics.items() if isinstance(value, (int, float))}); tracker.record_checkpoint(str(final))
-    return {"status": "completed", "output": str(final), "metrics": result.metrics}
+    return {"status": "completed", "output": str(final), "steps": getattr(result, "global_step", None), "metrics": result.metrics}
 
 
 def main(argv: list[str] | None = None) -> None:

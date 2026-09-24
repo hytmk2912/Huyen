@@ -22,6 +22,8 @@ Kế hoạch làm việc hiện tại: xem `TASKS.md` (nhiệm vụ 1 tuần, 7 
 ```bash
 python -m pip install datasets                        # tải dataset Hugging Face
 python -m pip install torch transformers trl peft     # huấn luyện (cần GPU)
+# máy không có GPU: cài torch bản CPU trước, rồi mới cài các thư viện kia
+# python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install bitsandbytes                    # nén 4bit/8bit và QLoRA (cần GPU CUDA)
 python -m unittest discover -s tests -v
 python -m compileall -q local_ai
@@ -141,7 +143,29 @@ QLoRA (LoRA trên model gốc nén 4bit) cho model chính dùng cấu hình mẫ
 python -m local_ai.training.finetune --config configs/training/qlora_primary.json --dry-run
 ```
 
+Các khóa hữu ích khác trong cấu hình huấn luyện:
+- `max_steps`: dừng sau đúng số bước này, ví dụ `2` để chạy thử;
+- `require_gpu: false`: cho phép chạy trên CPU.
+
+Để chấm model sau khi train, thêm một mục vào danh sách model, trỏ `adapter_path` tới thư mục adapter vừa lưu. Ví dụ `{"name": "smoke-lora", "source": "Qwen/Qwen2.5-0.5B-Instruct", "adapter_path": ".runs/sft/adapter", ...}`. Sau đó chạy `python -m local_ai.evaluation --model smoke-lora`. `max_new_tokens` (mặc định 512) giới hạn độ dài câu trả lời.
+
 Checkpoint lưu thành `checkpoint-N`; chạy lại sẽ tiếp tục từ checkpoint mới nhất (`--no-resume` để làm lại). Thiếu GPU hoặc thư viện (kể cả bitsandbytes khi dùng QLoRA) thì lệnh báo `"status": "skipped"`.
+
+### Chạy thử cả chuỗi trên CPU (không cần GPU, không tải gì)
+Test `tests/test_m6_cpu_pipeline.py` tự tạo tokenizer (BPE, có `chat_template`) và model Llama tí hon (2 lớp, hidden 64, khởi tạo ngẫu nhiên). Sau đó test chạy thật cả chuỗi:
+1. fixture preset → `sft.jsonl`;
+2. LoRA 2 bước trên CPU;
+3. lưu adapter;
+4. nạp lại model gốc cùng adapter;
+5. chạy eval 30 câu.
+
+Test chạy với `HF_HUB_OFFLINE=1`. Trên máy 4 CPU, test mất khoảng 6 giây. Máy thiếu torch, transformers, trl, peft hoặc datasets thì test tự bỏ qua.
+
+```bash
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install transformers trl peft datasets
+python -m unittest tests.test_m6_cpu_pipeline -v
+```
 
 ## Bước 3: đánh giá (eval)
 Bộ câu hỏi `data/eval/eval_v1.jsonl` có 30 câu:

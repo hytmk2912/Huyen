@@ -30,7 +30,7 @@ class ModelConfig:
     tokenizer_source: str | None = None
     tokenizer_revision: str | None = None
     dtype: str = "bfloat16"
-    device_map: str | dict[str, Any] = "auto"
+    device_map: str | dict[str, Any] | None = "auto"  # null: không truyền device_map (chạy trên CPU không cần accelerate)
     capabilities: frozenset[ModelCapability] = field(default_factory=frozenset)
     offline: bool = False
     quantization: str | None = None
@@ -40,6 +40,8 @@ class ModelConfig:
     base_url: str | None = None  # ví dụ http://localhost:11434/v1
     api_key_env: str | None = None  # tên biến môi trường chứa khóa của server (nếu server cần); không ghi khóa vào cấu hình
     timeout_s: float = 120.0
+    adapter_path: str | None = None  # thư mục LoRA adapter đã train (ví dụ .runs/sft/adapter), nạp chồng lên model gốc
+    max_new_tokens: int = 512
 
     def __post_init__(self) -> None:
         if self.kind not in MODEL_KINDS: raise ValueError(f"Model '{self.name}': kind phải là {' hoặc '.join(MODEL_KINDS)}, không phải '{self.kind}'")
@@ -51,6 +53,7 @@ class ModelConfig:
             url = urllib.parse.urlsplit(self.base_url or "")
             if url.scheme not in ("http", "https") or not url.hostname: raise ValueError(f"Model '{self.name}': backend openai_compatible cần base_url dạng http://máy:cổng/v1, không phải '{self.base_url}'")
         if isinstance(self.timeout_s, bool) or not isinstance(self.timeout_s, (int, float)) or self.timeout_s <= 0: raise ValueError(f"Model '{self.name}': timeout_s phải là số giây lớn hơn 0")
+        if isinstance(self.max_new_tokens, bool) or not isinstance(self.max_new_tokens, int) or self.max_new_tokens <= 0: raise ValueError(f"Model '{self.name}': max_new_tokens phải là số nguyên lớn hơn 0")
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "ModelConfig":
@@ -100,7 +103,14 @@ def load_pretrained(config: ModelConfig) -> tuple[Any, Any]:
     processor = processor_class.from_pretrained(config.tokenizer_source or config.source, revision=config.tokenizer_revision or config.revision, local_files_only=config.offline)
     kwargs = {"revision": config.revision, "local_files_only": config.offline, "torch_dtype": dtype, "device_map": config.device_map}
     if config.quantization: kwargs["quantization_config"] = quantization_config(transformers, config.quantization, dtype)
-    return model_loader_class(transformers, config.kind).from_pretrained(config.source, **kwargs), processor
+    model = model_loader_class(transformers, config.kind).from_pretrained(config.source, **kwargs)
+    if config.adapter_path:
+        try:
+            from peft import PeftModel
+        except ImportError as error: raise RuntimeError("Nạp LoRA adapter cần thư viện peft; hãy chạy `python -m pip install peft`") from error
+        if not Path(config.adapter_path).is_dir(): raise FileNotFoundError(f"Không tìm thấy thư mục adapter: {config.adapter_path}")
+        model = PeftModel.from_pretrained(model, config.adapter_path)
+    return model, processor
 
 
 def chat_messages(config: ModelConfig, messages: list[Message]) -> list[dict[str, Any]]:
@@ -139,5 +149,5 @@ class HuggingFaceModelAdapter:
         else:
             prompt = self.tokenizer.apply_chat_template(conversation, tokenize=False, add_generation_prompt=True)
             inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        output = self.model.generate(**inputs, max_new_tokens=512)
+        output = self.model.generate(**inputs, max_new_tokens=self.config.max_new_tokens)
         return self.tokenizer.decode(output[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)
