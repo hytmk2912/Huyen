@@ -1,5 +1,5 @@
 {
-  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp).",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp). backend: transformers (mặc định, nạp model bằng thư viện transformers) hoặc openai_compatible (gọi server local kiểu OpenAI: Ollama, llama.cpp, vLLM). Với openai_compatible: source là tên model trên server, base_url là địa chỉ server (chỉ cho phép máy này hoặc mạng nội bộ), timeout_s là số giây chờ tối đa, api_key_env (tùy chọn) là tên biến môi trường chứa khóa nếu server yêu cầu; dtype, device_map, quantization không dùng tới.",
   "models": [
     {
       "name": "primary",
@@ -46,6 +46,26 @@
       "device_map": "auto",
       "capabilities": ["chat", "evaluation"],
       "offline": false
+    },
+    {
+      "name": "ollama",
+      "backend": "openai_compatible",
+      "base_url": "http://localhost:11434/v1",
+      "source": "huihui_ai/Qwen3.8-abliterated:27b",
+      "kind": "multimodal",
+      "params_b": 27.78,
+      "timeout_s": 300,
+      "capabilities": ["chat", "reasoning", "coding", "tool_calling"]
+    },
+    {
+      "name": "llamacpp",
+      "backend": "openai_compatible",
+      "base_url": "http://localhost:8080/v1",
+      "source": "qwen2.5-0.5b-instruct",
+      "kind": "text",
+      "params_b": 0.49,
+      "timeout_s": 120,
+      "capabilities": ["chat", "reasoning"]
     }
   ]
 }

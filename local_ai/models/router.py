@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from local_ai.contracts import Message, ModelAdapter
-from local_ai.models.adapters import ModelConfig
+from local_ai.models.adapters import HuggingFaceModelAdapter, ModelConfig
+from local_ai.models.openai_compatible import OpenAICompatibleAdapter
 
 
 class ScriptedModelAdapter:
@@ -9,6 +10,11 @@ class ScriptedModelAdapter:
         self.name, self.responses = name, iter(responses)
         self.capabilities = capabilities or {"chat", "reasoning", "tool_calling"}
     def generate(self, messages: list[Message]) -> str: return next(self.responses)
+
+
+def create_adapter(config: ModelConfig) -> ModelAdapter:
+    """Tạo adapter theo backend trong cấu hình: openai_compatible gọi server local, transformers nạp model Hugging Face."""
+    return OpenAICompatibleAdapter(config) if config.backend == "openai_compatible" else HuggingFaceModelAdapter(config)
 
 
 class ModelRouter:
@@ -20,4 +26,4 @@ class ModelRouter:
         if self._default and self._default in self._models: return self._models[self._default]
         raise LookupError(f"Không có model nào được cấu hình cho khả năng: {capability}")
     @classmethod
-    def from_configs(cls, configs: list[ModelConfig], factory): return cls([factory(config) for config in configs])
+    def from_configs(cls, configs: list[ModelConfig], factory=create_adapter, default: str | None = None): return cls([factory(config) for config in configs], default)

@@ -17,12 +17,12 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 | --- | --- | --- | --- | --- | --- |
 | M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | **Xong** | 9/9 (100%) | `tests/test_m1_agent_cleanup.py` (11 test) |
 | M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | **Xong** | 8/8 (100%) | `tests/test_m2_models.py` (20 test) |
-| M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | Chưa làm | 0/7 (0%) | — |
+| M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | **Xong** | 7/7 (100%) | `tests/test_m3_local_server.py` (17 test) |
 | M4 | Preset dataset Hugging Face | Ngày 4 | Chưa làm | 0/6 (0%) | — |
 | M5 | Đánh giá (eval) mở rộng | Ngày 5 | Chưa làm | 0/7 (0%) | — |
 | M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | Chưa làm | 0/6 (0%) | — |
 | M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **29%** (200% ÷ 7) | |
+| **Tổng** | | | | **43%** (300% ÷ 7) | |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -70,16 +70,18 @@ Dọn repo:
 
 ---
 
-## M3: Adapter gọi server local kiểu OpenAI (Ollama, llama.cpp)
+## M3: Adapter gọi server local kiểu OpenAI (Ollama, llama.cpp, vLLM)
 
 **Tiêu chí xong**
-- [ ] 1. Adapter gửi `POST {base_url}/chat/completions` theo chuẩn OpenAI và trả về `choices[0].message.content`. Dùng được với Ollama (`http://localhost:11434/v1`) và llama.cpp server (`http://localhost:8080/v1`). Chỉ dùng thư viện chuẩn của Python, không thêm thư viện `openai`.
-- [ ] 2. Khai báo được trong `configs/models/platform.json` (ví dụ `backend: "openai_compatible"`, `base_url`, tên model trên server). Khóa truy cập, nếu server yêu cầu, chỉ đọc từ biến môi trường.
-- [ ] 3. Mặc định chỉ cho phép địa chỉ local hoặc mạng nội bộ; địa chỉ bên ngoài bị từ chối, để không vô tình gọi API trả phí.
-- [ ] 4. Lỗi mạng, hết thời gian chờ hay mã lỗi HTTP đều được báo rõ ràng bằng tiếng Việt; agent không sập khi server lỗi.
-- [ ] 5. Router và agent dùng được adapter này qua cấu hình.
-- [ ] 6. Có test dựng server giả bằng `http.server` trên localhost cho ba trường hợp: trả lời đúng, trả mã 500, và chậm quá thời gian chờ. Test không cần Ollama hay llama.cpp thật.
-- [ ] 7. README có hướng dẫn chạy với Ollama và llama.cpp: lệnh khởi động server và cấu hình mẫu.
+- [x] 1. Adapter gửi `POST {base_url}/chat/completions` theo chuẩn OpenAI và trả về `choices[0].message.content`. Dùng được với Ollama (`http://localhost:11434/v1`), llama.cpp server (`http://localhost:8080/v1`) và vLLM (`http://localhost:8000/v1`). Chỉ dùng `urllib` của Python, không thêm thư viện `openai`. Bằng chứng: `tests/test_m3_local_server.py` `RequestTests.test_success_sends_openai_payload_and_returns_content`.
+- [x] 2. Khai báo trong `configs/models/platform.json`: `backend: "openai_compatible"`, `base_url`, `source` (tên model trên server), `timeout_s`. Có 2 mục mẫu: `ollama` và `llamacpp`. Khóa truy cập, nếu server yêu cầu, chỉ đọc từ biến môi trường có tên ghi ở `api_key_env`. Bằng chứng: `RequestTests.test_api_key_is_read_only_from_environment`, `ConfigRoutingTests.test_platform_declares_ollama_and_llamacpp`, `LocalAddressTests.test_config_is_validated`.
+- [x] 3. Chỉ cho phép địa chỉ máy này hoặc mạng nội bộ. Địa chỉ Internet bị từ chối trước khi gửi, để không vô tình gọi API trả phí. Adapter không dùng proxy và không đi theo redirect. Bằng chứng: `LocalAddressTests` (3 test), `ErrorTests.test_bad_response_and_redirect`.
+- [x] 4. Lỗi mạng, hết thời gian chờ, mã lỗi HTTP hay trả lời sai chuẩn đều được báo rõ ràng bằng tiếng Việt. Agent không sập khi server lỗi: agent dừng lại và trả kết quả chưa hoàn thành, kèm thông báo lỗi. Bằng chứng: `ErrorTests` (4 test), `ConfigRoutingTests.test_agent_does_not_crash_when_server_fails`.
+- [x] 5. Router và agent dùng được adapter này qua cấu hình (`create_adapter`, `ModelRouter.from_configs`). Demo chạy được qua adapter: `python -m local_ai.demo --model <tên>`. Fine-tune từ chối model chạy qua server. Bằng chứng: `ConfigRoutingTests.test_agent_runs_through_router_built_from_config`, `DemoTests` (2 test), `ConfigRoutingTests.test_finetune_rejects_server_models`.
+- [x] 6. Có test dựng server giả bằng `http.server` trên 127.0.0.1 cho các trường hợp: trả lời đúng, trả mã 500, chậm quá thời gian chờ, và server chưa chạy. Test không cần Ollama hay llama.cpp thật. Bằng chứng: `tests/test_m3_local_server.py` (lớp `FakeServer`, 17 test).
+- [x] 7. README có hướng dẫn chạy với Ollama, llama.cpp và vLLM: lệnh khởi động server, cấu hình mẫu và lệnh demo. Bằng chứng: `ReadmeTests.test_readme_explains_ollama_llamacpp_and_vllm`.
+
+Chưa làm (ngoài tiêu chí): gửi ảnh qua server local. Hiện adapter báo lỗi rõ ràng khi có ảnh.
 
 ---
 

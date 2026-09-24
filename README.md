@@ -13,7 +13,7 @@ Kế hoạch làm việc hiện tại: xem `TASKS.md` (nhiệm vụ 1 tuần, 7 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); quét khóa bí mật (`secrets.py`).
 - `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA).
-- `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
+- `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: chấm điểm model.
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
 - `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ).
@@ -43,6 +43,44 @@ Xem VRAM ước tính cho mọi model (không tải model, không cần mạng):
 python -m local_ai.models.vram
 ```
 Bảng in ra trọng số ở bf16/8bit/4bit và bộ nhớ khi train LoRA/QLoRA. Ví dụ model chính (27,78 tỷ tham số): trọng số bf16 khoảng 55,6 GB, 4bit khoảng 15,6 GB, train QLoRA khoảng 20,5 GB. Đây chỉ là ước lượng, chưa đo trên GPU thật.
+
+## Chạy model qua server local (Ollama, llama.cpp, vLLM)
+Model có `backend: "openai_compatible"` được gọi qua `POST {base_url}/chat/completions` theo chuẩn OpenAI, chỉ dùng thư viện chuẩn của Python. Khi đó:
+- `source` là tên model trên server;
+- `timeout_s` là số giây chờ tối đa;
+- `api_key_env` (tùy chọn) là **tên** biến môi trường chứa khóa, dùng khi server yêu cầu khóa. Không ghi khóa vào file cấu hình.
+
+`base_url` chỉ được là máy này hoặc mạng nội bộ (localhost, 192.168.x.x, 10.x.x.x...). Địa chỉ Internet bị từ chối, để không vô tình gọi API trả phí.
+
+`configs/models/platform.json` có sẵn 2 mục mẫu:
+- `ollama`: `http://localhost:11434/v1`, model `huihui_ai/Qwen3.8-abliterated:27b`;
+- `llamacpp`: `http://localhost:8080/v1`.
+
+Cần cài Ollama, llama.cpp hoặc vLLM trước.
+
+```bash
+# Ollama
+ollama pull huihui_ai/Qwen3.8-abliterated:27b
+ollama serve                                   # nếu Ollama chưa tự chạy nền
+python -m local_ai.demo --model ollama
+
+# llama.cpp (model nhỏ, chạy được trên CPU)
+llama-server -hf Qwen/Qwen2.5-0.5B-Instruct-GGUF --port 8080
+python -m local_ai.demo --model llamacpp
+
+# vLLM (cần GPU)
+vllm serve Qwen/Qwen2.5-0.5B-Instruct --port 8000
+```
+
+Với vLLM, thêm một mục vào `configs/models/platform.json`:
+```json
+{"name": "vllm", "backend": "openai_compatible", "base_url": "http://localhost:8000/v1", "source": "Qwen/Qwen2.5-0.5B-Instruct", "kind": "text", "params_b": 0.49, "capabilities": ["chat", "reasoning"]}
+```
+Nếu chạy `vllm serve ... --api-key "$LOCAL_LLM_API_KEY"` thì thêm `"api_key_env": "LOCAL_LLM_API_KEY"` vào mục trên.
+
+`python -m local_ai.demo` (không có `--model`) chạy agent với model giả, không cần server.
+
+Khi server lỗi, agent dừng lại và báo lỗi bằng tiếng Việt, không bị sập. Các trường hợp lỗi: server chưa chạy, hết thời gian chờ, hoặc server trả mã lỗi HTTP. Model quá nhỏ có thể không trả JSON đúng định dạng; khi đó demo báo "không hoàn thành".
 
 ## Bước 1: chuẩn bị dữ liệu
 Sửa `configs/datasets/hf_sft.json`: điền `hf_dataset.name`, giấy phép lấy từ trang dataset, và chọn `messages_field` (cột hội thoại) hoặc `mapping.input` / `mapping.expected_output`.

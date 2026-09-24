@@ -72,7 +72,9 @@ def load_finetune_config(path: str | Path, **overrides: Any) -> FinetuneConfig:
 
 
 def resolve_base_model(config: FinetuneConfig) -> ModelConfig:
-    return find_model_config(config.models_config, config.base_model)
+    model = find_model_config(config.models_config, config.base_model)
+    if model.backend != "transformers": raise ValueError(f"Model '{model.name}' chạy qua server (backend {model.backend}), không fine-tune được; hãy chọn model có backend transformers")
+    return model
 
 
 def effective_quantization(config: FinetuneConfig, model: ModelConfig) -> str | None:

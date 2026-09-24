@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import sys
+import urllib.parse
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Any
 from local_ai.contracts import Message
 
 MODEL_KINDS = ("text", "multimodal")
+BACKENDS = ("transformers", "openai_compatible")
 QUANTIZATIONS = ("4bit", "8bit")
 TORCH_DTYPES = ("bfloat16", "float16", "float32")
 
@@ -34,12 +36,21 @@ class ModelConfig:
     quantization: str | None = None
     kind: str = "text"
     params_b: float | None = None
+    backend: str = "transformers"  # "openai_compatible": gọi server local (Ollama, llama.cpp, vLLM); source là tên model trên server
+    base_url: str | None = None  # ví dụ http://localhost:11434/v1
+    api_key_env: str | None = None  # tên biến môi trường chứa khóa của server (nếu server cần); không ghi khóa vào cấu hình
+    timeout_s: float = 120.0
 
     def __post_init__(self) -> None:
         if self.kind not in MODEL_KINDS: raise ValueError(f"Model '{self.name}': kind phải là {' hoặc '.join(MODEL_KINDS)}, không phải '{self.kind}'")
         if self.quantization is not None and self.quantization not in QUANTIZATIONS: raise ValueError(f"Model '{self.name}': quantization phải là {' hoặc '.join(QUANTIZATIONS)} (hoặc bỏ trống), không phải '{self.quantization}'")
         if self.params_b is not None and (isinstance(self.params_b, bool) or not isinstance(self.params_b, (int, float)) or self.params_b <= 0): raise ValueError(f"Model '{self.name}': params_b phải là số tỷ tham số lớn hơn 0")
         if ModelCapability.VISION in self.capabilities and self.kind != "multimodal": raise ValueError(f"Model '{self.name}' có khả năng vision thì kind phải là 'multimodal'")
+        if self.backend not in BACKENDS: raise ValueError(f"Model '{self.name}': backend phải là {' hoặc '.join(BACKENDS)}, không phải '{self.backend}'")
+        if self.backend == "openai_compatible":
+            url = urllib.parse.urlsplit(self.base_url or "")
+            if url.scheme not in ("http", "https") or not url.hostname: raise ValueError(f"Model '{self.name}': backend openai_compatible cần base_url dạng http://máy:cổng/v1, không phải '{self.base_url}'")
+        if isinstance(self.timeout_s, bool) or not isinstance(self.timeout_s, (int, float)) or self.timeout_s <= 0: raise ValueError(f"Model '{self.name}': timeout_s phải là số giây lớn hơn 0")
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "ModelConfig":
