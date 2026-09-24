@@ -1,6 +1,12 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.venv/
+venv/
+
+# Bí mật: HF_TOKEN và khóa khác chỉ để trong biến môi trường hoặc file .env (không commit)
+.env
+.env.*
 .runs/
 storage/
 data/processed/
