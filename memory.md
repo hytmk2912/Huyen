@@ -2,8 +2,9 @@
 
 Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở cuối lượt. Viết ngắn (dưới 80 dòng). Kế hoạch và tiêu chí: `TASKS.md`.
 
-## XONG – chờ merge
-Cả 7 mốc đã xong ngày 24/9. Toàn bộ nằm trên nhánh `claude/nhiem-vu-tuan`, PR #6 vào `main`. Lượt sau: không làm mốc mới; chỉ kiểm tra PR #6 đã gộp chưa, rồi báo chủ repo.
+## XONG – đã gộp vào main
+Cả 7 mốc đã xong ngày 24/9. PR #6 đã gộp vào `main` (commit gộp `63bdc61`) theo yêu cầu của chủ repo; PR #5 đã đóng vì thừa. Lượt tự động sau: không làm mốc mới, dừng ngay. Việc mới phải hỏi chủ repo trước.
+Sau khi gộp, đã rà soát cả repo cho thống nhất: thư mục dữ liệu SFT, file mẫu dataset, trợ giúp lệnh, tài liệu (xem nhật ký).
 
 ## Checklist
 - [x] M1 Sửa lỗi + dọn repo · [x] M2 Nạp model đúng loại + nén 4-bit · [x] M3 Adapter server local kiểu OpenAI
@@ -29,7 +30,6 @@ Chuẩn bị: cài torch bản CUDA, rồi `pip install transformers trl peft da
 Chạy `--dry-run` trước mỗi bước. Đo VRAM thật, rồi sửa hệ số trong `local_ai/models/vram.py`.
 
 ## Việc dở (chủ repo quyết định)
-- Gộp PR #6. Sau đó đóng PR #5 (chỉ có commit thiết lập, đã nằm trong PR #6).
 - PR #4 (`claude/expand-model-training-repo-v2yzyr`) đi ngược kế hoạch: xoá hẳn agent và corpus. Hỏi chủ repo nên đóng hay lấy phần nào; đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B mới chỉ có ở PR #4.
 - Việc ngoài `TASKS.md`, cần hỏi trước: gửi ảnh qua server local; lộ trình đề xuất trong README (6 việc).
 - Việc chủ repo tự làm: đổi mật khẩu máy chủ cũ còn trong lịch sử commit; cân nhắc chuyển repo sang Private; xoá nhánh `codex/build-autonomous-ai-system-architecture`; đọc lại giấy phép 3 dataset preset.
@@ -62,3 +62,5 @@ Chạy `--dry-run` trước mỗi bước. Đo VRAM thật, rồi sửa hệ s�
 | M5 | 8/8: 4 cách chấm, bộ đề 30 câu, lệnh eval, chặn trùng theo nội dung. Test cũ dựa vào lỗi cũ đã đổi fixture. 105 test. |
 | M6 | 7/7: chạy thật trên CPU; thêm `max_steps`, `adapter_path`, `max_new_tokens`. 108 test. |
 | M7 | 7/7: README (trạng thái, GPU smoke → light → primary, lộ trình đề xuất), ARCHITECTURE, test README khớp code. Sửa id `"NaN"` và secret-scan quét cả file bị `.gitignore`. 114 test, compileall và secret-scan sạch. |
+| Gộp | PR #6 gộp vào `main` (`63bdc61`), PR #5 đã đóng. |
+| Rà soát | Thống nhất sau khi gộp: lệnh trộn preset mặc định ghi vào `data/processed/hf_sft` (trùng chỗ train đọc; trước là `hf_mix`); `hf_sft.json` đọc streaming, limit 1000, có `language` và trạng thái giấy phép như preset; lệnh `vram` tìm cấu hình theo thư mục gốc repo; trợ giúp tiếng Việt cho mọi lệnh con của `local_ai.data`; lỗi `verify_math` bằng tiếng Việt; README ghi đủ thư mục và chạy lệnh từ thư mục gốc; thêm `tests/test_consistency.py`. Mô tả repo trên GitHub ("Train Từ Số 0") còn lệch hướng fine-tune: chủ repo tự sửa trong Settings. |

@@ -25,9 +25,13 @@ Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ,
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`.
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
+- `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
+- `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc.
 - `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ).
 
 ## Cài đặt và kiểm tra
+Chạy mọi lệnh trong README từ thư mục gốc của repo, vì các đường dẫn trong file cấu hình (`dataset_path`, `output_dir`...) tính từ đó.
+
 ```bash
 python -m pip install datasets                        # tải dataset Hugging Face
 python -m pip install torch transformers trl peft     # huấn luyện (cần GPU)
@@ -113,10 +117,10 @@ Khi server lỗi, agent dừng lại và báo lỗi bằng tiếng Việt, khôn
 ```bash
 python -m local_ai.data list-presets                                          # xem các preset
 python -m local_ai.data hf-sft --config configs/datasets/presets/code.json    # một preset
-python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_mix
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_sft
 ```
 
-Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả chung vào một `sft.jsonl`:
+Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả chung vào một `sft.jsonl`, mặc định ở `data/processed/hf_sft/`, đúng chỗ các cấu hình train đọc:
 - Tỉ lệ được chuẩn hóa về tổng 1.
 - Nếu không ghi `--total`, lệnh lấy tổng số dòng lớn nhất sao cho không preset nào vượt `limit` của nó.
 - `--limit 20` thì mỗi preset chỉ đọc tối đa 20 dòng, hợp để chạy thử.
@@ -197,12 +201,14 @@ Trước khi chấm, khối `<think>...</think>` trong câu trả lời được
 ```bash
 python -m local_ai.evaluation --scripted                  # chạy thử bằng đáp án mẫu (không cần model), kết quả 30/30
 python -m local_ai.evaluation --model ollama              # chấm một model trong configs/models/platform.json
-python -m local_ai.evaluation --scripted --train-data data/processed/hf_mix/sft.jsonl   # kiểm tra dữ liệu train không chứa câu eval
+python -m local_ai.evaluation --scripted --train-data data/processed/hf_sft/sft.jsonl   # kiểm tra dữ liệu train không chứa câu eval
 ```
 
 Báo cáo ghi vào `.runs/eval/<model>-<thời điểm>/`, hoặc thư mục ghi ở `--output`:
 - `report.json`: kết quả từng câu;
 - `report.md`: tỉ lệ đạt theo nhóm và theo ngôn ngữ, cùng danh sách câu không đạt kèm lý do.
+
+Nhóm câu eval (`code`, `reasoning`, `tool_use`) là cách chia riêng của bộ eval, khác với `domain` của dữ liệu train (`coding`, `math_logic`, `chat`...).
 
 Nếu model lỗi (ví dụ server chưa chạy), lệnh dừng và ghi `status: "error"`. Model chạy bằng transformers mà máy thiếu torch hoặc transformers thì lệnh báo bỏ qua.
 

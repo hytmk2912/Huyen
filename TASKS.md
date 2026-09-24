@@ -1,5 +1,7 @@
 # Nhiệm vụ 1 tuần
 
+**Đã xong cả 7 mốc và đã gộp vào `main` ngày 24/9 (PR #6, commit gộp `63bdc61`).**
+
 Bắt đầu: 2026-09-24, từ `main` tại commit `60e8541` (28 test chạy qua, 1 bỏ qua; compileall và secret-scan sạch).
 
 Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7, bằng skill `lam-moc` (gõ `/lam-moc` trong Claude Code hoặc nói "làm mốc tiếp theo"). Mốc đang làm, việc dở và lỗi gặp được ghi trong `memory.md`.
@@ -21,7 +23,7 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 | M4 | Preset dataset Hugging Face | Ngày 4 | **Xong** | 9/9 (100%) | `tests/test_m4_presets.py` (15 test) + chạy thật, commit `ed816ca` |
 | M5 | Đánh giá (eval) mở rộng | Ngày 5 | **Xong** | 8/8 (100%) | `tests/test_m5_eval.py` (20 test), commit `854faa1` |
 | M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | **Xong** | 7/7 (100%) | `tests/test_m6_cpu_pipeline.py` (3 test, chạy thật khoảng 6 giây), commit `2be8dc6` |
-| M7 | Tổng kết | Ngày 7 | **Xong** | 7/7 (100%) | `tests/test_m7_summary.py` (5 test), commit M7 (commit cuối của nhánh) |
+| M7 | Tổng kết | Ngày 7 | **Xong** | 7/7 (100%) | `tests/test_m7_summary.py` (5 test), commit `f9116f0` |
 | **Tổng** | | | | **100%** (7/7 mốc) | 114 test chạy qua, không bỏ qua test nào; compileall, secret-scan sạch |
 
 ## Ngoài phạm vi tuần này

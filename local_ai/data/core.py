@@ -177,7 +177,7 @@ def verify_math(record: dict[str, Any]) -> dict[str, Any]:
     def calculate(node: ast.AST) -> float:
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)): return node.value
         if isinstance(node, ast.BinOp) and type(node.op) in operators: return operators[type(node.op)](calculate(node.left), calculate(node.right))
-        raise ValueError("unsupported arithmetic")
+        raise ValueError("chỉ hỗ trợ phép tính số học + - * /")
     try:
         actual = str(calculate(ast.parse(record["input"], mode="eval").body))
         return {"kind": "math", "passed": actual == record["expected_output"], "actual": actual}
