@@ -1,24 +1,92 @@
-# Kiến trúc nền tảng AI tự động chạy cục bộ
+# Kiến trúc
 
 ## Phạm vi
-Repo này cung cấp hạ tầng điều phối, không phải một model đã huấn luyện, cũng không kết nối trực tiếp với thị trường hay web. Trọng số model, chỉ mục tìm kiếm, dataset và khóa truy cập đều nằm bên ngoài và được chọn qua cấu hình.
+Repo dùng để **fine-tune và đánh giá model có sẵn trên Hugging Face**, chạy cục bộ. Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ). Repo không chứa trọng số model và không gọi API trả phí.
 
-## Các tầng
+Mọi bước đều điều khiển bằng file cấu hình JSON trong `configs/`. Các phần nằm ngoài repo được chọn qua cấu hình: trọng số model, dataset, server model và khóa truy cập (chỉ đọc từ biến môi trường).
 
-1. **Cấu hình và tái lập**: file cấu hình JSON được nạp thành thiết lập chạy bất biến. `seed_everything` ghi lại và cố định seed ngẫu nhiên của Python; `RunTracker` ghi cấu hình, chỉ số, sự kiện và tham chiếu checkpoint vào thư mục của lượt chạy.
-2. **Truy cập model**: `ModelAdapter` là giao thức không phụ thuộc backend. `ScriptedModelAdapter` là adapter tất định dùng khi phát triển cục bộ. `HuggingFaceModelAdapter` chọn lớp nạp theo `kind` của model (`text`: `AutoModelForCausalLM`; `multimodal`: `AutoProcessor` + `AutoModelForMultimodalLM`, nhận được ảnh), nén 4bit/8bit bằng bitsandbytes theo `quantization`, và tự chuyển bf16 sang fp16 trên GPU không hỗ trợ bf16. `local_ai.models.vram` ước tính VRAM từ `params_b` mà không tải model. `OpenAICompatibleAdapter` gọi server local kiểu OpenAI (Ollama, llama.cpp, vLLM) bằng urllib: chỉ cho phép địa chỉ máy này hoặc mạng nội bộ, không dùng proxy, không đi theo redirect, có timeout và báo lỗi rõ. `create_adapter` chọn adapter theo `backend` trong cấu hình. Có thể thêm adapter cho các engine suy luận cục bộ mà không cần sửa agent.
-3. **Định tuyến**: `ModelRouter` chọn model đã cấu hình theo khả năng, có thể đặt model mặc định dự phòng.
-4. **Vòng lặp agent**: `AutonomousAgent` chạy yêu cầu → lập kế hoạch → chọn công cụ → thực thi → quan sát → đánh giá → sửa/thử lại → câu trả lời cuối. Công cụ lỗi thì agent thử lại; model lỗi (ví dụ server chưa chạy) thì agent dừng êm và trả kết quả chưa hoàn thành. Bước lập kế hoạch và đánh giá được thiết kế thành giao diện có cấu trúc để có thể thay bằng model hoặc quy tắc tất định.
-5. **Công cụ và sandbox**: `ToolRegistry` cung cấp các công cụ đã khai báo. `PythonSandbox` chạy đoạn code được đưa vào trong một thư mục làm việc tạm, có giới hạn thời gian và thu lại đầu ra. Đây chỉ là giao diện ranh giới cách ly, không phải bảo đảm an toàn trước code độc hại; khi chạy thật phải cách ly bằng hệ điều hành/container.
-6. **Ngữ cảnh và tri thức**: `MemoryStore` lưu một số lượng giới hạn tin nhắn hội thoại. `Retriever` là giao thức cho nguồn tri thức bên ngoài/RAG, để các thông tin hay thay đổi không phải nằm trong trọng số.
-7. **Dữ liệu, huấn luyện và đánh giá**: manifest dataset ghi phiên bản, nguồn và cách chia tập. Kế hoạch huấn luyện hỗ trợ các lượt SFT, tối ưu theo sở thích (preference optimization) và RFT trong tương lai. `local_ai.data.hub` chuyển các dòng dataset Hugging Face sang schema của repo trước bước build chuẩn (giữ nguyên hội thoại nhiều lượt, kể cả dạng ShareGPT), đọc preset trong `configs/datasets/presets/` và trộn nhiều preset theo tỉ lệ thành một `sft.jsonl`; `local_ai.training.finetune` là khung SFT tùy chọn (full, LoRA hoặc QLoRA trên model nén 4bit), tự bỏ qua khi thiếu GPU hoặc thư viện. Bộ benchmark dùng chung một hàm đánh giá và chia theo từng nhóm khả năng.
+Luồng chính:
 
-## Điểm mở rộng
-- Cài đặt `ModelAdapter.generate` cho một backend cục bộ (ví dụ máy chủ cục bộ hoặc runtime chạy trong tiến trình).
-- Khai báo model kèm khả năng trong phần `models` của cấu hình.
-- Đăng ký các công cụ đã được kiểm duyệt qua `ToolRegistry`; các giao diện dự kiến gồm lập trình, suy luận, nghiên cứu, giao dịch, truy xuất, chạy lệnh terminal và thao tác file.
-- Cài đặt `Retriever.search` cho chỉ mục vector hoặc nguồn dữ liệu trực tiếp.
-- `local_ai.training.finetune` là bộ huấn luyện cụ thể đầu tiên đứng sau `TrainingPlan`; preference optimization và RFT vẫn là việc của tương lai.
+```
+preset / dataset Hugging Face ──► local_ai.data (kiểm tra, loại trùng, chặn trùng với eval) ──► sft.jsonl
+sft.jsonl ──► local_ai.training.finetune (full | LoRA | QLoRA) ──► adapter (.runs/<tên>/adapter)
+model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
+```
+
+## Thành phần
+
+### Cấu hình (`configs/`, `local_ai/config`)
+
+| File | Nội dung |
+| --- | --- |
+| `configs/models/platform.json` | Danh sách model: `backend` (`transformers` hoặc `openai_compatible`), `kind` (`text`/`multimodal`), `params_b`, `quantization`, `adapter_path`, `max_new_tokens`, `base_url`, `timeout_s`, `api_key_env`. |
+| `configs/datasets/presets/*.json` | 3 preset dataset (`code`, `reasoning`, `vietnamese`): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". |
+| `configs/datasets/hf_sft.json` | Mẫu để tự khai báo một dataset. |
+| `configs/training/sft.json`, `qlora_primary.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, siêu tham số, `max_steps`, `require_gpu`. |
+
+`ModelConfig` kiểm tra giá trị ngay khi nạp; giá trị sai thì báo lỗi bằng tiếng Việt. Test `test_every_config_key_is_read_by_code` bảo đảm không có khóa cấu hình nào thừa.
+
+### Dữ liệu (`local_ai/data`)
+- `hub.py`:
+  - đọc dataset Hugging Face; đọc kiểu streaming với `limit` để không tải cả dataset;
+  - ánh xạ cột sang schema của repo. Hội thoại nhiều lượt được giữ nguyên, hiểu cả dạng `role/content` lẫn ShareGPT `from/value`;
+  - trộn nhiều preset theo tỉ lệ.
+- `core.py`:
+  - kiểm tra schema và loại trùng theo nội dung;
+  - chặn trùng với eval (`find_eval_overlap`) theo id, theo nội dung và theo câu hỏi đã chuẩn hóa;
+  - xuất `sft.jsonl`: `reasoning` được đưa vào khối `<think>`, `context` đặt trước câu hỏi.
+- `secrets.py`: quét khóa bí mật trong những file có thể bị commit.
+- Lệnh: `python -m local_ai.data hf-sft | list-presets | build | secret-scan ...`.
+
+### Model (`local_ai/models`)
+- `adapters.py` — `HuggingFaceModelAdapter`:
+  - chọn lớp nạp theo `kind`: `AutoModelForCausalLM` cho model chữ; `AutoProcessor` + `AutoModelForMultimodalLM` cho model ảnh + chữ (bản transformers cũ thì dùng `AutoModelForImageTextToText`);
+  - nén 4bit/8bit bằng bitsandbytes;
+  - GPU không có bf16 thì dùng fp16;
+  - nạp LoRA đã train qua `adapter_path`;
+  - thư viện nặng chỉ được import khi thật sự dùng tới.
+- `openai_compatible.py` — `OpenAICompatibleAdapter`:
+  - gọi `POST {base_url}/chat/completions` (Ollama, llama.cpp, vLLM) bằng urllib;
+  - chỉ cho phép máy này hoặc mạng nội bộ; không dùng proxy, không đi theo redirect; có timeout và báo lỗi rõ.
+- `router.py`:
+  - `create_adapter` chọn adapter theo `backend`;
+  - `ModelRouter` chọn model theo khả năng;
+  - `ScriptedModelAdapter` là model giả dùng trong test và demo.
+- `vram.py`: ước tính VRAM từ `params_b`, không tải model.
+
+### Huấn luyện (`local_ai/training`)
+`finetune.py` là khung SFT dùng transformers, trl và peft:
+- chạy `full`, `lora`, hoặc QLoRA (`lora` cùng `quantization: "4bit"`);
+- chạy tiếp từ `checkpoint-N` mới nhất;
+- thiếu GPU hoặc thư viện thì trả `"status": "skipped"`;
+- từ chối model chạy qua server và từ chối full fine-tune trên model đã nén.
+
+`RunTracker` ghi cấu hình, chỉ số và đường dẫn adapter vào thư mục của lượt chạy.
+
+### Đánh giá (`local_ai/evaluation`)
+- `suite.py`:
+  - 4 cách chấm: `exact`, `contains`, `regex`, `python_tests`. `python_tests` chạy unit test trong `PythonSandbox`, có giới hạn thời gian;
+  - bỏ khối `<think>` trước khi chấm;
+  - báo cáo theo nhóm và theo ngôn ngữ.
+- Lệnh: `python -m local_ai.evaluation --model <tên> | --scripted`. Tùy chọn `--train-data` từ chối chạy nếu dữ liệu train chứa câu eval.
+- Bộ đề `data/eval/eval_v1.jsonl`: 30 câu Việt + Anh, mỗi câu có đáp án mẫu.
+- `benchmarks.py` là phần chấm khớp đúng cũ, vẫn giữ lại.
+
+### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
+`AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
+- công cụ lỗi thì agent ghi vào trace rồi thử lại;
+- model lỗi (ví dụ server chưa chạy) thì agent dừng và trả kết quả chưa hoàn thành;
+- `extract_json_object` tách được JSON dù câu trả lời có chữ thừa, khối code hoặc `<think>`.
+
+`python -m local_ai.demo [--model <tên>]` là demo agent dùng công cụ máy tính.
+
+## Kiểm thử
+- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
+- Lệnh kiểm tra trước khi đẩy: xem `CLAUDE.md`.
 
 ## An toàn và giới hạn
-Quyền dùng công cụ được khai báo rõ ràng, bị giới hạn bởi số vòng lặp và thời gian chờ, và mọi kết quả công cụ đều được quan sát trước quyết định tiếp theo. Bản demo đi kèm chỉ dùng một model tất định và công cụ máy tính. Adapter giao dịch chỉ là giao diện phân tích và không đặt lệnh.
+- Chỉ gọi model cục bộ hoặc server trong mạng nội bộ, không gọi API trả phí. Khóa chỉ đọc từ biến môi trường.
+- `PythonSandbox` chỉ tách code ra một tiến trình riêng, có giới hạn thời gian. Nó không cách ly an toàn trước code độc hại; khi chấm code của model lạ, hãy chạy trong container.
+- Chưa kiểm chứng trên GPU thật: QLoRA, model ảnh + chữ, và số VRAM ước tính. Chi tiết trong `memory.md`.
+- Interface giao dịch (`TradingAnalysisTool`) chỉ để phân tích, không đặt lệnh.

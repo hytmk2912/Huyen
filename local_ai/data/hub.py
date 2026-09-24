@@ -5,6 +5,7 @@ Preset dataset nằm trong `configs/datasets/presets/<tên>.json`; có thể tr�
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 from itertools import islice
@@ -76,6 +77,7 @@ def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> 
             prompt, answer = (users[0] if users else None), (messages[-1]["content"] if messages else None)
         else: prompt, answer = row.get(mapping["input"]), row.get(mapping["expected_output"])
         identifier = row.get(mapping["id"]) if mapping.get("id") else None
+        if (isinstance(identifier, float) and math.isnan(identifier)) or str(identifier).strip().lower() in ("nan", "none", "null"): identifier = None  # id giữ chỗ, ví dụ chuỗi "NaN" ở OpenR1-Math
         metadata = {"hf_split": spec.get("split", "train"), "hf_row": index, **({"language": spec["language"]} if spec.get("language") else {})}
         record = {"id": f"{slug}-{identifier if identifier not in (None, '') else index}", "domain": spec.get("domain", "reasoning"), "task": spec.get("task", "sft"), "input": prompt, "expected_output": answer, "source": source, "license": dict(spec["license"]), "dataset_version": version, "metadata": metadata}
         if messages is not None: record["messages"] = messages

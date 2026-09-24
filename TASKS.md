@@ -13,16 +13,16 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 
 ## Bảng tiến độ
 
-| Mốc | Nội dung | Ngày gợi ý | Trạng thái | Tiến độ | Bằng chứng |
+| Mốc | Nội dung | Ngày gợi ý | Trạng thái | Tiến độ | Bằng chứng (test, commit) |
 | --- | --- | --- | --- | --- | --- |
-| M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | **Xong** | 9/9 (100%) | `tests/test_m1_agent_cleanup.py` (11 test) |
-| M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | **Xong** | 8/8 (100%) | `tests/test_m2_models.py` (20 test) |
-| M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | **Xong** | 7/7 (100%) | `tests/test_m3_local_server.py` (17 test) |
-| M4 | Preset dataset Hugging Face | Ngày 4 | **Xong** | 9/9 (100%) | `tests/test_m4_presets.py` (14 test) + chạy thật 20 dòng/preset |
-| M5 | Đánh giá (eval) mở rộng | Ngày 5 | **Xong** | 8/8 (100%) | `tests/test_m5_eval.py` (20 test) |
-| M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | **Xong** | 7/7 (100%) | `tests/test_m6_cpu_pipeline.py` (3 test, chạy thật khoảng 6 giây) |
-| M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **86%** (600% ÷ 7) | |
+| M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | **Xong** | 9/9 (100%) | `tests/test_m1_agent_cleanup.py` (11 test), commit `ebf3c63` |
+| M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | **Xong** | 8/8 (100%) | `tests/test_m2_models.py` (20 test), commit `d8cc5ae` |
+| M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | **Xong** | 7/7 (100%) | `tests/test_m3_local_server.py` (17 test), commit `fa88440` |
+| M4 | Preset dataset Hugging Face | Ngày 4 | **Xong** | 9/9 (100%) | `tests/test_m4_presets.py` (15 test) + chạy thật, commit `ed816ca` |
+| M5 | Đánh giá (eval) mở rộng | Ngày 5 | **Xong** | 8/8 (100%) | `tests/test_m5_eval.py` (20 test), commit `854faa1` |
+| M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | **Xong** | 7/7 (100%) | `tests/test_m6_cpu_pipeline.py` (3 test, chạy thật khoảng 6 giây), commit `2be8dc6` |
+| M7 | Tổng kết | Ngày 7 | **Xong** | 7/7 (100%) | `tests/test_m7_summary.py` (5 test), commit M7 (commit cuối của nhánh) |
+| **Tổng** | | | | **100%** (7/7 mốc) | 114 test chạy qua, không bỏ qua test nào; compileall, secret-scan sạch |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -131,9 +131,19 @@ Chưa làm (ngoài tiêu chí): gửi ảnh qua server local. Hiện adapter bá
 
 ## M7: Tổng kết
 
-**Tiêu chí xong**
-- [ ] 1. README cập nhật đúng trạng thái thật: cài đặt, luồng làm việc và lệnh cho từng bước. Mọi lệnh trong README đều đã chạy thử được.
-- [ ] 2. Có lộ trình sau tuần 1: vài việc tiếp theo, ghi rõ là đề xuất, chưa làm.
-- [ ] 3. Chấm lại % từng mốc trong bảng tiến độ theo tiêu chí, kèm bằng chứng (tên test, commit), và ghi tổng %.
-- [ ] 4. `memory.md` có tổng kết tuần: việc đã xong, việc còn dở, lỗi còn tồn.
-- [ ] 5. Cả ba lệnh kiểm tra (test, compileall, secret-scan) đều xanh.
+**Tiêu chí xong** (thêm tiêu chí 6–7 ngày 24/9 theo yêu cầu của chủ repo: cập nhật `docs/ARCHITECTURE.md`; `memory.md` có % từng phần và lệnh train khi có GPU)
+- [x] 1. README đúng trạng thái thật: có bảng trạng thái (phần nào chạy thật, phần nào mới test bằng module giả), cài đặt, luồng làm việc, lệnh từng bước.
+  - Mọi lệnh của repo trong README đã chạy thử trong lượt này: `vram`, `demo` (có và không có `--model`), `list-presets`, `hf-sft --config presets/code.json` (thật, 1000 dòng), `hf-sft --preset ...` (thật, 2500 dòng), `finetune --dry-run` / chạy thật (trả `skipped` vì không có GPU), `evaluation --scripted` / `--model ollama` / `--train-data`, test M6.
+  - Không chạy được: lệnh của phần mềm ngoài (`ollama`, `llama-server`, `vllm`), lệnh train trên GPU, và lệnh eval phải tải trọng số model. Lý do: không có GPU, và quy tắc không cho tải trọng số model. README ghi rõ các lệnh này "chưa chạy thử".
+  - Test tự kiểm tra README: 25 lệnh `python -m local_ai...` chỉ dùng cờ có thật; số VRAM khớp `vram.py`; `adapter_path` khớp thư mục đầu ra của train.
+  - Bằng chứng: `tests/test_m7_summary.py` `ReadmeMatchesCodeTests` (4 test).
+- [x] 2. Có lộ trình sau tuần 1, ghi rõ là đề xuất, chưa làm: mục "Lộ trình tiếp theo (đề xuất, chưa làm)" trong README, 6 việc. Bằng chứng: `ReadmeMatchesCodeTests.test_readme_has_status_gpu_plan_and_proposed_roadmap`.
+- [x] 3. Chấm lại % từng mốc trong bảng tiến độ theo tiêu chí, kèm bằng chứng (tên test, commit), và ghi tổng %: 100%.
+- [x] 4. `memory.md` có tổng kết tuần: việc đã xong, việc còn dở, lỗi còn tồn.
+- [x] 5. Cả ba lệnh kiểm tra (test, compileall, secret-scan) đều xanh: 114 test chạy qua.
+- [x] 6. `docs/ARCHITECTURE.md` viết lại theo code hiện tại: luồng dữ liệu → train → eval, bảng file cấu hình, từng module và lệnh, giới hạn chưa kiểm chứng.
+- [x] 7. `memory.md` có % tiến độ từng phần, lệnh train khi có GPU (smoke → light → primary) và VRAM cần cho từng bước; README có bảng tương ứng. `platform.json` có sẵn `smoke-lora`, `light-lora`, `primary-qlora` trỏ tới adapter của từng bước để eval. Bằng chứng: `ReadmeMatchesCodeTests.test_post_training_models_point_to_training_outputs`, `test_vram_numbers_in_readme_match_estimator`.
+
+**Sửa thêm khi chạy thử lệnh trong README:**
+- Preset `reasoning` có dòng mà `uuid` là chuỗi giữ chỗ `"NaN"`. Các dòng đó bị coi là trùng id và bị loại oan (2/750). Nay id rỗng, NaN, hoặc chuỗi `"NaN"`/`"None"`/`"null"` được thay bằng số thứ tự dòng; chạy lại giữ đủ 2500/2500 dòng. Bằng chứng: `tests/test_m4_presets.py` `PresetMappingTests.test_missing_or_nan_id_falls_back_to_row_number`.
+- `secret-scan` quét cả dữ liệu tải về đã nằm trong `.gitignore`, nên báo nhầm vì code mẫu trong dataset có dòng dạng `password = ...`. Nay chỉ quét file có thể bị commit (theo `git ls-files`); thư mục không phải repo git thì vẫn quét hết như cũ. Bằng chứng: `SecretScanTests.test_gitignored_files_are_not_scanned`.

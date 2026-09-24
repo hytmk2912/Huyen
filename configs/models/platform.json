@@ -1,5 +1,5 @@
 {
-  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp). backend: transformers (mặc định, nạp model bằng thư viện transformers) hoặc openai_compatible (gọi server local kiểu OpenAI: Ollama, llama.cpp, vLLM). Với openai_compatible: source là tên model trên server, base_url là địa chỉ server (chỉ cho phép máy này hoặc mạng nội bộ), timeout_s là số giây chờ tối đa, api_key_env (tùy chọn) là tên biến môi trường chứa khóa nếu server yêu cầu; dtype, device_map, quantization không dùng tới.",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp). backend: transformers (mặc định, nạp model bằng thư viện transformers) hoặc openai_compatible (gọi server local kiểu OpenAI: Ollama, llama.cpp, vLLM). Với openai_compatible: source là tên model trên server, base_url là địa chỉ server (chỉ cho phép máy này hoặc mạng nội bộ), timeout_s là số giây chờ tối đa, api_key_env (tùy chọn) là tên biến môi trường chứa khóa nếu server yêu cầu; dtype, device_map, quantization không dùng tới. adapter_path (tùy chọn): thư mục LoRA adapter đã train, nạp chồng lên model gốc khi chạy hoặc chấm (ví dụ smoke-lora, light-lora, primary-qlora dùng sau khi train theo README); max_new_tokens (tùy chọn, mặc định 512).",
   "models": [
     {
       "name": "primary",
@@ -66,6 +66,40 @@
       "params_b": 0.49,
       "timeout_s": 120,
       "capabilities": ["chat", "reasoning"]
+    },
+    {
+      "name": "smoke-lora",
+      "source": "Qwen/Qwen2.5-0.5B-Instruct",
+      "kind": "text",
+      "params_b": 0.49,
+      "adapter_path": ".runs/sft/adapter",
+      "dtype": "bfloat16",
+      "device_map": "auto",
+      "capabilities": ["chat", "evaluation"],
+      "offline": false
+    },
+    {
+      "name": "light-lora",
+      "source": "Qwen/Qwen3-4B",
+      "kind": "text",
+      "params_b": 4.02,
+      "adapter_path": ".runs/sft_light/adapter",
+      "dtype": "bfloat16",
+      "device_map": "auto",
+      "capabilities": ["chat", "reasoning"],
+      "offline": false
+    },
+    {
+      "name": "primary-qlora",
+      "source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated",
+      "kind": "multimodal",
+      "params_b": 27.78,
+      "quantization": "4bit",
+      "adapter_path": ".runs/qlora_primary/adapter",
+      "dtype": "bfloat16",
+      "device_map": "auto",
+      "capabilities": ["chat", "reasoning", "coding"],
+      "offline": false
     }
   ]
 }

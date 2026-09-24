@@ -97,6 +97,11 @@ class PresetMappingTests(unittest.TestCase):
             {"role": "user", "content": "Còn của Đức?"}, {"role": "assistant", "content": "Berlin."}])
         self.assertIn("invalid:messages", rejected[0]["verification"]["schema_errors"])  # kết thúc bằng câu hỏi thì không train được
 
+    def test_missing_or_nan_id_falls_back_to_row_number(self):
+        spec = {"name": "org/ds", "license": {"name": "CC0-1.0"}, "mapping": {"id": "uuid", "input": "q", "expected_output": "a"}}
+        rows = [{"uuid": float("nan"), "q": "1", "a": "1"}, {"uuid": None, "q": "2", "a": "2"}, {"uuid": "NaN", "q": "3", "a": "3"}, {"uuid": "u4", "q": "4", "a": "4"}]
+        self.assertEqual([record["id"] for record in map_rows(rows, spec, "v")], ["org-ds-0", "org-ds-1", "org-ds-2", "org-ds-u4"])
+
     def test_context_is_put_before_question(self):
         spec = {"name": "org/ctx", "license": {"name": "CC0-1.0"}, "mapping": {"input": "q", "expected_output": "a", "context": "c"}}
         valid, _ = validate_records(map_rows([{"q": "Câu hỏi?", "a": "Đáp án.", "c": "Đoạn văn."}], spec, "v"))
