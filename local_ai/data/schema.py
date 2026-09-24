@@ -3,8 +3,18 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-
-VALID_DOMAINS = {"coding", "software_engineering", "math_logic", "reasoning", "planning", "tool_use", "agent", "research", "trading", "debugging"}
+VALID_DOMAINS = {
+    "coding",
+    "software_engineering",
+    "math_logic",
+    "reasoning",
+    "planning",
+    "tool_use",
+    "agent",
+    "research",
+    "trading",
+    "debugging",
+}
 VALID_STATUSES = {"pending", "valid", "rejected"}
 
 

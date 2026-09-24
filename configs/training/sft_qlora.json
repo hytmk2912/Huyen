@@ -1,10 +1,10 @@
 {
-  "_comment": "Mẫu huấn luyện phân tán BF16 bằng FSDP trên 8 GPU (full fine-tune model 14B). Chạy: python -m local_ai.training.finetune --config configs/training/sft_fsdp.json --print-launch rồi chạy lệnh torchrun in ra.",
-  "base_model": "huihui-qwen3-14b",
+  "_comment": "QLoRA cho model chính 27B: trọng số nén 4-bit NF4 (khoảng 15 GB thay vì 54 GB ở bf16), chạy được trên GPU 24 GB. Xem ước lượng bằng --dry-run.",
+  "base_model": "primary",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",
-  "output_dir": ".runs/sft-fsdp",
-  "method": "full",
+  "output_dir": ".runs/sft-qlora-27b",
+  "method": "qlora",
   "lora": {
     "r": 16,
     "alpha": 32,
@@ -13,7 +13,7 @@
   },
   "seed": 17,
   "epochs": 1,
-  "learning_rate": 1e-05,
+  "learning_rate": 0.0001,
   "per_device_batch_size": 1,
   "gradient_accumulation_steps": 8,
   "max_length": 2048,
@@ -23,12 +23,6 @@
   "logging_steps": 10,
   "resume": true,
   "require_gpu": true,
-  "train_dtype": "bfloat16",
-  "distributed": {
-    "strategy": "fsdp",
-    "num_processes": 8,
-    "num_nodes": 1
-  },
   "eval_cases": "data/eval/vi_trading_eval.jsonl",
   "eval_max_new_tokens": 128
 }

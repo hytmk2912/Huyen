@@ -1,4 +1,5 @@
 """Quét repo tìm khóa/mật khẩu bị lộ trước khi commit (lệnh `python -m local_ai.data secret-scan`)."""
+
 from __future__ import annotations
 
 import re

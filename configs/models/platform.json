@@ -1,5 +1,5 @@
 {
-  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype và capabilities; name không được trùng. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization, gguf_file (đường dẫn file GGUF cục bộ), gguf_outtype (kiểu số khi xuất GGUF, ví dụ f32). Dòng Qwen3 không có cỡ 3B/7B nên dùng cỡ gần nhất 4B/8B/14B; trên Hugging Face chưa có bản GGUF f32 nên file GGUF được xuất từ trọng số gốc bằng `python -m local_ai.models.gguf`.",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Mỗi mục cần name (không trùng), source (tên repo trên Hugging Face), dtype và capabilities. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (\"nf4\" để nạp 4-bit khi chạy suy luận), params_billion (để ước lượng bộ nhớ). Giữ dtype bfloat16 như trọng số gốc: đổi lên float32 không làm model tốt hơn mà tốn gấp đôi bộ nhớ. Dòng Qwen3 không có cỡ 3B/7B nên dùng 4B/8B.",
   "models": [
     {
       "name": "primary",
@@ -16,27 +16,27 @@
         "tool_calling",
         "long_context"
       ],
-      "offline": false
+      "offline": false,
+      "params_billion": 27
     },
     {
       "name": "huihui-qwen3-4b",
       "source": "huihui-ai/Huihui-Qwen3-4B-abliterated-v2",
       "revision": "main",
-      "dtype": "float32",
+      "dtype": "bfloat16",
       "device_map": "auto",
       "capabilities": [
         "chat",
         "reasoning"
       ],
       "offline": false,
-      "gguf_file": "models/gguf/Huihui-Qwen3-4B-abliterated-v2.f32.gguf",
-      "gguf_outtype": "f32"
+      "params_billion": 4.0
     },
     {
       "name": "huihui-qwen3-8b",
       "source": "huihui-ai/Huihui-Qwen3-8B-abliterated-v2",
       "revision": "main",
-      "dtype": "float32",
+      "dtype": "bfloat16",
       "device_map": "auto",
       "capabilities": [
         "chat",
@@ -45,14 +45,13 @@
         "tool_calling"
       ],
       "offline": false,
-      "gguf_file": "models/gguf/Huihui-Qwen3-8B-abliterated-v2.f32.gguf",
-      "gguf_outtype": "f32"
+      "params_billion": 8.2
     },
     {
       "name": "huihui-qwen3-14b",
       "source": "huihui-ai/Huihui-Qwen3-14B-abliterated-v2",
       "revision": "main",
-      "dtype": "float32",
+      "dtype": "bfloat16",
       "device_map": "auto",
       "capabilities": [
         "chat",
@@ -61,8 +60,7 @@
         "tool_calling"
       ],
       "offline": false,
-      "gguf_file": "models/gguf/Huihui-Qwen3-14B-abliterated-v2.f32.gguf",
-      "gguf_outtype": "f32"
+      "params_billion": 14.8
     }
   ]
 }

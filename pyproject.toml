@@ -1,0 +1,28 @@
+[project]
+name = "local-ai"
+version = "0.2.0"
+description = "Fine-tune model Qwen3 (Huihui) bằng LoRA/QLoRA: dataset Hugging Face → sft.jsonl → huấn luyện → đánh giá"
+readme = "README.md"
+requires-python = ">=3.11"  # code dùng enum.StrEnum (có từ Python 3.11)
+dependencies = []  # phần kiểm tra dữ liệu và test chỉ cần thư viện chuẩn
+
+[project.optional-dependencies]
+data = ["datasets>=3.0", "huggingface_hub>=0.25", "pyarrow"]
+train = ["torch>=2.4", "transformers>=4.51", "trl>=0.20", "peft>=0.13", "accelerate>=1.0", "datasets>=3.0"]
+qlora = ["bitsandbytes>=0.45"]
+dev = ["ruff>=0.6"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["local_ai*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

@@ -1,3 +1,25 @@
+Metadata-Version: 2.4
+Name: local-ai
+Version: 0.2.0
+Summary: Fine-tune model Qwen3 (Huihui) bằng LoRA/QLoRA: dataset Hugging Face → sft.jsonl → huấn luyện → đánh giá
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Provides-Extra: data
+Requires-Dist: datasets>=3.0; extra == "data"
+Requires-Dist: huggingface_hub>=0.25; extra == "data"
+Requires-Dist: pyarrow; extra == "data"
+Provides-Extra: train
+Requires-Dist: torch>=2.4; extra == "train"
+Requires-Dist: transformers>=4.51; extra == "train"
+Requires-Dist: trl>=0.20; extra == "train"
+Requires-Dist: peft>=0.13; extra == "train"
+Requires-Dist: accelerate>=1.0; extra == "train"
+Requires-Dist: datasets>=3.0; extra == "train"
+Provides-Extra: qlora
+Requires-Dist: bitsandbytes>=0.45; extra == "qlora"
+Provides-Extra: dev
+Requires-Dist: ruff>=0.6; extra == "dev"
+
 # Fine-tune Qwen3 (Huihui) bằng LoRA/QLoRA
 
 Repo này chỉ làm một việc: fine-tune model Qwen3 bản Huihui có sẵn trên Hugging Face.

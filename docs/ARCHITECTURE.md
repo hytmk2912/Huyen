@@ -1,24 +1,36 @@
-# Kiến trúc nền tảng AI tự động chạy cục bộ
+# Kiến trúc
 
 ## Phạm vi
-Repo này cung cấp hạ tầng điều phối, không phải một model đã huấn luyện, cũng không kết nối trực tiếp với thị trường hay web. Trọng số model, chỉ mục tìm kiếm, dataset và khóa truy cập đều nằm bên ngoài và được chọn qua cấu hình.
+Repo fine-tune model Qwen3 (Huihui) có sẵn bằng LoRA/QLoRA. Không huấn luyện từ đầu (pretrain), không chứa agent. Trọng số model, dataset và khóa truy cập nằm ngoài repo, được chọn qua file cấu hình.
 
-## Các tầng
+## Luồng xử lý
 
-1. **Cấu hình và tái lập**: file cấu hình JSON được nạp thành thiết lập chạy bất biến. `seed_everything` ghi lại và cố định seed ngẫu nhiên của Python; `RunTracker` ghi cấu hình, chỉ số, sự kiện và tham chiếu checkpoint vào thư mục của lượt chạy.
-2. **Truy cập model**: `ModelAdapter` là giao thức không phụ thuộc backend. `ScriptedModelAdapter` là adapter tất định dùng khi phát triển cục bộ. Có thể thêm adapter cho các engine suy luận cục bộ mà không cần sửa agent.
-3. **Định tuyến**: `ModelRouter` chọn model đã cấu hình theo khả năng, có thể đặt model mặc định dự phòng.
-4. **Vòng lặp agent**: `AutonomousAgent` chạy yêu cầu → lập kế hoạch → chọn công cụ → thực thi → quan sát → đánh giá → sửa/thử lại → câu trả lời cuối. Bước lập kế hoạch và đánh giá được thiết kế thành giao diện có cấu trúc để có thể thay bằng model hoặc quy tắc tất định.
-5. **Công cụ và sandbox**: `ToolRegistry` cung cấp các công cụ đã khai báo. `PythonSandbox` chạy đoạn code được đưa vào trong một thư mục làm việc tạm, có giới hạn thời gian và thu lại đầu ra. Đây chỉ là giao diện ranh giới cách ly, không phải bảo đảm an toàn trước code độc hại; khi chạy thật phải cách ly bằng hệ điều hành/container.
-6. **Ngữ cảnh và tri thức**: `MemoryStore` lưu một số lượng giới hạn tin nhắn hội thoại. `Retriever` là giao thức cho nguồn tri thức bên ngoài/RAG, để các thông tin hay thay đổi không phải nằm trong trọng số.
-7. **Dữ liệu, huấn luyện và đánh giá**: manifest dataset ghi phiên bản, nguồn và cách chia tập. Kế hoạch huấn luyện hỗ trợ các lượt SFT, tối ưu theo sở thích (preference optimization) và RFT trong tương lai. `local_ai.data.hub` chuyển các dòng dataset Hugging Face sang schema của repo trước bước build chuẩn; `local_ai.training.finetune` là khung SFT tùy chọn (full hoặc LoRA), tự bỏ qua khi thiếu GPU hoặc thư viện. Bộ benchmark dùng chung một hàm đánh giá và chia theo từng nhóm khả năng.
+```
+Hugging Face dataset
+   │  local_ai/data/hub.py        tải (HF_TOKEN từ biến môi trường), chuyển sang schema
+   ▼
+bản ghi DatasetExample            local_ai/data/schema.py
+   │  local_ai/data/core.py       kiểm tra → loại trùng → chặn rò rỉ eval → sft.jsonl
+   ▼
+sft.jsonl (mảng messages)
+   │  local_ai/training/finetune.py   full / LoRA / QLoRA 4-bit, checkpoint, chạy tiếp
+   ▼
+adapter/ hoặc final/
+   │  local_ai/evaluation/suites.py   chấm theo nhóm → eval_report.json cạnh checkpoint
+   ▼
+báo cáo đánh giá
+```
 
-## Điểm mở rộng
-- Cài đặt `ModelAdapter.generate` cho một backend cục bộ (ví dụ máy chủ cục bộ hoặc runtime chạy trong tiến trình).
-- Khai báo model kèm khả năng trong phần `models` của cấu hình.
-- Đăng ký các công cụ đã được kiểm duyệt qua `ToolRegistry`; các giao diện dự kiến gồm lập trình, suy luận, nghiên cứu, giao dịch, truy xuất, chạy lệnh terminal và thao tác file.
-- Cài đặt `Retriever.search` cho chỉ mục vector hoặc nguồn dữ liệu trực tiếp.
-- `local_ai.training.finetune` là bộ huấn luyện cụ thể đầu tiên đứng sau `TrainingPlan`; preference optimization và RFT vẫn là việc của tương lai.
+## Các module
+- `local_ai/data/core.py`: đọc JSON/JSONL/CSV/Parquet, kiểm tra schema, loại trùng theo `content_hash`, chặn rò rỉ eval, tạo `sft.jsonl`. Hàm `sft_messages` giữ nguyên hội thoại nhiều lượt; bản ghi một lượt thì context được đặt trước câu hỏi và reasoning nằm trong khối `<think>`.
+- `local_ai/data/hub.py`: bước dữ liệu từ Hugging Face.
+- `local_ai/data/secrets.py`: quét khóa/mật khẩu bị lộ (`python -m local_ai.data secret-scan`).
+- `local_ai/models/adapters.py`: `ModelConfig`, `quantization_settings` (NF4 4-bit), adapter chạy suy luận.
+- `local_ai/config/settings.py`: đọc danh sách model.
+- `local_ai/training/finetune.py`: huấn luyện SFT bằng transformers + trl + peft (+ bitsandbytes cho QLoRA).
+- `local_ai/evaluation/suites.py`: bộ đánh giá theo nhóm (khớp đúng, chứa đáp án, so số).
+- `local_ai/experiments/tracking.py`: ghi cấu hình, metrics, checkpoint của lượt chạy.
 
-## An toàn và giới hạn
-Quyền dùng công cụ được khai báo rõ ràng, bị giới hạn bởi số vòng lặp và thời gian chờ, và mọi kết quả công cụ đều được quan sát trước quyết định tiếp theo. Bản demo đi kèm chỉ dùng một model tất định và công cụ máy tính. Adapter giao dịch chỉ là giao diện phân tích và không đặt lệnh.
+## Nguyên tắc
+- Thư viện nặng (torch, transformers, trl, peft, bitsandbytes) chỉ được import khi thật sự train. Thiếu GPU hoặc thư viện thì trả về `"skipped"`.
+- Mọi test chạy được mà không cần mạng hay GPU.
