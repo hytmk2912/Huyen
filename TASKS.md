@@ -15,14 +15,14 @@ Cách làm: mỗi lượt làm **tối đa 1 mốc**, theo thứ tự M1 → M7,
 
 | Mốc | Nội dung | Ngày gợi ý | Trạng thái | Tiến độ | Bằng chứng |
 | --- | --- | --- | --- | --- | --- |
-| M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | Chưa làm | 0/9 (0%) | — |
+| M1 | Agent không sập khi công cụ lỗi; dọn repo | Ngày 1 | **Xong** | 9/9 (100%) | `tests/test_m1_agent_cleanup.py` (11 test) |
 | M2 | Model ảnh+chữ, nén 4-bit (QLoRA), ước tính VRAM | Ngày 2 | Chưa làm | 0/7 (0%) | — |
 | M3 | Adapter gọi server local kiểu OpenAI | Ngày 3 | Chưa làm | 0/7 (0%) | — |
 | M4 | Preset dataset Hugging Face | Ngày 4 | Chưa làm | 0/6 (0%) | — |
 | M5 | Đánh giá (eval) mở rộng | Ngày 5 | Chưa làm | 0/7 (0%) | — |
 | M6 | Test chạy thật trên CPU với model tí hon | Ngày 6 | Chưa làm | 0/6 (0%) | — |
 | M7 | Tổng kết | Ngày 7 | Chưa làm | 0/5 (0%) | — |
-| **Tổng** | | | | **0%** | |
+| **Tổng** | | | | **14%** (100% ÷ 7) | |
 
 ## Ngoài phạm vi tuần này
 Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GGUF, gọi API trả phí, tải trọng số model hay dataset lớn. Việc phát sinh ngoài 7 mốc: ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước.
@@ -38,17 +38,17 @@ Không làm: pretrain/corpus quy mô lớn, huấn luyện phân tán, xuất GG
 **Tiêu chí xong**
 
 Agent:
-- [ ] 1. Công cụ ném bất kỳ ngoại lệ nào (kể cả `ZeroDivisionError`, `SyntaxError`) thì `ToolRegistry.execute` trả kết quả thất bại kèm thông báo lỗi, không ném ra ngoài. Có test với `1/0` và `2 +`.
-- [ ] 2. Agent chạy hết vòng, không sập khi công cụ lỗi: lỗi được ghi vào trace và model được thử lại. Có test: model giả gọi `1/0`, sau đó sửa thành phép tính đúng, và agent hoàn thành.
-- [ ] 3. Tách được JSON từ câu trả lời model trong các trường hợp: JSON thuần; có chữ thừa trước hoặc sau; nằm trong khối ```` ```json ```` hoặc ```` ``` ````; đứng sau `<think>...</think>` (bỏ qua JSON nằm trong `<think>`); chuỗi trong JSON chứa dấu `{` `}`. Mỗi trường hợp có một test.
-- [ ] 4. Agent hoàn thành nhiệm vụ khi model giả trả lời theo các kiểu ở tiêu chí 3.
+- [x] 1. Công cụ ném bất kỳ ngoại lệ nào (kể cả `ZeroDivisionError`, `SyntaxError`) thì `ToolRegistry.execute` trả kết quả thất bại kèm thông báo lỗi, không ném ra ngoài. Có test với `1/0` và `2 +`. Bằng chứng: `tests/test_m1_agent_cleanup.py` `ToolErrorTests.test_division_by_zero_and_syntax_error_do_not_raise`.
+- [x] 2. Agent chạy hết vòng, không sập khi công cụ lỗi: lỗi được ghi vào trace và model được thử lại. Có test: model giả gọi `1/0`, sau đó sửa thành phép tính đúng, và agent hoàn thành. Bằng chứng: `tests/test_m1_agent_cleanup.py` `ToolErrorTests.test_agent_survives_tool_error_and_retries`.
+- [x] 3. Tách được JSON từ câu trả lời model trong các trường hợp: JSON thuần; có chữ thừa trước hoặc sau; nằm trong khối ```` ```json ```` hoặc ```` ``` ````; đứng sau `<think>...</think>` (bỏ qua JSON nằm trong `<think>`); chuỗi trong JSON chứa dấu `{` `}`. Mỗi trường hợp có một test. Bằng chứng: `tests/test_m1_agent_cleanup.py` `JsonExtractionTests (test_each_format, test_braces_inside_strings_and_nested_objects, test_no_json_or_only_json_inside_think)`.
+- [x] 4. Agent hoàn thành nhiệm vụ khi model giả trả lời theo các kiểu ở tiêu chí 3. Bằng chứng: `tests/test_m1_agent_cleanup.py` `JsonExtractionTests.test_agent_completes_with_messy_model_output`.
 
 Dọn repo:
-- [ ] 5. Cất phần corpus 10T vào `archive/corpus-10t/`: `local_ai/data/corpus.py`, `configs/datasets/corpus_10t.json`, `configs/datasets/smoke_real.json`, các lệnh CLI corpus và test đi kèm. Code trong `local_ai/` không còn import phần này, và test đã cất không còn chạy trong `tests/`.
-- [ ] 6. Lệnh `python -m local_ai.data secret-scan` vẫn chạy: hàm quét được tách ra một file riêng trong `local_ai/` và có test.
-- [ ] 7. Không còn khóa cấu hình thừa: mọi khóa trong `configs/**/*.json` (trừ `_comment`) đều được code đọc, có test tự dò. Khóa thừa hiện chỉ nằm trong `corpus_10t.json` và `smoke_real.json`.
-- [ ] 8. Không còn link `huyenb2404-ops` (hiện nằm ở `data/raw/seed_examples.jsonl` và `data/eval/seed_eval.jsonl`); đổi thành `https://github.com/hytmk2912/Huyen`.
-- [ ] 9. README khớp hướng fine-tune: mô tả luồng dataset Hugging Face → sft.jsonl → LoRA/QLoRA → đánh giá, bỏ mục tiêu 10T token, phần lộ trình trỏ tới `TASKS.md`.
+- [x] 5. Cất phần corpus 10T vào `archive/corpus-10t/`: `local_ai/data/corpus.py`, `configs/datasets/corpus_10t.json`, `configs/datasets/smoke_real.json`, các lệnh CLI corpus và test đi kèm. Code trong `local_ai/` không còn import phần này, và test đã cất không còn chạy trong `tests/`. Bằng chứng: `tests/test_m1_agent_cleanup.py` `CleanupTests.test_corpus_is_archived_and_not_imported`.
+- [x] 6. Lệnh `python -m local_ai.data secret-scan` vẫn chạy: hàm quét được tách ra một file riêng trong `local_ai/` và có test. Bằng chứng: `tests/test_m1_agent_cleanup.py` `CleanupTests.test_secret_scan_command_still_works`.
+- [x] 7. Không còn khóa cấu hình thừa: mọi khóa trong `configs/**/*.json` (trừ `_comment`) đều được code đọc, có test tự dò. Khóa thừa hiện chỉ nằm trong `corpus_10t.json` và `smoke_real.json`. Bằng chứng: `tests/test_m1_agent_cleanup.py` `CleanupTests.test_every_config_key_is_read_by_code`.
+- [x] 8. Không còn link `huyenb2404-ops` (hiện nằm ở `data/raw/seed_examples.jsonl` và `data/eval/seed_eval.jsonl`); đổi thành `https://github.com/hytmk2912/Huyen`. Bằng chứng: `tests/test_m1_agent_cleanup.py` `CleanupTests.test_old_repo_link_is_gone`.
+- [x] 9. README khớp hướng fine-tune: mô tả luồng dataset Hugging Face → sft.jsonl → LoRA/QLoRA → đánh giá, bỏ mục tiêu 10T token, phần lộ trình trỏ tới `TASKS.md`. Bằng chứng: `tests/test_m1_agent_cleanup.py` `CleanupTests.test_readme_follows_finetune_direction`.
 
 ---
 

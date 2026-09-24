@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,13 +17,34 @@ class AgentResult:
     completed: bool
 
 
-def _parse_json_object(text: str) -> dict[str, Any]:
-    """Model thật hay trả về JSON lỗi; coi đó là câu trả lời rỗng thay vì làm chương trình dừng."""
-    try:
-        value = json.loads(text)
-    except json.JSONDecodeError:
-        return {}
-    return value if isinstance(value, dict) else {}
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+_FENCED_BLOCK = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+
+
+def extract_json_object(text: str) -> dict[str, Any]:
+    """Tách object JSON đầu tiên trong câu trả lời của model.
+
+    Chịu được: chữ thừa trước/sau, khối ```json ... ``` hoặc ``` ... ```, khối <think>...</think>
+    (JSON nằm trong <think> bị bỏ qua) và dấu { } nằm trong chuỗi. Không tìm thấy thì trả về {}.
+    """
+    text = _THINK_BLOCK.sub("", text or "")
+    if "<think>" in text.lower():  # <think> chưa đóng: phần sau nó chưa phải câu trả lời
+        text = text[: text.lower().index("<think>")]
+    decoder = json.JSONDecoder()
+    candidates = [block.strip() for block in _FENCED_BLOCK.findall(text)] + [text.strip()]
+    for candidate in candidates:
+        for start in (index for index, char in enumerate(candidate) if char == "{"):
+            try:
+                value, _ = decoder.raw_decode(candidate, start)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                return value
+    return {}
+
+
+# Giữ tên cũ để code khác không bị ảnh hưởng.
+_parse_json_object = extract_json_object
 
 
 class AutonomousAgent:

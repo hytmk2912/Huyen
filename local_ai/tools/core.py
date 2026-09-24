@@ -22,8 +22,8 @@ class ToolRegistry:
             return ToolResult(call.name, "Unknown tool", False)
         try:
             return ToolResult(call.name, str(tool(**call.arguments)), True)
-        except (TypeError, ValueError) as error:
-            return ToolResult(call.name, str(error), False)
+        except Exception as error:  # mọi lỗi của công cụ (chia 0, sai cú pháp...) thành kết quả thất bại, agent không sập
+            return ToolResult(call.name, f"Tool error: {type(error).__name__}: {error}", False)
 
 
 _ALLOWED_OPERATORS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
