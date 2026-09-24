@@ -1,5 +1,6 @@
 {
-  "_comment": "Bước dữ liệu SFT từ Hugging Face. Điền hf_dataset.name (dạng org/name) và license lấy từ trang giới thiệu dataset. Dùng messages_field (cột dạng hội thoại) hoặc mapping.input + mapping.expected_output. HF_TOKEN chỉ đọc từ biến môi trường.",
+  "_comment": "Mẫu tự khai báo một dataset Hugging Face cho bước SFT. Điền hf_dataset.name (dạng org/name), revision (nên là commit cố định) và giấy phép lấy từ trang giới thiệu dataset (dataset card). Dùng messages_field (cột hội thoại) hoặc mapping.input + mapping.expected_output. Mặc định đọc streaming tối đa 1000 dòng, giống các preset trong configs/datasets/presets/. HF_TOKEN chỉ đọc từ biến môi trường.",
+  "description": "Dataset tự khai báo",
   "dataset_version": "hf-sft-v1",
   "seed": 17,
   "output_dir": "data/processed/hf_sft",
@@ -10,11 +11,12 @@
     "subset": null,
     "split": "train",
     "revision": "main",
-    "streaming": false,
-    "limit": null,
+    "streaming": true,
+    "limit": 1000,
     "domain": "reasoning",
+    "language": null,
     "task": "sft",
-    "license": {"name": "", "url": ""},
+    "license": {"name": "", "url": "", "status": "cần kiểm tra lại trên dataset card"},
     "messages_field": null,
     "mapping": {"id": null, "input": "prompt", "expected_output": "response", "context": null, "reasoning": null}
   }

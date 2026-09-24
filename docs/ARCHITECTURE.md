@@ -82,6 +82,7 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 
 ## Kiểm thử
 - `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_consistency.py` giữ repo thống nhất: file mẫu dataset và preset cùng quy tắc (streaming, `limit` ≤ 1000, trạng thái giấy phép), cùng một thư mục `data/processed/hf_sft`, mọi lệnh con có trợ giúp, chữ cho người dùng bằng tiếng Việt.
 - `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
 - Lệnh kiểm tra trước khi đẩy: xem `CLAUDE.md`.
 

@@ -16,6 +16,7 @@ from local_ai.data.core import build_dataset, write_jsonl
 
 RowLoader = Callable[..., Iterable[dict[str, Any]]]
 PRESET_DIR = Path(__file__).resolve().parents[2] / "configs" / "datasets" / "presets"
+DEFAULT_SFT_DIR = "data/processed/hf_sft"  # nơi các cấu hình train (configs/training/*.json) đọc sft.jsonl
 ROLE_ALIASES = {"human": "user", "gpt": "assistant"}  # dạng ShareGPT: {"from": "human", "value": "..."}
 _state = {"real_stream": False}
 
@@ -90,7 +91,7 @@ def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> 
 def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None, loader: RowLoader | None = None) -> dict[str, Any]:
     """Tải -> chuyển đổi -> kiểm tra/loại trùng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json."""
     spec = config["hf_dataset"]; validate_spec(spec)
-    version = config.get("dataset_version", "hf-v1"); output = Path(output_dir or config.get("output_dir", "data/processed/hf_sft"))
+    version = config.get("dataset_version", "hf-v1"); output = Path(output_dir or config.get("output_dir", DEFAULT_SFT_DIR))
     raw = output / "raw.jsonl"; write_jsonl(raw, map_rows(load_hf_rows(spec, loader), spec, version))
     build_config = {"seed": config.get("seed", 0), "formats": config.get("formats", ["sft"]), "hf_dataset": {key: value for key, value in spec.items() if key != "token"}}
     return build_dataset([raw], output, version, build_config, config.get("eval_sources", []))

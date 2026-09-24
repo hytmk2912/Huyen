@@ -21,15 +21,15 @@ def _exit_after_stream() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m local_ai.data")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("inspect", "validate", "deduplicate", "stats"):
-        item = commands.add_parser(name); item.add_argument("path")
-    build = commands.add_parser("build"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
-    generate = commands.add_parser("generate"); generate.add_argument("teacher_output", help="Các bản ghi JSONL do TeacherModel đã sinh ra"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
+    for name, text in (("inspect", "In 3 bản ghi đầu của file dữ liệu"), ("validate", "Kiểm tra schema, đếm bản ghi hợp lệ và bị loại"), ("deduplicate", "Đếm bản ghi trùng nội dung"), ("stats", "Thống kê domain, nguồn, độ dài")):
+        item = commands.add_parser(name, help=text); item.add_argument("path", help="File dữ liệu (.jsonl, .json, .csv hoặc .parquet)")
+    build = commands.add_parser("build", help="Kiểm tra, loại trùng, chặn trùng với eval rồi xuất train.jsonl, sft.jsonl, manifest.json"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
+    generate = commands.add_parser("generate", help="Kiểm chứng bản ghi do model thầy sinh ra (math, python, tool_call)"); generate.add_argument("teacher_output", help="Các bản ghi JSONL do TeacherModel đã sinh ra"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
     hf = commands.add_parser("hf-sft", help="Tải dataset từ Hugging Face, kiểm tra rồi xuất sft.jsonl")
     source = hf.add_mutually_exclusive_group(required=True)
     source.add_argument("--config", help="File cấu hình một dataset (ví dụ configs/datasets/presets/code.json)")
     source.add_argument("--preset", action="append", help="Tên preset, có thể kèm tỉ lệ trộn: --preset code:0.5 --preset vietnamese:0.5 (lặp lại để trộn nhiều preset)")
-    hf.add_argument("--dataset", help="Ghi đè hf_dataset.name (chỉ dùng với --config)"); hf.add_argument("--output", help="Thư mục đầu ra")
+    hf.add_argument("--dataset", help="Ghi đè hf_dataset.name (chỉ dùng với --config)"); hf.add_argument("--output", help="Thư mục đầu ra (mặc định: output_dir trong cấu hình, hoặc data/processed/hf_sft khi trộn preset)")
     hf.add_argument("--limit", type=int, help="Số dòng tối đa đọc từ mỗi dataset"); hf.add_argument("--total", type=int, help="Tổng số dòng đọc khi trộn preset, chia theo tỉ lệ")
     commands.add_parser("list-presets", help="Liệt kê các preset dataset trong configs/datasets/presets/")
     commands.add_parser("secret-scan", help="Quét repo tìm khóa/mật khẩu bị lộ")
@@ -40,8 +40,8 @@ def main() -> None:
             print(f"{item['name']}: {item['dataset']}@{item['revision'][:8]} | domain {item['domain']} | ngôn ngữ {item['language']} | tối đa {item['limit']} dòng | giấy phép {item['license']} ({item['license_status']})\n    {item['description']}")
         return
     if args.command == "hf-sft" and args.preset:
-        from local_ai.data.hub import parse_mix, prepare_hf_mix
-        print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or "data/processed/hf_mix", total=args.total, limit=args.limit), indent=2, ensure_ascii=False)); _exit_after_stream(); return
+        from local_ai.data.hub import DEFAULT_SFT_DIR, parse_mix, prepare_hf_mix
+        print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or DEFAULT_SFT_DIR, total=args.total, limit=args.limit), indent=2, ensure_ascii=False)); _exit_after_stream(); return
     if args.command == "hf-sft":
         from local_ai.data.hub import prepare_hf_sft
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
