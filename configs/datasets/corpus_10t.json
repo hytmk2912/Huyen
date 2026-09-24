@@ -1,5 +1,5 @@
 {
-  "_comment": "Corpus 10T token. domain_mixture là tỷ lệ token theo nhóm: code 10%, trading 20%, reasoning (suy luận) 10%, vietnamese (tiếng Việt) 10%, general (dữ liệu tự do) 50%. Mỗi nguồn phải thuộc một nhóm có trong domain_mixture. Xem số token mục tiêu từng nhóm: python -m local_ai.data mixture --config configs/datasets/corpus_10t.json allowed_licenses là danh sách giấy phép đã duyệt; nguồn có giấy phép khác bị từ chối. Nguồn từ dataset Hugging Face: download_method \"hf_dataset\", url \"hf://datasets/org/name\", dataset_version là revision, options {\"text_field\": \"text\", \"subset\": null, \"split\": \"train\", \"max_rows\": null}. near_dedup: loại tài liệu gần trùng (MinHash) giữa mọi nguồn; threshold là độ giống tối thiểu để coi là trùng.",
+  "_comment": "Corpus 10T token. domain_mixture là tỷ lệ token theo nhóm: code 10%, trading 20%, reasoning (suy luận) 10%, vietnamese (tiếng Việt) 10%, general (dữ liệu tự do) 50%. Mỗi nguồn phải thuộc một nhóm có trong domain_mixture. Xem số token mục tiêu từng nhóm: python -m local_ai.data mixture --config configs/datasets/corpus_10t.json allowed_licenses là danh sách giấy phép đã duyệt; nguồn có giấy phép khác bị từ chối. Nguồn từ dataset Hugging Face: download_method \"hf_dataset\", url \"hf://datasets/org/name\", dataset_version là revision, options {\"text_field\": \"text\", \"text_template\": null, \"subset\": null, \"split\": \"train\", \"max_rows\": null}; text_template ghép nhiều cột, ví dụ \"{problem}\\n\\n{solution}\". near_dedup: loại tài liệu gần trùng (MinHash) giữa mọi nguồn; threshold là độ giống tối thiểu để coi là trùng.",
   "dataset_version": "10t-v1",
   "target_tokens": 10000000000000,
   "storage_root": "storage",
@@ -129,6 +129,26 @@
         "text_field": "text",
         "split": "train",
         "max_rows": 500
+      }
+    },
+    {
+      "source_id": "openr1-math",
+      "dataset_name": "OpenR1-Math-220k (bài toán + lời giải có suy luận)",
+      "dataset_version": "e4e141ec9dea9f8326f4d347be56105859b2bd68",
+      "url": "hf://datasets/open-r1/OpenR1-Math-220k",
+      "license": "Apache-2.0",
+      "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "domain": "reasoning",
+      "language": "en",
+      "estimated_size": 100000000,
+      "estimated_tokens": 8960800,
+      "download_method": "hf_dataset",
+      "processing_recipe": "plain_text_v1",
+      "options": {
+        "text_template": "{problem}\n\n{solution}",
+        "subset": "default",
+        "split": "train",
+        "max_rows": 20000
       }
     }
   ]

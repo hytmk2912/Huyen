@@ -58,3 +58,16 @@ class PinAndMeasureSourcesTests(unittest.TestCase):
 
 
 if __name__ == "__main__": unittest.main()
+
+
+class TextTemplateTests(unittest.TestCase):
+    def test_template_joins_columns_and_missing_column_is_empty(self):
+        from local_ai.data.corpus import row_text
+        self.assertEqual(row_text({"problem": "Đề", "solution": "Giải"}, {"text_template": "{problem}\n\n{solution}"}), "Đề\n\nGiải")
+        self.assertEqual(row_text({"problem": "Đề"}, {"text_template": "{problem} {solution}"}), "")
+        self.assertEqual(row_text({"content": " x "}, {"text_field": "content"}), "x")
+
+    def test_reasoning_source_is_declared_and_pinned(self):
+        sources = {item["source_id"]: item for item in json.loads(Path(CORPUS).read_text())["sources"]}
+        self.assertEqual(sources["openr1-math"]["domain"], "reasoning")
+        self.assertRegex(sources["openr1-math"]["dataset_version"], r"^[0-9a-f]{40}$")

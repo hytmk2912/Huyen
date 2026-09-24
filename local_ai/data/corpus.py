@@ -53,6 +53,15 @@ def hf_dataset_id(url: str) -> str:
     return url[len(prefix):]
 
 
+def row_text(row: dict[str, Any], options: dict[str, Any]) -> str:
+    """Lấy văn bản của một dòng: dùng text_template (ví dụ "{problem}\\n\\n{solution}") nếu có, không thì cột text_field."""
+    template = options.get("text_template")
+    if template:
+        try: return template.format(**row).strip()
+        except (KeyError, IndexError): return ""
+    return str(row.get(options.get("text_field", "text")) or "").strip()
+
+
 def fetch_hf_text(source: "Source", target: Path, loader: Any = None, budget: Any = None, throttle: Any = None) -> Path:
     """Tải cột văn bản của một dataset Hugging Face (streaming) vào file .part; dừng giữa chừng thì lần sau tải tiếp từ dòng đã dừng."""
     from local_ai.data.limits import StorageBudget, Throttle
@@ -62,14 +71,14 @@ def fetch_hf_text(source: "Source", target: Path, loader: Any = None, budget: An
             from datasets import load_dataset
         except ImportError as error: raise RuntimeError("Hãy cài gói tùy chọn `datasets` để tải nguồn hf_dataset") from error
         loader = load_dataset
-    options = source.options; field_name = options.get("text_field", "text")
+    options = source.options
     rows = loader(hf_dataset_id(source.url), options.get("subset"), split=options.get("split", "train"), revision=source.dataset_version, streaming=True, token=os.environ.get("HF_TOKEN") or None)
     limit = options.get("max_rows"); partial = target.with_suffix(".part"); progress = target.with_suffix(".progress")
     done = int(progress.read_text()) if progress.exists() and partial.exists() else 0
     if not done: partial.write_text("", encoding="utf-8")
     with partial.open("a", encoding="utf-8") as output:
         for row in islice(rows, done, limit):
-            text = str(row.get(field_name) or "").strip()
+            text = row_text(row, options)
             if text:
                 data = ("\n\n" if partial.stat().st_size or output.tell() else "") + text
                 size = len(data.encode("utf-8")); budget.reserve(size); output.write(data); output.flush(); throttle.consume(size)
@@ -297,9 +306,9 @@ def measure_source(source: "Source", config: dict[str, Any], sample_rows: int = 
             from datasets import load_dataset
         except ImportError as error: raise RuntimeError("Hãy cài gói tùy chọn `datasets` để đo nguồn hf_dataset") from error
         loader = load_dataset
-    tokenizer = tokenizer or Tokenizer(config["tokenizer"]); options = source.options; field_name = options.get("text_field", "text")
+    tokenizer = tokenizer or Tokenizer(config["tokenizer"]); options = source.options
     rows = loader(hf_dataset_id(source.url), options.get("subset"), split=options.get("split", "train"), revision=source.dataset_version, streaming=True, token=os.environ.get("HF_TOKEN") or None)
-    counts = [len(tokenizer.encode(str(row[field_name]))) for row in islice(rows, sample_rows) if row.get(field_name)]
+    counts = [len(tokenizer.encode(text)) for text in (row_text(row, options) for row in islice(rows, sample_rows)) if text]
     if not counts: return {"source_id": source.source_id, "status": "empty"}
     average = sum(counts) / len(counts); planned = options.get("max_rows")
     return {"source_id": source.source_id, "status": "measured", "tokenizer": tokenizer.info()["name"], "sample_rows": len(counts), "avg_tokens_per_row": round(average, 1), "planned_rows": planned, "estimated_tokens": round(average * planned) if planned else None}

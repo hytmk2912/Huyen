@@ -87,13 +87,15 @@ Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc
 **Quy tắc:** lộ trình luôn có đúng **5 mục đang làm**. Làm xong mục nào thì chuyển mục đó xuống "Đã hoàn thành" và bổ sung ngay một mục mới chưa làm, để lộ trình luôn đủ 5 mục. Với mục cần phần cứng hoặc khóa truy cập thật, phần code và test được làm trong repo; phần phải chạy thật được ghi vào "Việc cần chạy trên máy thật".
 
 ### Đang làm
-1. Tìm thêm nguồn trading thuần (tin thị trường, dữ liệu giá có giấy phép rõ) và nguồn cho nhóm `reasoning` để bám đủ tỷ lệ 20% và 10%.
-2. Kiểm thử đầu-cuối toàn bộ đường ống bằng dữ liệu giả, không cần mạng/GPU: build-corpus → verify-shard → hf-sft → finetune `--dry-run` → đánh giá theo nhóm.
-3. Báo cáo tiến độ corpus dễ đọc bằng tiếng Việt: bảng theo nhóm (đã có/mục tiêu/phần trăm), dung lượng đã dùng và ước tính dung lượng còn cần.
-4. Chạy thử `build-corpus` thật ở quy mô nhỏ (vài trăm dòng mỗi nguồn đã cố định) trong môi trường có mạng, ghi lại số token, tỷ lệ loại trùng và lỗi gặp phải.
-5. Khai báo thêm nguồn cho nhóm `code` (mã nguồn giấy phép permissive, có cố định phiên bản) để bám tỷ lệ 10%.
+1. Báo cáo tiến độ corpus dễ đọc bằng tiếng Việt: bảng theo nhóm (đã có/mục tiêu/phần trăm), dung lượng đã dùng và ước tính dung lượng còn cần.
+2. Chạy thử `build-corpus` thật ở quy mô nhỏ (vài trăm dòng mỗi nguồn đã cố định) trong môi trường có mạng, ghi lại số token, tỷ lệ loại trùng và lỗi gặp phải.
+3. Khai báo thêm nguồn cho nhóm `code` (mã nguồn giấy phép permissive, có cố định phiên bản) để bám tỷ lệ 10%.
+4. Tự tạo dữ liệu trading tổng hợp có kiểm chứng bằng công thức (lợi nhuận, R:R, khối lượng theo rủi ro, phí/thuế, điểm hòa vốn), bản quyền thuộc repo, để bù cho việc thiếu nguồn trading thuần.
+5. Tăng tốc near-dedup cho quy mô lớn: xử lý theo lô, dùng thư viện tùy chọn (datasketch) khi có, và đo tốc độ trên dữ liệu mẫu.
 
 ### Đã hoàn thành
+- **Nguồn reasoning và tìm nguồn trading**: đã khai báo `open-r1/OpenR1-Math-220k` (Apache-2.0, cố định commit `e4e141ec…`) cho nhóm `reasoning`, ghép đề bài và lời giải bằng tùy chọn mới `text_template`. Đo thật trên 200 bài mẫu bằng tokenizer model chính: khoảng 448 token/bài, tức khoảng 9 triệu token cho 20.000 bài. Với trading, các dataset tìm được trên Hugging Face hoặc là bảng số (OHLCV, không phải văn bản), hoặc là bản gộp từ nhiều nguồn có giấy phép không rõ, nên chưa thêm; đã đưa hướng tự tạo dữ liệu trading thành mục mới.
+- **Kiểm thử đầu-cuối bằng dữ liệu giả** (`tests/test_end_to_end.py`): chạy liền build-corpus (nguồn reasoning thật trong cấu hình, dữ liệu giả) → verify-shard (kho Hugging Face giả) → hf-sft → finetune `--dry-run` → đánh giá theo nhóm, không cần mạng hay GPU.
 - **Tự động đánh giá sau huấn luyện**: sau khi lưu adapter/model, `finetune.py` chạy bộ đánh giá theo nhóm (`eval_cases`, mặc định `data/eval/vi_trading_eval.jsonl`), ghi `eval_report.json` cạnh checkpoint và thêm độ chính xác từng nhóm vào metrics. Đặt `eval_cases` là `null` để tắt.
 - **Cố định phiên bản và đo token của nguồn Hugging Face** (đã chạy thật): lệnh `pin-sources` đã ghi mã commit cho FineWeb-2 (`af9c1333…`) và PleIAs/SEC (`b09d02e1…`). Lệnh `measure-sources` đã đo trên 200 dòng mẫu mỗi nguồn bằng tokenizer của model chính: tiếng Việt trung bình khoảng 1.699 token/dòng (khoảng 34 triệu token cho 20.000 dòng), báo cáo SEC khoảng 25.767 token/báo cáo (khoảng 12,9 triệu token cho 500 báo cáo). Đây là số đo trên mẫu, chưa phải toàn bộ dữ liệu.
 - **Giới hạn tài nguyên khi thu thập corpus**: `local_ai/data/limits.py` kiểm tra `max_local_storage_gb` trong lúc tải (vượt thì dừng an toàn, báo `paused` và `build-corpus` ngừng các nguồn còn lại) và giữ tốc độ tải theo `max_bandwidth_mbps`. File đang tải nằm ở `.part`: nguồn HTTP tải tiếp bằng header `Range` (máy chủ không hỗ trợ thì tải lại từ đầu), nguồn Hugging Face nhớ số dòng đã tải trong `.progress` để chạy lại thì tải tiếp.
