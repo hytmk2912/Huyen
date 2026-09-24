@@ -1,4 +1,71 @@
-# Nhiệm vụ 1 tuần
+# Nhiệm vụ tuần 2 (M8–M14)
+
+Bắt đầu: 2026-09-24, từ `main` tại commit `09c93f3` (119 test chạy qua; compileall và secret-scan sạch). Nhánh làm việc: `claude/nhiem-vu-tuan-2`.
+
+Cách làm và cách chấm giống tuần 1 (xem phần tuần 1 bên dưới): mỗi lượt làm **tối đa 1 mốc** bằng skill `lam-moc`. Làm các mốc tồn của tuần 1 trước (hiện không có), rồi M8 → M14. Mốc chỉ **Xong** khi đạt mọi tiêu chí và cả ba lệnh kiểm tra đều xanh.
+
+Quy tắc riêng tuần 2:
+- Notebook lưu không kèm output, ghim phiên bản thư viện, mỗi ô có chú thích tiếng Việt dễ hiểu (chủ repo dùng điện thoại).
+- Notebook không chạy được trong môi trường phát triển: chỉ kiểm tra hợp lệ và chạy thử lệnh của nó bằng `--dry-run`.
+- Token chỉ đọc từ biến môi trường hoặc Colab Secrets, không ghi vào repo hay notebook.
+
+## Bảng tiến độ tuần 2
+
+| Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
+| --- | --- | --- | --- | --- |
+| M8 | Gộp repo Agent, phần 1: đưa code runtime vào | **Xong** | 4/4 (100%) | `tests/test_m8_runtime.py` (14 test) |
+| M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | Chưa làm | 0/5 | — |
+| M10 | Notebook train trên Colab free (0.5B) | Chưa làm | 0/5 | — |
+| M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | Chưa làm | 0/4 | — |
+| M12 | Chất lượng dữ liệu | Chưa làm | 0/3 | — |
+| M13 | Agent chạy model thật trên Colab | Chưa làm | 0/3 | — |
+| M14 | Tổng kết tuần 2 | Chưa làm | 0/4 | — |
+
+## M8: Gộp repo Agent, phần 1: đưa code vào
+- [x] 1. Lấy được repo Agent. `hytmk2912/Agent` không truy cập được từ phiên (có thể đang riêng tư); `huyenytmk2912/agent` công khai, đã `git clone`, commit `78a3e25`.
+- [x] 2. `docs/GOP_AGENT.md`: phần đưa vào (bảng đối chiếu), phần để M9, phần bỏ (FastAPI, uvicorn, pydantic, python-dotenv), 7 rủi ro bảo mật (nghiêm trọng nhất: chèn lệnh qua `shell=True`), commit gốc đã lấy. Code gốc cất nguyên văn ở `archive/agent-goc/`.
+- [x] 3. Runtime nằm trong `local_ai/runtime/` (`executor.py`, `jobs.py`, `auth.py`), chỉ dùng thư viện chuẩn, bịt ngay lỗ hổng chèn lệnh (chạy lệnh dạng list, không shell). **Repo Agent không có test nào**, nên "test gốc" không có để chép; thay bằng test mới kiểm tra đúng hành vi của `agent_runtime.py` và `gateway.py` gốc cùng các chỗ sửa an toàn. Bằng chứng: `tests/test_m8_runtime.py` (14 test, gồm chuỗi chèn lệnh `;` `&&` `|` `$()` backtick, xuống dòng chỉ được in ra như chữ).
+- [x] 4. Test cũ và test của runtime đều xanh: 133 test chạy qua; compileall và secret-scan sạch.
+
+## M9: Gộp repo Agent, phần 2: tool chạy lệnh
+- [ ] 1. `TerminalTool` trên runtime vừa gộp: chỉ chạy lệnh có trong allowlist ở `configs/tools/terminal.json`, không dùng `shell=True`, tham số truyền dạng list, có timeout, ghi log từng lệnh.
+- [ ] 2. Tool tắt mặc định, muốn bật phải khai báo rõ.
+- [ ] 3. Gateway/mạng (nếu có) tắt mặc định, chỉ nghe 127.0.0.1, bắt buộc token.
+- [ ] 4. Đăng ký tool vào `ToolRegistry` cho agent.
+- [ ] 5. Test chặn command-injection (dấu `;` `&&` `|` `$()` backtick, xuống dòng), lệnh ngoài allowlist bị từ chối, timeout chạy đúng.
+
+## M10: Notebook train trên Colab free (0.5B)
+- [ ] 1. `notebooks/train_colab.ipynb`; README có nút "Open in Colab" trỏ tới notebook ở nhánh `main`.
+- [ ] 2. Các ô: kiểm tra GPU (không có thì hướng dẫn chọn T4) → clone repo, cài thư viện (không cài lại torch) → đọc `HF_TOKEN` từ Colab Secrets → lấy 2000 dòng từ preset → QLoRA model smoke ở fp16 → eval trước/sau, in bảng so sánh → đẩy adapter lên repo HF private.
+- [ ] 3. Finetune có tùy chọn đẩy checkpoint lên HF (`hub_strategy` checkpoint); chạy lại thì tải `last-checkpoint` về và train tiếp.
+- [ ] 4. Notebook hợp lệ (nbformat), lưu không kèm output, ghim phiên bản thư viện, mỗi ô có chú thích tiếng Việt.
+- [ ] 5. Test chạy các lệnh của notebook bằng `--dry-run`.
+
+## M11: Colab cho Qwen3-4B + hướng dẫn iPhone
+- [ ] 1. `configs/training/colab_light.json`: QLoRA 4-bit, fp16, batch 1, `max_length` vừa T4.
+- [ ] 2. Notebook thêm lựa chọn model light, in ước tính thời gian, tự train tiếp khi Colab ngắt.
+- [ ] 3. `docs/TRAIN_COLAB.md`: từng bước trên iPhone (mở link, chọn T4, thêm `HF_TOKEN` vào Secrets, Run all, kết quả nằm đâu, lỗi hay gặp).
+- [ ] 4. Test dry-run với cấu hình mới xanh.
+
+## M12: Chất lượng dữ liệu
+- [ ] 1. Bộ lọc: ngôn ngữ (ưu tiên tiếng Việt), độ dài, lặp từ/câu, gần trùng (MinHash tự viết, không thêm thư viện nặng).
+- [ ] 2. Thống kê trước/sau lọc ghi vào `manifest.json`.
+- [ ] 3. Mỗi bộ lọc có test bằng fixture.
+
+## M13: Agent chạy model thật trên Colab
+- [ ] 1. `notebooks/agent_colab.ipynb`: cài Ollama, kéo 1 model nhỏ (ví dụ `qwen3:4b`), agent gọi qua adapter OpenAI (M3).
+- [ ] 2. Làm 5 nhiệm vụ mẫu bằng calculator và `TerminalTool` (lệnh trong allowlist như `ls`, `cat`), in trace và tỉ lệ thành công.
+- [ ] 3. Notebook hợp lệ, test dry-run xanh.
+
+## M14: Tổng kết tuần 2
+- [ ] 1. Cập nhật README, `docs/ARCHITECTURE.md`, lộ trình.
+- [ ] 2. `memory.md`: % tiến độ từng phần; danh sách việc chủ repo phải tự làm (chạy notebook nào, archive repo Agent cũ...); đề xuất 7 mốc tuần 3.
+- [ ] 3. README khớp code.
+- [ ] 4. Mọi test xanh.
+
+---
+
+# Nhiệm vụ tuần 1 (M1–M7, đã xong)
 
 **Đã xong cả 7 mốc và đã gộp vào `main` ngày 24/9 (PR #6, commit gộp `63bdc61`).**
 

@@ -72,6 +72,14 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 - Bộ đề `data/eval/eval_v1.jsonl`: 30 câu Việt + Anh, mỗi câu có đáp án mẫu.
 - `benchmarks.py` là phần chấm khớp đúng cũ, vẫn giữ lại.
 
+### Runtime (`local_ai/runtime`, gộp từ repo Agent)
+Viết lại bằng thư viện chuẩn từ repo Agent (commit `78a3e25`; xem `docs/GOP_AGENT.md`):
+- `executor.run_command`: chạy lệnh dạng list, **không qua shell**, trong thư mục làm việc; có timeout (quá giờ thì dừng cả nhóm tiến trình con); cắt output; ghi job id và thời điểm;
+- `jobs.JobQueue`: hàng đợi job trong bộ nhớ (tạo, xem, nhận, trả kết quả), có giới hạn số job;
+- `auth.require_token`: kiểm tra `Bearer <token>` bằng so sánh an toàn.
+
+Import không mở cổng mạng, không tạo thư mục. Allowlist lệnh và `TerminalTool` làm ở mốc M9.
+
 ### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
 `AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
 - công cụ lỗi thì agent ghi vào trace rồi thử lại;
