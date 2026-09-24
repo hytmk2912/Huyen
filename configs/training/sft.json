@@ -1,5 +1,5 @@
 {
-  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể.",
+  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. quantization (tùy chọn): 4bit | 8bit | none, ghi đè kiểu nén của model gốc; lora + 4bit là QLoRA (xem qlora_primary.json). resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể.",
   "base_model": "smoke",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",

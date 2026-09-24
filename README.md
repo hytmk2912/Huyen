@@ -1,60 +1,250 @@
-# Nền tảng AI tự động chạy cục bộ
+# Fine-tune model Qwen3 (Huihui) chạy cục bộ
 
-Nền tảng AI chạy cục bộ, mọi thứ điều khiển bằng file cấu hình. Model chính đã xác minh là `huihui-ai/Huihui-Qwen3.8-27B-abliterated`; các model cục bộ khác được liệt kê trong `configs/models/platform.json` và được bộ định tuyến (router) chọn theo khả năng. Mặc định repo này không huấn luyện và không tải model 27B.
+Repo dùng để fine-tune model có sẵn trên Hugging Face, mọi bước đều điều khiển bằng file cấu hình:
 
-## Kiến trúc
-- `local_ai.models`: cấu hình model, adapter, truy cập tokenizer và định tuyến theo khả năng.
-- `local_ai.data`: một hệ thống dữ liệu/corpus thống nhất: ghi nguồn gốc dữ liệu, lọc, tokenize, chia shard, sổ đăng ký (registry) và lưu trữ Hugging Face tùy chọn.
-- `local_ai.agents`: vòng lặp agent có giới hạn: lập kế hoạch → gọi công cụ → quan sát → đánh giá → thử lại.
-- `local_ai.tools`: sổ đăng ký công cụ tường minh và giao diện sandbox cho phát triển.
-- `local_ai.training`: kế hoạch huấn luyện và khung SFT tùy chọn (`finetune.py`, full hoặc LoRA).
-- `local_ai.evaluation`, `local_ai.experiments`: các thành phần đánh giá và tái lập thí nghiệm, chạy theo cấu hình.
-
-## Corpus
-Mục tiêu là **10.000.000.000.000 token thật**. Đây chỉ là mục tiêu: token cục bộ hoặc token trong cấu hình không bao giờ được tính là tiến độ đã tải lên. Chỉ các shard production đã được xác minh trên máy chủ từ xa mới được tính. Bắt buộc có thông tin nguồn và giấy phép (license). Không có đợt thu thập dữ liệu lớn nào tự động chạy.
-
-Tokenizer production phải được nạp từ model chính trong cấu hình. Các tokenizer thử nghiệm cũ (theo byte và `cl100k_base`) chỉ dùng cho test, không được tính vào corpus production.
-
-## Model
-`configs/models/platform.json` chứa danh sách model (`name`, `source` là tên trên Hugging Face, `dtype`, `capabilities`, và các thiết lập tùy chọn về revision/tokenizer/thiết bị). Mục đầu tiên là model chính. Muốn thêm model thì thêm một mục mới với `name` không trùng; router và khung huấn luyện đều gọi model theo tên.
-
-## Huấn luyện (SFT)
-Phần huấn luyện mới là khung tùy chọn: mặc định không huấn luyện gì, và test không tải model hay dataset nào.
-
-1. Chuẩn bị dữ liệu từ một dataset trên Hugging Face. Sửa `configs/datasets/hf_sft.json`: điền `hf_dataset.name`, giấy phép lấy từ trang giới thiệu dataset (dataset card), và chọn một trong hai: `messages_field` (cột dạng hội thoại) hoặc `mapping.input` / `mapping.expected_output`. Sau đó chạy:
-
-   ```bash
-   python -m pip install datasets
-   python -m local_ai.data hf-sft --config configs/datasets/hf_sft.json [--dataset org/name] [--limit 1000]
-   ```
-
-   Các dòng dữ liệu được chuyển sang schema của repo và đi qua các bước kiểm tra sẵn có: kiểm tra hợp lệ, loại trùng và chặn trùng với tập eval. Kết quả nằm trong `output_dir`: `raw.jsonl`, `train.jsonl`, `sft.jsonl`, `rejected.jsonl`, `manifest.json`. `HF_TOKEN` chỉ được đọc từ biến môi trường (cần khi dataset bị giới hạn truy cập hoặc riêng tư).
-
-2. Fine-tune. `configs/training/sft.json` chỉ định model gốc (lấy theo tên trong danh sách model), đường dẫn `sft.jsonl`, thư mục đầu ra và các siêu tham số. `method` là `full` hoặc `lora`; gradient checkpointing bật sẵn.
-
-   ```bash
-   python -m pip install torch transformers trl peft datasets
-   python -m local_ai.training.finetune --config configs/training/sft.json --dry-run
-   python -m local_ai.training.finetune --config configs/training/sft.json --method lora
-   ```
-
-   Checkpoint được lưu thành `checkpoint-N` trong thư mục đầu ra; chạy lại sẽ tự tiếp tục từ checkpoint mới nhất (dùng `--no-resume` để bắt đầu lại). Adapter LoRA cuối cùng lưu vào `adapter/`, bản fine-tune full lưu vào `final/`. Nếu thiếu GPU hoặc thư viện tùy chọn, lượt chạy trả về `"status": "skipped"` thay vì báo lỗi.
-
-## Cài đặt và kiểm tra
-Cài các thư viện tùy chọn khi cần nạp model:
-
-```bash
-python -m pip install transformers torch huggingface_hub
-# thư viện thêm cho huấn luyện (tùy chọn): trl peft datasets
-python -m unittest discover -s tests -v
-python -m compileall -q local_ai
+```
+dataset Hugging Face → kiểm tra, loại trùng, chặn rò rỉ eval → sft.jsonl → fine-tune LoRA/QLoRA → đánh giá
 ```
 
-Chỉ đặt `HF_TOKEN` trong biến môi trường (dùng khi tải lên hoặc tải dataset bị giới hạn truy cập); `HF_DATASET_REPO` có thể đặt ở biến môi trường hoặc trong cấu hình không chứa bí mật. Tuyệt đối không commit khóa/mật khẩu. Chạy `python -m local_ai.data secret-scan` trước khi thu thập dữ liệu.
+Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ, 27,78 tỷ tham số); các model khác nằm trong `configs/models/platform.json`. Repo không tự tải model: test chạy được mà không cần mạng hay GPU.
 
-## Lộ trình
-1. Cố định phiên bản và chạy thử model/tokenizer chính trên phần cứng đích.
-2. Hoàn tất xác minh từ xa có xác thực cho một shard.
-3. Thêm dần các adapter nguồn corpus đã được duyệt và có giấy phép.
-4. Triển khai huấn luyện phân tán BF16; FP8 vẫn chưa hỗ trợ cho đến khi đã chọn và thử nghiệm runtime cùng phần cứng.
-5. Mở rộng công cụ cho agent, cơ chế cách ly, bộ đánh giá và kiểm thử khả năng phục hồi.
+Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ, việc dở và lỗi còn tồn: `memory.md`.
+
+## Trạng thái sau tuần 1
+| Phần | Làm được gì | Đã kiểm chứng thế nào |
+| --- | --- | --- |
+| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval | Test bằng fixture; **chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây |
+| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ; GPU không bf16 thì dùng fp16 | **Chạy thật LoRA trên CPU** với model tí hon (khoảng 6 giây). QLoRA và model ảnh + chữ **mới test bằng module giả**, chưa chạy trên GPU |
+| Eval | 30 câu Việt + Anh, 4 cách chấm, báo cáo JSON + Markdown | Test đủ 4 cách chấm; **chạy thật** với model tí hon sau khi train |
+| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI) | Test bằng server HTTP giả; **chưa chạy với server thật** |
+| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn | Test bằng model giả |
+
+## Cấu trúc
+- `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); quét khóa bí mật (`secrets.py`).
+- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA).
+- `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
+- `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`.
+- `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
+- `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ).
+
+## Cài đặt và kiểm tra
+```bash
+python -m pip install datasets                        # tải dataset Hugging Face
+python -m pip install torch transformers trl peft     # huấn luyện (cần GPU)
+# máy không có GPU: cài torch bản CPU trước, rồi mới cài các thư viện kia
+# python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install bitsandbytes                    # nén 4bit/8bit và QLoRA (cần GPU CUDA)
+python -m unittest discover -s tests -v
+python -m compileall -q local_ai
+python -m local_ai.data secret-scan
+```
+
+Phiên bản đã chạy thử: Python 3.11, torch 2.14.0 (bản CPU), transformers 5.17.0, trl 1.13.0, peft 0.21.0, datasets 5.0.1. Model chính cần transformers bản 5.x.
+
+Chỉ đặt `HF_TOKEN` trong biến môi trường hoặc file `.env` (đã có trong `.gitignore`); tuyệt đối không commit khóa hay mật khẩu.
+
+## Danh sách model
+Mỗi model trong `configs/models/platform.json` khai báo:
+- `kind`: `text` (nạp bằng `AutoTokenizer` + `AutoModelForCausalLM`) hoặc `multimodal` (ảnh + chữ, nạp bằng `AutoProcessor` + `AutoModelForMultimodalLM`; bản transformers cũ không có lớp này thì dùng `AutoModelForImageTextToText`). Model chính là `multimodal` theo thẻ trên Hugging Face.
+- `params_b`: số tỷ tham số, dùng để ước tính VRAM.
+- `quantization` (tùy chọn): `4bit` (NF4) hoặc `8bit`, nén bằng bitsandbytes khi nạp model.
+
+GPU không hỗ trợ bf16 (ví dụ T4) thì model tự chuyển sang fp16 và in cảnh báo. Chỉ model `multimodal` nhận được ảnh (`Message(..., images=("duong/dan/anh.png",))`); gửi ảnh tới model `text` sẽ báo lỗi.
+
+Xem VRAM ước tính cho mọi model (không tải model, không cần mạng):
+```bash
+python -m local_ai.models.vram
+```
+Bảng in ra trọng số ở bf16/8bit/4bit và bộ nhớ khi train LoRA/QLoRA. Ví dụ model chính (27,78 tỷ tham số): trọng số bf16 khoảng 55,6 GB, 4bit khoảng 15,6 GB, train QLoRA khoảng 20,5 GB. Đây chỉ là ước lượng, chưa đo trên GPU thật.
+
+## Chạy model qua server local (Ollama, llama.cpp, vLLM)
+Model có `backend: "openai_compatible"` được gọi qua `POST {base_url}/chat/completions` theo chuẩn OpenAI, chỉ dùng thư viện chuẩn của Python. Khi đó:
+- `source` là tên model trên server;
+- `timeout_s` là số giây chờ tối đa;
+- `api_key_env` (tùy chọn) là **tên** biến môi trường chứa khóa, dùng khi server yêu cầu khóa. Không ghi khóa vào file cấu hình.
+
+`base_url` chỉ được là máy này hoặc mạng nội bộ (localhost, 192.168.x.x, 10.x.x.x...). Địa chỉ Internet bị từ chối, để không vô tình gọi API trả phí.
+
+`configs/models/platform.json` có sẵn 2 mục mẫu:
+- `ollama`: `http://localhost:11434/v1`, model `huihui_ai/Qwen3.8-abliterated:27b`;
+- `llamacpp`: `http://localhost:8080/v1`.
+
+Cần cài Ollama, llama.cpp hoặc vLLM trước. Các lệnh `ollama`, `llama-server`, `vllm` dưới đây **chưa chạy thử** trong môi trường phát triển của repo, vì cần cài phần mềm và tải model. Phần của repo gọi tới server đã được test bằng server giả.
+
+```bash
+# Ollama
+ollama pull huihui_ai/Qwen3.8-abliterated:27b
+ollama serve                                   # nếu Ollama chưa tự chạy nền
+python -m local_ai.demo --model ollama
+
+# llama.cpp (model nhỏ, chạy được trên CPU)
+llama-server -hf Qwen/Qwen2.5-0.5B-Instruct-GGUF --port 8080
+python -m local_ai.demo --model llamacpp
+
+# vLLM (cần GPU)
+vllm serve Qwen/Qwen2.5-0.5B-Instruct --port 8000
+```
+
+Với vLLM, thêm một mục vào `configs/models/platform.json`:
+```json
+{"name": "vllm", "backend": "openai_compatible", "base_url": "http://localhost:8000/v1", "source": "Qwen/Qwen2.5-0.5B-Instruct", "kind": "text", "params_b": 0.49, "capabilities": ["chat", "reasoning"]}
+```
+Nếu chạy `vllm serve ... --api-key "$LOCAL_LLM_API_KEY"` thì thêm `"api_key_env": "LOCAL_LLM_API_KEY"` vào mục trên.
+
+`python -m local_ai.demo` (không có `--model`) chạy agent với model giả, không cần server.
+
+Khi server lỗi, agent dừng lại và báo lỗi bằng tiếng Việt, không bị sập. Các trường hợp lỗi: server chưa chạy, hết thời gian chờ, hoặc server trả mã lỗi HTTP. Model quá nhỏ có thể không trả JSON đúng định dạng; khi đó demo báo "không hoàn thành".
+
+## Bước 1: chuẩn bị dữ liệu
+
+### Dùng preset có sẵn
+`configs/datasets/presets/` có 3 preset trỏ tới dataset công khai trên Hugging Face. Mỗi preset:
+- khóa cố định một commit (`revision`);
+- đọc kiểu streaming, tối đa 1000 dòng, nên không tải cả dataset.
+
+| Preset | Dataset | Nội dung | Giấy phép ghi trên Hugging Face |
+| --- | --- | --- | --- |
+| `code` | `bigcode/self-oss-instruct-sc2-exec-filter-50k` | Bài lập trình Python kèm lời giải đã chạy thử (tiếng Anh) | ODC-By |
+| `reasoning` | `open-r1/OpenR1-Math-220k` | Bài toán + lời giải (đưa vào khối `<think>`) + đáp án (tiếng Anh) | Apache-2.0 |
+| `vietnamese` | `5CD-AI/Vietnamese-Multi-turn-Chat-Alpaca` | Hội thoại tiếng Việt nhiều lượt, giữ nguyên mọi lượt | Apache-2.0 |
+
+**Trước khi dùng, hãy đọc lại giấy phép trên dataset card** (trang giới thiệu dataset). Giấy phép trong preset được ghi kèm trạng thái "cần kiểm tra lại trên dataset card", vì dữ liệu có thể được dịch hoặc sinh từ model khác, và giấy phép gốc có thể chặt hơn.
+
+```bash
+python -m local_ai.data list-presets                                          # xem các preset
+python -m local_ai.data hf-sft --config configs/datasets/presets/code.json    # một preset
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_mix
+```
+
+Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả chung vào một `sft.jsonl`:
+- Tỉ lệ được chuẩn hóa về tổng 1.
+- Nếu không ghi `--total`, lệnh lấy tổng số dòng lớn nhất sao cho không preset nào vượt `limit` của nó.
+- `--limit 20` thì mỗi preset chỉ đọc tối đa 20 dòng, hợp để chạy thử.
+- Tỉ lệ tính trên số dòng đọc vào. Dòng bị loại (trùng, sai dạng) làm tỉ lệ cuối lệch nhẹ; số dòng thật của từng nguồn ghi trong `manifest.json`.
+
+### Tự khai báo dataset
+Sửa `configs/datasets/hf_sft.json`: điền `hf_dataset.name`, giấy phép lấy từ trang dataset, và chọn `messages_field` (cột hội thoại, hiểu cả dạng role/content lẫn ShareGPT from/value) hoặc `mapping.input` / `mapping.expected_output` (tùy chọn thêm `mapping.context`, `mapping.reasoning`).
+
+```bash
+python -m local_ai.data hf-sft --config configs/datasets/hf_sft.json [--dataset org/name] [--limit 1000]
+```
+
+Kết quả nằm trong `output_dir`:
+- `sft.jsonl`: dùng để train;
+- `train.jsonl`;
+- `rejected.jsonl`: dòng bị loại kèm lý do;
+- `manifest.json`.
+
+Trong `sft.jsonl`:
+- hội thoại nhiều lượt giữ nguyên mọi lượt, kể cả system;
+- `context` được đặt trước câu hỏi;
+- `reasoning` được đưa vào khối `<think>...</think>` trước câu trả lời (định dạng suy luận của Qwen3).
+
+## Bước 2: fine-tune
+`configs/training/sft.json` chỉ định model gốc, đường dẫn `sft.jsonl`, thư mục đầu ra và siêu tham số; `method` là `full` hoặc `lora`; `quantization` (tùy chọn) ghi đè kiểu nén của model gốc.
+
+```bash
+python -m local_ai.training.finetune --config configs/training/sft.json --dry-run
+python -m local_ai.training.finetune --config configs/training/sft.json
+```
+
+QLoRA (LoRA trên model gốc nén 4bit) cho model chính dùng cấu hình mẫu `configs/training/qlora_primary.json` (`method: "lora"` + `quantization: "4bit"`); có thể ghi đè bằng `--quantization 4bit|8bit|none`. Full fine-tune không chạy trên model nén.
+
+```bash
+python -m local_ai.training.finetune --config configs/training/qlora_primary.json --dry-run
+```
+
+Các khóa hữu ích khác trong cấu hình huấn luyện:
+- `max_steps`: dừng sau đúng số bước này, ví dụ `2` để chạy thử;
+- `require_gpu: false`: cho phép chạy trên CPU.
+
+Để chấm model sau khi train, thêm một mục vào danh sách model, trỏ `adapter_path` tới thư mục adapter vừa lưu. Ví dụ `{"name": "smoke-lora", "source": "Qwen/Qwen2.5-0.5B-Instruct", "adapter_path": ".runs/sft/adapter", ...}`. Sau đó chạy `python -m local_ai.evaluation --model smoke-lora`. `max_new_tokens` (mặc định 512) giới hạn độ dài câu trả lời.
+
+Checkpoint lưu thành `checkpoint-N`; chạy lại sẽ tiếp tục từ checkpoint mới nhất (`--no-resume` để làm lại). Thiếu GPU hoặc thư viện (kể cả bitsandbytes khi dùng QLoRA) thì lệnh báo `"status": "skipped"`.
+
+### Chạy thử cả chuỗi trên CPU (không cần GPU, không tải gì)
+Test `tests/test_m6_cpu_pipeline.py` tự tạo tokenizer (BPE, có `chat_template`) và model Llama tí hon (2 lớp, hidden 64, khởi tạo ngẫu nhiên). Sau đó test chạy thật cả chuỗi:
+1. fixture preset → `sft.jsonl`;
+2. LoRA 2 bước trên CPU;
+3. lưu adapter;
+4. nạp lại model gốc cùng adapter;
+5. chạy eval 30 câu.
+
+Test chạy với `HF_HUB_OFFLINE=1`. Trên máy 4 CPU, test mất khoảng 6 giây. Máy thiếu torch, transformers, trl, peft hoặc datasets thì test tự bỏ qua.
+
+```bash
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install transformers trl peft datasets
+python -m unittest tests.test_m6_cpu_pipeline -v
+```
+
+## Bước 3: đánh giá (eval)
+Bộ câu hỏi `data/eval/eval_v1.jsonl` có 30 câu:
+- chia theo ngôn ngữ: 15 câu tiếng Việt, 15 câu tiếng Anh;
+- chia theo nhóm: 8 câu `code`, 14 câu `reasoning`, 8 câu `tool_use` (trả JSON gọi công cụ).
+
+Mỗi câu ghi `language`, `group` và cách chấm `scoring`:
+
+| scoring | Cách chấm |
+| --- | --- |
+| `exact` | Trả lời đúng bằng `expected`. Không phân biệt hoa thường, gộp khoảng trắng, chuẩn hóa Unicode tiếng Việt. |
+| `contains` | Câu trả lời chứa `expected`, chuẩn hóa như trên. |
+| `regex` | Câu trả lời khớp `pattern`. Không phân biệt hoa thường. |
+| `python_tests` | Lấy code trong câu trả lời, chạy cùng `tests` trong `PythonSandbox`, giới hạn `timeout_s` giây. Code sai cú pháp, lỗi khi chạy hoặc lặp vô hạn đều tính là không đạt. |
+
+Trước khi chấm, khối `<think>...</think>` trong câu trả lời được bỏ đi. Mỗi câu có `reference` là một câu trả lời đúng mẫu; test kiểm tra mọi `reference` đều đạt.
+
+```bash
+python -m local_ai.evaluation --scripted                  # chạy thử bằng đáp án mẫu (không cần model), kết quả 30/30
+python -m local_ai.evaluation --model ollama              # chấm một model trong configs/models/platform.json
+python -m local_ai.evaluation --scripted --train-data data/processed/hf_mix/sft.jsonl   # kiểm tra dữ liệu train không chứa câu eval
+```
+
+Báo cáo ghi vào `.runs/eval/<model>-<thời điểm>/`, hoặc thư mục ghi ở `--output`:
+- `report.json`: kết quả từng câu;
+- `report.md`: tỉ lệ đạt theo nhóm và theo ngôn ngữ, cùng danh sách câu không đạt kèm lý do.
+
+Nếu model lỗi (ví dụ server chưa chạy), lệnh dừng và ghi `status: "error"`. Model chạy bằng transformers mà máy thiếu torch hoặc transformers thì lệnh báo bỏ qua.
+
+**Chặn trùng train/eval** theo id, theo nội dung, và theo câu hỏi đã chuẩn hóa (kể cả các lượt user trong hội thoại):
+- Bước build dữ liệu (`hf-sft`, `build`) dừng và báo lỗi nếu dữ liệu train trùng với file trong `eval_sources`. Các cấu hình có sẵn đã chặn cả `seed_eval.jsonl` lẫn `eval_v1.jsonl`.
+- Lệnh eval với `--train-data <train.jsonl hoặc sft.jsonl>` từ chối chạy nếu dữ liệu train chứa câu eval.
+
+`PythonSandbox` chỉ chạy code trong một tiến trình riêng, có giới hạn thời gian. Nó không phải lớp cách ly an toàn. Nếu chấm code của model lạ, hãy chạy trong container.
+
+## Train trên GPU: smoke → light → primary
+Làm lần lượt từ model nhỏ đến model lớn; mỗi bước chạy `--dry-run` trước để xem cấu hình. **Các lệnh train trên GPU chưa chạy thử** (môi trường phát triển không có GPU); lệnh đã chạy được trên CPU với model tí hon (xem trên).
+
+Chuẩn bị:
+- trên máy GPU, cài torch bản CUDA, rồi `python -m pip install transformers trl peft datasets bitsandbytes`;
+- tạo dữ liệu vào đúng đường dẫn mà các cấu hình train đang đọc:
+
+```bash
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_sft
+```
+
+| Bước | Model | Lệnh train | VRAM ước tính | GPU gợi ý |
+| --- | --- | --- | ---: | --- |
+| 1. smoke | `smoke` (Qwen2.5-0.5B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json` | 2,2 GB | GPU bất kỳ từ 4 GB (T4 tự dùng fp16) |
+| 2. light | `light` (Qwen3-4B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json --base-model light --output-dir .runs/sft_light` | 11,0 GB | T4 16 GB, RTX 3060 12 GB; thêm `--quantization 4bit` (QLoRA) thì còn 3,8 GB |
+| 3. primary | `primary` (27,78 tỷ), QLoRA 4bit | `python -m local_ai.training.finetune --config configs/training/qlora_primary.json` | 20,5 GB | 24 GB (RTX 3090/4090, L4, A10); LoRA bf16 không nén cần khoảng 70,5 GB (A100 80 GB) |
+
+Chấm sau mỗi bước: `smoke-lora`, `light-lora`, `primary-qlora` trong `configs/models/platform.json` đã trỏ sẵn `adapter_path` tới thư mục adapter của từng bước. So với model gốc bằng cùng một bộ eval:
+```bash
+python -m local_ai.evaluation --model smoke --train-data data/processed/hf_sft/sft.jsonl
+python -m local_ai.evaluation --model smoke-lora --train-data data/processed/hf_sft/sft.jsonl
+python -m local_ai.evaluation --model primary-qlora
+```
+
+Số VRAM lấy từ `python -m local_ai.models.vram` (batch 1, khoảng 2048 token, bật gradient checkpointing). Đây chỉ là ước lượng; khi chạy thật, hãy đo lại và sửa hệ số trong `local_ai/models/vram.py`. Chạy `light` sau khi xong `smoke` thì luôn ghi `--output-dir` khác, để không chạy tiếp nhầm checkpoint của model khác.
+
+## Lộ trình tiếp theo (đề xuất, chưa làm)
+Các việc dưới đây chỉ là đề xuất sau tuần 1, chưa làm; chủ repo chọn việc nào thì mới đưa vào kế hoạch:
+1. Chạy thật smoke → light → primary trên GPU, đo VRAM và thời gian thật, sửa hệ số ước tính trong `vram.py`.
+2. Với model chính (ảnh + chữ), chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh; kiểm tra QLoRA chạy được trên GPU 24 GB.
+3. Thử adapter server local với Ollama và llama.cpp thật; hỗ trợ gửi ảnh qua server (`image_url` dạng base64).
+4. Mở rộng bộ eval (nhiều câu hơn, câu dùng công cụ nhiều bước) và tự chạy eval ngay sau mỗi lần train.
+5. Đổi `torch_dtype` sang `dtype` theo transformers 5.x.
+6. Quyết định PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B).
+
+Kế hoạch tuần 1 (M1–M7) và bằng chứng từng mốc nằm trong `TASKS.md`.

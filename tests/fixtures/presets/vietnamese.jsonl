@@ -1,0 +1,4 @@
+{"id": "v1", "conversations": [{"from": "system", "value": "Bạn là trợ lý tiếng Việt."}, {"from": "human", "value": "Thủ đô của Pháp là gì?"}, {"from": "gpt", "value": "Paris."}, {"from": "human", "value": "Còn của Đức?"}, {"from": "gpt", "value": "Berlin."}]}
+{"id": "v2", "conversations": [{"from": "human", "value": "Xin chào"}, {"from": "gpt", "value": "Chào bạn, tôi có thể giúp gì?"}]}
+{"id": "v3", "conversations": [{"from": "human", "value": "1 + 1 bằng mấy?"}, {"from": "gpt", "value": "Bằng 2."}]}
+{"id": "v4", "conversations": [{"from": "gpt", "value": "Lượt đầu là trợ lý."}, {"from": "human", "value": "Hội thoại kết thúc bằng câu hỏi"}]}

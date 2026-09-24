@@ -1,0 +1,4 @@
+{"uuid": "u1", "problem": "Compute 2 + 3 * 4.", "solution": "Multiply first: 3 * 4 = 12, then 2 + 12 = 14.", "answer": "14", "problem_type": "Algebra", "messages": []}
+{"uuid": "u2", "problem": "What is 10 / 4?", "solution": "10 / 4 = 2.5.", "answer": "2.5", "problem_type": "Algebra", "messages": []}
+{"uuid": "u3", "problem": "Find x if 2x = 8.", "solution": "Divide both sides by 2: x = 4.", "answer": "4", "problem_type": "Algebra", "messages": []}
+{"uuid": "u4", "problem": "Prove that 1 = 1.", "solution": "Trivial.", "answer": "", "problem_type": "Logic", "messages": []}

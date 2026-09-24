@@ -1,0 +1,33 @@
+{
+  "_comment": "Preset tiếng Việt: hội thoại nhiều lượt dạng ShareGPT (from/value), giữ nguyên mọi lượt. Dữ liệu có thể được dịch hoặc sinh từ model khác, nên giấy phép gốc có thể hạn chế hơn Apache-2.0. Đọc lại dataset card trước khi dùng.",
+  "description": "Trò chuyện tiếng Việt nhiều lượt",
+  "dataset_version": "preset-vietnamese-v1",
+  "seed": 17,
+  "output_dir": "data/processed/presets/vietnamese",
+  "formats": [
+    "sft"
+  ],
+  "eval_sources": [
+    "data/eval/seed_eval.jsonl", "data/eval/eval_v1.jsonl"
+  ],
+  "hf_dataset": {
+    "name": "5CD-AI/Vietnamese-Multi-turn-Chat-Alpaca",
+    "subset": null,
+    "split": "train",
+    "revision": "3a1bef5b6681fe78eeaa25a97c4da1a2a1145a9e",
+    "streaming": true,
+    "limit": 1000,
+    "domain": "chat",
+    "language": "vi",
+    "task": "sft",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://huggingface.co/datasets/5CD-AI/Vietnamese-Multi-turn-Chat-Alpaca",
+      "status": "cần kiểm tra lại trên dataset card"
+    },
+    "messages_field": "conversations",
+    "mapping": {
+      "id": "id"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "_comment": "Preset reasoning: bài toán kèm lời giải; lời giải được đưa vào khối <think>...</think>, đáp án cuối là câu trả lời. Đề bài lấy từ NuminaMath 1.5, lời giải sinh bởi DeepSeek R1. Đọc lại dataset card trước khi dùng.",
+  "description": "Lập luận toán: đề bài + lời giải (vào <think>) + đáp án (tiếng Anh)",
+  "dataset_version": "preset-reasoning-v1",
+  "seed": 17,
+  "output_dir": "data/processed/presets/reasoning",
+  "formats": [
+    "sft"
+  ],
+  "eval_sources": [
+    "data/eval/seed_eval.jsonl", "data/eval/eval_v1.jsonl"
+  ],
+  "hf_dataset": {
+    "name": "open-r1/OpenR1-Math-220k",
+    "subset": "default",
+    "split": "train",
+    "revision": "e4e141ec9dea9f8326f4d347be56105859b2bd68",
+    "streaming": true,
+    "limit": 1000,
+    "domain": "math_logic",
+    "language": "en",
+    "task": "sft",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://huggingface.co/datasets/open-r1/OpenR1-Math-220k",
+      "status": "cần kiểm tra lại trên dataset card"
+    },
+    "messages_field": null,
+    "mapping": {
+      "id": "uuid",
+      "input": "problem",
+      "expected_output": "answer",
+      "reasoning": "solution"
+    }
+  }
+}

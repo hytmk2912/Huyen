@@ -1,0 +1,22 @@
+{
+  "_comment": "QLoRA cho model chính (27,78 tỷ tham số, multimodal): nạp model gốc nén 4bit (NF4, bitsandbytes) rồi gắn LoRA. Ước tính cần GPU khoảng 24 GB trở lên (xem `python -m local_ai.models.vram`). GPU không có bf16 (ví dụ T4) thì tự chuyển sang fp16.",
+  "base_model": "primary",
+  "models_config": "configs/models/platform.json",
+  "dataset_path": "data/processed/hf_sft/sft.jsonl",
+  "output_dir": ".runs/qlora_primary",
+  "method": "lora",
+  "quantization": "4bit",
+  "lora": {"r": 16, "alpha": 32, "dropout": 0.05, "target_modules": "all-linear"},
+  "seed": 17,
+  "epochs": 1,
+  "learning_rate": 0.0002,
+  "per_device_batch_size": 1,
+  "gradient_accumulation_steps": 16,
+  "max_length": 2048,
+  "gradient_checkpointing": true,
+  "save_steps": 100,
+  "save_total_limit": 3,
+  "logging_steps": 10,
+  "resume": true,
+  "require_gpu": true
+}
