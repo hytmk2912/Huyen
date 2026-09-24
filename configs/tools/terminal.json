@@ -20,6 +20,6 @@
     {"name": "npm", "exact_args": [["--version"]]},
     {"name": "uname", "max_args": 2},
     {"name": "whoami", "max_args": 0},
-    {"name": "date", "max_args": 1}
+    {"name": "date", "max_args": 3, "deny_options": ["-s", "--set", "-f", "--file"]}
   ]
 }

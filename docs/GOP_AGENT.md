@@ -22,6 +22,7 @@ Test: `tests/test_m8_runtime.py`. Vì repo Agent không có test, đây là test
 - **`TerminalTool`** (`local_ai/runtime/terminal.py`):
   - tắt mặc định;
   - chặn ký tự điều khiển shell, lệnh ngoài allowlist, tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc;
+  - tham số nguy hiểm gồm `find -exec`/`-delete`, `git log --output`, `tail -f`, `grep -R`, `date -s`/`--set` (đổi đồng hồ hệ thống nếu chạy bằng root, ví dụ trên Colab); tham số ngắn bị chặn cả khi viết gộp (`date -us2020-01-01` nghĩa là `-u -s ...`);
   - có timeout; ghi log JSONL từng lệnh, kể cả lệnh bị từ chối;
   - đăng ký vào `ToolRegistry` bằng `register_terminal`.
 - **Gateway `/v1/jobs`** (`local_ai/runtime/gateway.py`, viết bằng `http.server`): tắt mặc định, chỉ nghe `127.0.0.1`, bắt buộc token dài ít nhất 16 ký tự đọc từ biến môi trường, giới hạn kích thước nội dung gửi lên.

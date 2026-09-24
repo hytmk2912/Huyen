@@ -63,6 +63,17 @@ class TerminalConfig:
         return config
 
 
+def _denied(arg: str, option: str) -> bool:
+    """Tham số `arg` có dùng tùy chọn bị cấm `option` không.
+
+    - Tùy chọn dài (`--set`) và kiểu find (`-exec`): so theo tiền tố, nên `--set=...` và `-exec+` đều bị chặn.
+    - Tùy chọn ngắn một chữ (`-s`): chặn cả khi viết gộp, ví dụ `date -us2020-01-01` nghĩa là `-u -s 2020-01-01`.
+    """
+    if len(option) == 2 and option.startswith("-") and option != "--":
+        return arg.startswith("-") and not arg.startswith("--") and option[1] in arg[1:]
+    return arg.startswith(option)
+
+
 class TerminalTool:
     """Gọi như một hàm (`tool(command="ls -la")` hoặc `tool(command=["ls", "-la"])`) để dùng trong ToolRegistry."""
 
@@ -92,8 +103,7 @@ class TerminalTool:
             if not args or args[0] not in rule.subcommands: raise CommandRejected(f"Lệnh '{name}' chỉ được dùng với: {', '.join(rule.subcommands)}")
             args = args[1:]
         for arg in args:
-            if any(arg == option or arg.startswith(option + "=") or (not option.startswith("--") and len(option) == 2 and arg.startswith(option)) for option in rule.deny_options):
-                raise CommandRejected(f"Tham số '{arg}' bị cấm với lệnh '{name}'")
+            if any(_denied(arg, option) for option in rule.deny_options): raise CommandRejected(f"Tham số '{arg}' bị cấm với lệnh '{name}'")
             if arg.startswith("--"): value = arg.split("=", 1)[1] if "=" in arg else None  # --file=/etc/passwd
             elif arg.startswith("-"): value = arg[2:] if len(arg) > 2 and ("/" in arg[2:] or ".." in arg[2:]) else None  # -f/etc/passwd
             else: value = arg

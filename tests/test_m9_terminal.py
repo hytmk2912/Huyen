@@ -65,7 +65,7 @@ class InjectionTests(TerminalCase):
 
     def test_dangerous_options_and_paths_are_rejected(self):
         for command in ("find . -delete", "find . -execdir id", "find -L .", "git log --output=x.txt", "git log -ox.txt", "tail -f ghi_chu.txt", "tail -fn1 ghi_chu.txt", "grep -R dòng .",
-                        "cat /etc/passwd", "cat ../log.jsonl", "head -n1 ../../etc/hostname", "grep --file=/etc/passwd x", "grep -f/etc/passwd x", "grep -f../log.jsonl x", "ls " + "a " * 9):
+                        "cat /etc/passwd", "cat ../log.jsonl", "head -n1 ../../etc/hostname", "grep --file=/etc/passwd x", "date -s2020-01-01", "date --set=2020-01-01", "date -us2020-01-01", "tail -qf ghi_chu.txt", "find . -exec+", "grep -rR dòng .", "grep -f/etc/passwd x", "grep -f../log.jsonl x", "ls " + "a " * 9):
             with self.subTest(command), self.assertRaises(CommandRejected): self.tool(command)
 
 

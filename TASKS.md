@@ -33,6 +33,7 @@ Quy tắc riêng tuần 2:
   - không dùng shell, tham số truyền dạng list, có timeout;
   - ghi log JSONL từng lệnh, kể cả lệnh bị từ chối;
   - chặn thêm tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc.
+  - Bổ sung khi rà lại: chặn `date -s`/`--set` (đổi đồng hồ hệ thống khi chạy bằng root) và tham số ngắn viết gộp (`date -us...`, `tail -qf`).
 
   Bằng chứng: `AllowedCommandTests`, `InjectionTests.test_dangerous_options_and_paths_are_rejected`; test M8 kiểm tra bằng AST rằng không nơi nào trong `local_ai/` gọi với `shell=True`.
 - [x] 2. Tool tắt mặc định (`"enabled": false`). Muốn bật phải khai báo rõ: `enabled: true` trong cấu hình, hoặc `TerminalTool(enabled=True)`. Khi đang tắt, mọi lần gọi bị từ chối kèm lý do. Bằng chứng: `ConfigTests`, `AgentRegistrationTests.test_disabled_terminal_fails_safely`.
