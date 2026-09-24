@@ -1,10 +1,10 @@
 {
-  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora | qlora. resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể. eval_cases: bộ câu hỏi chạy tự động sau huấn luyện (null để tắt), báo cáo ghi vào eval_report.json cạnh checkpoint.",
-  "base_model": "huihui-qwen3-4b",
+  "_comment": "QLoRA cho model chính 27B: trọng số nén 4-bit NF4 (khoảng 15 GB thay vì 54 GB ở bf16), chạy được trên GPU 24 GB. Xem ước lượng bằng --dry-run.",
+  "base_model": "primary",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",
-  "output_dir": ".runs/sft",
-  "method": "lora",
+  "output_dir": ".runs/sft-qlora-27b",
+  "method": "qlora",
   "lora": {
     "r": 16,
     "alpha": 32,
@@ -13,7 +13,7 @@
   },
   "seed": 17,
   "epochs": 1,
-  "learning_rate": 0.0002,
+  "learning_rate": 0.0001,
   "per_device_batch_size": 1,
   "gradient_accumulation_steps": 8,
   "max_length": 2048,

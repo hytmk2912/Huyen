@@ -1,5 +1,5 @@
 {
-  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype và capabilities; name không được trùng. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization.",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Mỗi mục cần name (không trùng), source (tên repo trên Hugging Face), dtype và capabilities. Tùy chọn: revision, tokenizer_source, tokenizer_revision, device_map, offline, quantization (\"nf4\" để nạp 4-bit khi chạy suy luận), params_billion (để ước lượng bộ nhớ). Giữ dtype bfloat16 như trọng số gốc: đổi lên float32 không làm model tốt hơn mà tốn gấp đôi bộ nhớ. Dòng Qwen3 không có cỡ 3B/7B nên dùng 4B/8B.",
   "models": [
     {
       "name": "primary",
@@ -9,35 +9,58 @@
       "tokenizer_revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
-      "capabilities": ["chat", "reasoning", "coding", "tool_calling", "long_context"],
-      "offline": false
+      "capabilities": [
+        "chat",
+        "reasoning",
+        "coding",
+        "tool_calling",
+        "long_context"
+      ],
+      "offline": false,
+      "params_billion": 27
     },
     {
-      "name": "coder",
-      "source": "Qwen/Qwen2.5-Coder-7B-Instruct",
+      "name": "huihui-qwen3-4b",
+      "source": "huihui-ai/Huihui-Qwen3-4B-abliterated-v2",
       "revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
-      "capabilities": ["coding", "tool_calling"],
-      "offline": false
+      "capabilities": [
+        "chat",
+        "reasoning"
+      ],
+      "offline": false,
+      "params_billion": 4.0
     },
     {
-      "name": "light",
-      "source": "Qwen/Qwen3-4B",
+      "name": "huihui-qwen3-8b",
+      "source": "huihui-ai/Huihui-Qwen3-8B-abliterated-v2",
       "revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
-      "capabilities": ["chat", "reasoning"],
-      "offline": false
+      "capabilities": [
+        "chat",
+        "reasoning",
+        "coding",
+        "tool_calling"
+      ],
+      "offline": false,
+      "params_billion": 8.2
     },
     {
-      "name": "smoke",
-      "source": "Qwen/Qwen2.5-0.5B-Instruct",
+      "name": "huihui-qwen3-14b",
+      "source": "huihui-ai/Huihui-Qwen3-14B-abliterated-v2",
       "revision": "main",
       "dtype": "bfloat16",
       "device_map": "auto",
-      "capabilities": ["chat", "evaluation"],
-      "offline": false
+      "capabilities": [
+        "chat",
+        "reasoning",
+        "coding",
+        "tool_calling"
+      ],
+      "offline": false,
+      "params_billion": 14.8
     }
   ]
 }

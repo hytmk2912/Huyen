@@ -3,8 +3,18 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-
-VALID_DOMAINS = {"coding", "software_engineering", "math_logic", "reasoning", "planning", "tool_use", "agent", "research", "trading", "debugging"}
+VALID_DOMAINS = {
+    "coding",
+    "software_engineering",
+    "math_logic",
+    "reasoning",
+    "planning",
+    "tool_use",
+    "agent",
+    "research",
+    "trading",
+    "debugging",
+}
 VALID_STATUSES = {"pending", "valid", "rejected"}
 
 
@@ -20,6 +30,8 @@ class DatasetExample:
     dataset_version: str
     context: str | None = None
     reasoning: str | None = None
+    # Hội thoại đầy đủ (kể cả system và nhiều lượt); khi có thì sft.jsonl dùng nguyên mảng này.
+    messages: list[dict[str, str]] | None = None
     trajectory: list[dict[str, Any]] | None = None
     tools_used: list[str] = field(default_factory=list)
     difficulty: int = 1

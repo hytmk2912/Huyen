@@ -1,0 +1,8 @@
+{"id": "vi-1", "suite": "vietnamese", "prompt": "Thủ đô của Việt Nam là thành phố nào? Chỉ trả lời tên thành phố.", "expected": "Hà Nội", "scoring": "contains"}
+{"id": "vi-2", "suite": "vietnamese", "prompt": "Từ trái nghĩa với \"nóng\" là gì? Chỉ trả lời một từ.", "expected": "lạnh", "scoring": "contains"}
+{"id": "vi-3", "suite": "vietnamese", "prompt": "Một năm có bao nhiêu tháng? Chỉ trả lời bằng số.", "expected": "12", "scoring": "numeric"}
+{"id": "vi-4", "suite": "vietnamese", "prompt": "Viết lại cho đúng chính tả: \"ngày mai tôi đi hoc\". Chỉ trả lời câu đã sửa.", "expected": "ngày mai tôi đi học", "scoring": "contains"}
+{"id": "trading-1", "suite": "trading", "prompt": "Mua cổ phiếu giá 50.000 đồng, bán giá 55.000 đồng. Lợi nhuận bao nhiêu phần trăm? Chỉ trả lời con số.", "expected": "10", "scoring": "numeric", "tolerance": 0.01}
+{"id": "trading-2", "suite": "trading", "prompt": "Tài khoản 100.000.000 đồng, mỗi lệnh chỉ chấp nhận rủi ro 1%. Số tiền rủi ro tối đa mỗi lệnh là bao nhiêu đồng? Chỉ trả lời con số.", "expected": "1000000", "scoring": "numeric"}
+{"id": "trading-3", "suite": "trading", "prompt": "Vào lệnh ở 20.000, dừng lỗ ở 19.000, chốt lời ở 23.000. Tỷ lệ lợi nhuận/rủi ro (R:R) là bao nhiêu? Chỉ trả lời con số.", "expected": "3", "scoring": "numeric", "tolerance": 0.01}
+{"id": "trading-4", "suite": "trading", "prompt": "Giá giảm từ 200 xuống 150. Giá đã giảm bao nhiêu phần trăm? Chỉ trả lời con số.", "expected": "25", "scoring": "numeric", "tolerance": 0.01}
