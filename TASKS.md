@@ -11,6 +11,8 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M15 | Số đo thật trên Colab | **Bị chặn** (chờ số đo thật) | 3/4 (75%) | `tests/test_m15_measurements.py` (9 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (11 test) |
 
+Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
+
 ## M15: Số đo thật trên Colab
 Mục tiêu: sửa các hằng số ước tính (`local_ai/training/estimate.py`, `local_ai/models/vram.py`) theo số đo thật khi chủ repo chạy notebook, và ghi bảng số đo thật vào README. Hiện notebook không đo VRAM, và chủ repo khó chép số từ điện thoại, nên cần làm phần ghi số đo trước.
 - [x] 1. Ghi số đo khi chạy thật:

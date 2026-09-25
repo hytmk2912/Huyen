@@ -181,7 +181,7 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     # sft.jsonl chỉ có chữ, nên kể cả model multimodal cũng dùng tokenizer (không cần phần xử lý ảnh).
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.tokenizer_source or model_config.source, revision=model_config.tokenizer_revision or model_config.revision, local_files_only=model_config.offline)
     if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
-    model_kwargs = {"revision": model_config.revision, "torch_dtype": dtype, "device_map": model_config.device_map, "local_files_only": model_config.offline}
+    model_kwargs = {"revision": model_config.revision, "dtype": dtype, "device_map": model_config.device_map, "local_files_only": model_config.offline}
     if quantization: model_kwargs["quantization_config"] = quantization_config(transformers, quantization, dtype)
     model = model_loader_class(transformers, model_config.kind).from_pretrained(model_config.source, **model_kwargs)
     model.config.use_cache = not config.gradient_checkpointing

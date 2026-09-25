@@ -5,7 +5,9 @@ import re
 import subprocess
 from pathlib import Path
 
-SECRET = re.compile(r"(?:hf_[A-Za-z0-9]{20,}|(?:api[_-]?key|password|secret)\s*[=:]\s*[^\s]{8,})", re.I)
+# Biến shell viết HOA có chữ PASS gán giá trị viết thẳng, kể cả giá trị mặc định kiểu SYNC_PASS="${SYNC_PASS:-...}"
+# (mật khẩu rsync từng lọt vào lịch sử commit theo đúng kiểu này). Giá trị bắt đầu bằng $ là lấy từ biến khác nên bỏ qua.
+SECRET = re.compile(r"(?:hf_[A-Za-z0-9]{20,}|(?:api[_-]?key|password|secret)\s*[=:]\s*[^\s]{8,}|(?-i:\b[A-Z_]*PASS(?:WORD|WD)?[A-Z_]*=)[\"']?(?:\$\{[A-Za-z_]+:-)?[^\s\"'$}]{8,})", re.I)
 SKIPPED_DIRS = {".git", ".venv", "venv", "__pycache__"}
 MAX_BYTES = 2_000_000
 
