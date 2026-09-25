@@ -10,11 +10,13 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Checklist tuần 3
 Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào được chọn thì mới có tiêu chí trong `TASKS.md`.
-- [ ] M15 Số đo thật trên Colab (đã chọn 25/9)
-- M16 Notebook bền hơn · M17 Model chính: LoRA chỉ phần ngôn ngữ, `dtype` · M18 Agent dùng model đã train (GGUF) · M19 Mở rộng eval · M20 Dữ liệu: gần trùng train/eval, thêm preset tiếng Việt · M21 Tổng kết tuần 3 (chưa chọn)
+- [ ] M15 Số đo thật trên Colab (đã chọn 25/9; **bị chặn**: chờ số đo thật)
+- [x] M16 Notebook bền hơn (xong 25/9)
+- M17 Model chính: LoRA chỉ phần ngôn ngữ, `dtype` · M18 Agent dùng model đã train (GGUF) · M19 Mở rộng eval · M20 Dữ liệu: gần trùng train/eval, thêm preset tiếng Việt · M21 Tổng kết tuần 3 (chưa chọn)
 
 ## Mốc đang làm
-- M15 — bắt đầu 25/9, **dở: chờ số đo thật** (tiêu chí 3). Phần ghi số đo và lệnh `calibrate` đã xong.
+- Không có mốc dở. M15 vẫn chờ số đo thật; mốc kế tiếp: mốc chủ repo chọn (M17–M21).
+- M15 **bị chặn** 2 lượt liền (25/9): Hugging Face của chủ repo vẫn chưa có repo `huyen-*-qlora`, nên chưa có số đo thật (tiêu chí 3). Phần ghi số đo và lệnh `calibrate` đã xong.
   - Khi chủ repo chạy xong notebook: đọc `so_do/<model>.json` trong repo riêng tư `Hytmk2912/huyen-<model>-qlora` (connector Hugging Face đọc được), hoặc xem ảnh chụp bảng Bước 12;
   - sau đó sửa `GPUS["T4"]` trong `estimate.py`, sửa `TRAINING_FACTOR` (chỉ theo số đo của `light`), rồi thêm bảng số đo thật vào README.
 
@@ -40,3 +42,4 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 | Ngày | Lượt | Kết quả |
 | --- | --- | --- |
 | 25/9 | Thiết lập tuần 3 + M15 (dở) | Chủ repo chọn M15. Dựng lại nhánh `claude/nhiem-vu-tuan-jixv6i` từ `main` (`12e86fc`); chuyển nhật ký tuần 2 sang `archive/memory-tuan-2.md`; thêm phần tuần 3 vào `TASKS.md`, cập nhật skill `lam-moc` và `CLAUDE.md`. Kiểm tra Hugging Face của chủ repo: chưa có repo `huyen-*-qlora`, tức là chưa chạy notebook, nên phần sửa hằng số bị chặn. Đã làm: `measurements.json` khi train, thời gian trong báo cáo eval/agent, lệnh `calibrate`, ô Bước 12 trong notebook. Lỗi gặp: khi chạy tiếp, TRL đếm lại token nhưng log cũ vẫn còn, nên `num_tokens` lấy nhầm số lần trước (đã lọc theo bước); hệ số VRAM từ model nhỏ vô nghĩa (đã đánh dấu). 215 test qua, compileall và secret-scan sạch. Tiếp theo: chờ số đo thật cho M15, hoặc mốc chủ repo chọn tiếp. |
+| 25/9 | M16 | Xong 4/4. Hàm `run` (`local_ai/colab.py`): lệnh chạy không qua shell, in output ngay khi có, lỗi thì ném `StepFailed` nên Run all dừng; 2 notebook bỏ hết `!python`/`!pip`/`!apt-get`/`!ollama` (chỉ còn `!git clone` lần đầu). Lệnh eval có `--hub-repo`/`--hub-path`: đẩy báo cáo kèm cài đặt, chạy lại thì dùng lại nếu cài đặt khớp (Bước 7 không chấm lại sau khi Colab ngắt). Không dùng `_exit_code` của Colab vì không kiểm chứng được (không có `google-colab` trên PyPI). Lỗi gặp: báo cáo hỏng trên Hub làm lệnh chấm lỗi, nay chấm lại; một test dùng chung thư mục Hub giả nên sai, đã tách. Test M10/M13 sửa cách đọc lệnh. M15 vẫn bị chặn (lượt 2). 226 test qua, compileall và secret-scan sạch. |

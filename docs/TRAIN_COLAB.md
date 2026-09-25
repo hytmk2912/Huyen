@@ -73,7 +73,7 @@ Trong lúc train, checkpoint mới nhất được đẩy lên repo riêng tư: 
 
 Bước 6 sẽ báo "Đã train N/125 bước", rồi Bước 8 tự tải checkpoint về và train tiếp. Chỉ mất phần việc làm sau checkpoint cuối cùng.
 
-Chạy lại thì Bước 7 cũng chấm lại model gốc: `light` mất thêm khoảng 17 phút.
+Bước 7 không chấm lại model gốc: lần đầu chấm xong, báo cáo đã được lưu vào repo riêng tư (`eval/truoc/`), nên lần chạy lại tải về dùng luôn. Chỉ chấm lại khi bạn đổi model hoặc cài đặt chấm.
 
 ## Lỗi hay gặp
 | Thấy gì | Cách xử lý |
@@ -83,6 +83,6 @@ Chạy lại thì Bước 7 cũng chấm lại model gốc: `light` mất thêm 
 | "Chưa đọc được HF_TOKEN" | Làm lại Bước 3; nhớ bật **Notebook access**. |
 | Lỗi 401 hoặc 403 khi đẩy lên Hugging Face | Token chưa có quyền **Write**: tạo token mới loại Write, rồi sửa giá trị secret `HF_TOKEN`. |
 | "CUDA out of memory" (hết bộ nhớ GPU) | Chọn `smoke`. Muốn giữ `light` thì phải giảm `max_length` trong `configs/training/colab_light.json` (sửa file trong repo). |
-| Nhiều ô liên tiếp báo lỗi đỏ | Lệnh `!python` bị lỗi không làm dừng **Run all**, nên các ô sau cũng lỗi theo. Hãy xem **ô đầu tiên** báo lỗi. |
+| Ô báo đỏ "Bước N lỗi (mã thoát ...)" | Lệnh của bước đó lỗi nên **Run all** dừng ngay ở ô này; các ô sau chưa chạy. Đọc thông báo ngay phía trên dòng đỏ, sửa xong thì chạy lại từ ô đó (menu Runtime → Run after). |
 | pip in dòng "ERROR: pip's dependency resolver ..." khi cài thư viện | Thường chỉ là xung đột với gói có sẵn của Colab. Nếu các ô sau vẫn chạy được thì có thể bỏ qua. |
 | Colab ngắt giữa chừng | Xem mục "Khi Colab ngắt giữa chừng". |

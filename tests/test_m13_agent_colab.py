@@ -98,7 +98,7 @@ class NotebookTests(unittest.TestCase):
                 first = source.splitlines()[0]
                 self.assertTrue(first.startswith(f"# Bước {number}:"), first); self.assertRegex(first, VIETNAMESE)
         self.assertRegex(build.OLLAMA_VERSION, r"^\d+\.\d+\.\d+$")
-        self.assertIn(f"| OLLAMA_VERSION={build.OLLAMA_VERSION} sh", cells["buoc-3-cai-ollama"])  # ghim bản Ollama
+        self.assertIn(f'env={{"OLLAMA_VERSION": "{build.OLLAMA_VERSION}"}}', cells["buoc-3-cai-ollama"])  # ghim bản Ollama (từ M16 chạy qua run, không qua shell)
         self.assertIn("zstd", cells["buoc-3-cai-ollama"])  # bản cài .tar.zst của Ollama cần zstd
         self.assertIn(f"ollama pull {build.OLLAMA_MODEL}", cells["buoc-5-tai-model"])
         self.assertEqual(find_model_config(PLATFORM, "ollama-colab").source, build.OLLAMA_MODEL)
@@ -107,11 +107,11 @@ class NotebookTests(unittest.TestCase):
         self.assertIsNone(SECRET.search(text)); self.assertNotIn("HF_TOKEN", text)
 
     def test_notebook_commands_run_with_dry_run(self):
-        lines = [line.strip() for source in code_cells().values() for line in source.splitlines() if line.strip().startswith("!python -m local_ai")]
+        lines = [command for source in code_cells().values() for command in re.findall(r'run\(f?"(python -m local_ai[^"]*)"', source)]  # từ M16: run("python -m ...")
         self.assertEqual(len(lines), 2)
         for line in lines:
             with self.subTest(line):
-                result = subprocess.run([sys.executable, *shlex.split(line[1:])[1:], "--dry-run"], cwd=ROOT, env={**os.environ, "PYTHONPATH": str(ROOT)}, capture_output=True, text=True, timeout=60)
+                result = subprocess.run([sys.executable, *shlex.split(line)[1:], "--dry-run"], cwd=ROOT, env={**os.environ, "PYTHONPATH": str(ROOT)}, capture_output=True, text=True, timeout=60)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 plan = json.loads(result.stdout)
                 self.assertEqual((plan["model"]["name"], plan["model"]["base_url"], plan["model"]["source"]), ("ollama-colab", "http://localhost:11434/v1", "qwen3:4b"))

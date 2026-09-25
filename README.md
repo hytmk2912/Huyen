@@ -32,6 +32,7 @@ Chạy trên Colab miễn phí, không cần máy có GPU:
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent; 5 nhiệm vụ mẫu cho agent (`agents/tasks.py`).
 - `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
+- `local_ai/colab.py`: hàm `run` cho notebook Colab. Lệnh chạy không qua shell; lệnh lỗi thì ô báo đỏ và Run all dừng.
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc. `docs/TRAIN_COLAB.md`: train trên Colab bằng iPhone.
 - `notebooks/`: notebook Colab, sinh từ `notebooks/build.py` (lưu không kèm output).
@@ -256,6 +257,8 @@ Báo cáo ghi vào `.runs/eval/<model>-<thời điểm>/`, hoặc thư mục ghi
 - `report.json`: kết quả từng câu;
 - `report.md`: tỉ lệ đạt theo nhóm và theo ngôn ngữ, cùng danh sách câu không đạt kèm lý do.
 
+Với `--hub-repo <tên>/<repo> --hub-path <thư mục>`, chấm xong thì báo cáo được đẩy lên repo Hugging Face riêng tư. Lần chạy sau, nếu repo đã có báo cáo cùng cài đặt (model, `max_new_tokens`, mã băm bộ câu hỏi) thì báo cáo được dùng lại, không nạp model.
+
 So sánh 2 lần chấm (ví dụ trước và sau khi train): `python -m local_ai.evaluation.compare <trước>/report.json <sau>/report.json`. Lệnh in bảng tỉ lệ đạt theo nhóm và theo ngôn ngữ, mức thay đổi (điểm %), cùng các câu mới đạt và mới trượt. `--max-new-tokens` ghi đè độ dài câu trả lời tối đa để chấm nhanh hơn; `--dry-run` chỉ in kế hoạch, không nạp model.
 
 Nhóm câu eval (`code`, `reasoning`, `tool_use`) là cách chia riêng của bộ eval, khác với `domain` của dữ liệu train (`coding`, `math_logic`, `chat`...).
@@ -324,6 +327,9 @@ Các ô sau chạy lần lượt:
 **Colab ngắt giữa chừng:** mở lại notebook, giữ nguyên model đã chọn và chạy Run all.
 - Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước (`light`: 10, `smoke`: 25).
 - Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_<model>/_hub/last-checkpoint` rồi train tiếp.
+- Bước chấm trước khi train (`--hub-repo ... --hub-path eval/truoc`) cũng không phải chạy lại. Lần đầu chấm xong, báo cáo được đẩy lên repo riêng tư, kèm cài đặt (model, `max_new_tokens`, mã băm bộ câu hỏi). Lần sau, nếu cài đặt giống thì báo cáo được tải về dùng luôn.
+
+**Lệnh lỗi thì dừng (M16).** Mọi lệnh trong notebook chạy qua `run(...)` của `local_ai/colab.py`, thay cho `!python`. Khi mã thoát khác 0, ô báo đỏ "Bước N lỗi (mã thoát ...)" và Run all dừng ngay, không chạy tiếp các ô sau như trước.
 
 Notebook đẩy adapter lên repo riêng tư bằng lệnh con `push-adapter` của `local_ai.training.hub`. Token đọc từ biến môi trường `HF_TOKEN`; thêm `--dry-run` để chỉ kiểm tra tham số, không gọi mạng.
 
@@ -391,7 +397,7 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
 1. **M15 – Số đo thật trên Colab** (đang làm: đã có phần ghi số đo, chờ số đo thật). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
-2. **M16 – Notebook bền hơn:**
+2. **M16 – Notebook bền hơn** (đang làm):
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh; đổi `torch_dtype` sang `dtype` theo transformers 5.x.

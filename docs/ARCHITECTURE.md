@@ -115,7 +115,12 @@ Viết lại bằng thư viện chuẩn từ repo Agent (commit `78a3e25`; xem `
 Import không mở cổng mạng, không tạo thư mục.
 
 ### Notebook Colab (`notebooks/`)
-`notebooks/build.py` sinh các notebook (không kèm output, thư viện ghim phiên bản, mỗi ô có chú thích tiếng Việt). Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test chạy được đúng các lệnh đó bằng `--dry-run`:
+`notebooks/build.py` sinh các notebook (không kèm output, thư viện ghim phiên bản, mỗi ô có chú thích tiếng Việt). Từ M16:
+- mọi lệnh chạy qua `local_ai/colab.py` (`run`): lệnh dạng list, không qua shell, in output ngay khi có; mã thoát khác 0 thì ném `StepFailed`, nên Run all dừng ở đúng ô lỗi;
+- bước chấm trước khi train lưu và dùng lại báo cáo trên Hub (`--hub-repo`, `--hub-path` của lệnh eval, so khớp cài đặt model, `max_new_tokens`, mã băm bộ câu hỏi).
+
+Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test chạy được đúng các lệnh đó bằng `--dry-run`:
+
 - `train_colab.ipynb`, trên GPU T4:
   1. chọn model `smoke` (Qwen2.5-0.5B) hoặc `light` (Qwen3-4B);
   2. lấy dữ liệu 2000 dòng;
@@ -158,6 +163,7 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
   - mọi lệnh của notebook chạy được bằng `--dry-run`, với cả model `smoke` lẫn `light`;
   - Hugging Face Hub và thư viện train là module giả;
   - số phút ghi trong tài liệu khớp với ước tính.
+- `tests/test_m15_measurements.py`: số đo khi train (có một lượt train thật trên CPU) và lệnh `calibrate` với số đo mẫu. `tests/test_m16_notebook_resilience.py`: hàm `run` với tiến trình thật, notebook không còn `!python`, dùng lại báo cáo chấm trước với Hub giả.
 - `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
 - `tests/test_m13_agent_colab.py`:
   - kiểm tra notebook agent hợp lệ;
