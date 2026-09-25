@@ -8,7 +8,7 @@ Mọi bước đều điều khiển bằng file cấu hình JSON trong `configs
 Luồng chính:
 
 ```
-preset / dataset Hugging Face ──► local_ai.data (kiểm tra, loại trùng, chặn trùng với eval) ──► sft.jsonl
+preset / dataset Hugging Face ──► local_ai.data (kiểm tra, loại trùng, lọc chất lượng, chặn trùng với eval) ──► sft.jsonl
 sft.jsonl ──► local_ai.training.finetune (full | LoRA | QLoRA) ──► adapter (.runs/<tên>/adapter)
 model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
 ```
@@ -22,6 +22,7 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 | `configs/models/platform.json` | Danh sách model: `backend` (`transformers` hoặc `openai_compatible`), `kind` (`text`/`multimodal`), `params_b`, `quantization`, `adapter_path`, `max_new_tokens`, `base_url`, `timeout_s`, `api_key_env`. |
 | `configs/datasets/presets/*.json` | 3 preset dataset (`code`, `reasoning`, `vietnamese`): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". |
 | `configs/datasets/hf_sft.json` | Mẫu để tự khai báo một dataset. |
+| `configs/datasets/quality.json` | Ngưỡng của 4 bộ lọc chất lượng dữ liệu (ngôn ngữ, độ dài, lặp, gần trùng). |
 | `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json`, `colab_light.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
 
 `ModelConfig` kiểm tra giá trị ngay khi nạp; giá trị sai thì báo lỗi bằng tiếng Việt. Test `test_every_config_key_is_read_by_code` bảo đảm không có khóa cấu hình nào thừa.
@@ -35,6 +36,9 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
   - kiểm tra schema và loại trùng theo nội dung;
   - chặn trùng với eval (`find_eval_overlap`) theo id, theo nội dung và theo câu hỏi đã chuẩn hóa;
   - xuất `sft.jsonl`: `reasoning` được đưa vào khối `<think>`, `context` đặt trước câu hỏi.
+- `quality.py`: bộ lọc chất lượng, cấu hình ở `configs/datasets/quality.json`. `hf-sft` bật mặc định, `build` bật bằng `--quality`.
+  - Các bộ lọc: ngôn ngữ (ưu tiên tiếng Việt: nhận theo chữ có dấu, loại tiếng Việt không dấu và chữ không phải Latin), độ dài, lặp từ/câu (xét từng lượt, bỏ qua code và lệnh LaTeX), gần trùng (MinHash tự viết kiểu một hoán vị, LSH theo dải, so lại bằng Jaccard thật).
+  - Chạy sau bước loại trùng tuyệt đối, trước bước chặn trùng với eval. Thống kê trước/sau lọc ghi vào mục `quality` của `manifest.json`.
 - `secrets.py`: quét khóa bí mật trong những file có thể bị commit.
 - Lệnh: `python -m local_ai.data hf-sft | list-presets | build | secret-scan ...`.
 
@@ -122,6 +126,7 @@ Import không mở cổng mạng, không tạo thư mục.
 
 ## Kiểm thử
 - `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1, `tests/test_m8_…` trở đi là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
 - `tests/test_m10_colab.py` kiểm tra notebook hợp lệ (nbformat), khớp với `notebooks/build.py`, và chạy mọi lệnh của notebook bằng `--dry-run`; Hugging Face Hub và thư viện train đều là module giả. `tests/test_m11_colab_light.py` chạy lại các lệnh đó với model `light`. Test này cũng kiểm tra cấu hình vừa T4, ước tính thời gian, và việc số phút ghi trong tài liệu khớp với ước tính.
 - `tests/test_consistency.py` giữ repo thống nhất: file mẫu dataset và preset cùng quy tắc (streaming, `limit` ≤ 1000, trạng thái giấy phép), cùng một thư mục `data/processed/hf_sft`, mọi lệnh con có trợ giúp, chữ cho người dùng bằng tiếng Việt.
 - `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.

@@ -13,12 +13,12 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 - [x] M9 Gộp repo Agent, phần 2: tool chạy lệnh an toàn (xong 24/9)
 - [x] M10 Notebook train trên Colab free (0.5B) (xong 25/9)
 - [x] M11 Colab cho Qwen3-4B + hướng dẫn iPhone (xong 25/9)
-- [ ] M12 Chất lượng dữ liệu
+- [x] M12 Chất lượng dữ liệu (xong 25/9)
 - [ ] M13 Agent chạy model thật trên Colab
 - [ ] M14 Tổng kết tuần 2
 
 ## Mốc đang làm
-- Không có mốc dở. Mốc kế tiếp: **M12** (bộ lọc dữ liệu: ngôn ngữ, độ dài, lặp từ/câu, gần trùng bằng MinHash tự viết; thống kê trước/sau lọc trong `manifest.json`; mỗi bộ lọc có test bằng fixture).
+- Không có mốc dở. Mốc kế tiếp: **M13** (`notebooks/agent_colab.ipynb`: cài Ollama, kéo model nhỏ, agent gọi qua adapter OpenAI; 5 nhiệm vụ mẫu bằng calculator và `TerminalTool`, in trace và tỉ lệ thành công; test dry-run).
 
 ## Việc dở
 - Nhánh làm việc: `claude/nhiem-vu-tuan-2` (tạo từ `main` tại `09c93f3`).
@@ -45,3 +45,4 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 | 24/9 | M9 (rà lại) | Chủ repo gõ lại "M9": M9 đã xong trên remote (`1214702`), rà thêm các cách lách `TerminalTool`. Tìm thấy `date -s2020-01-01`/`--set` lọt (đổi đồng hồ hệ thống nếu chạy root, ví dụ trên Colab) và tham số ngắn viết gộp (`date -us...`, `tail -qf`) lọt luật cũ; đã chặn, thêm 6 ca test; nâng `max_args` của `date` lên 3 để `date -u +%Y` chạy được. Tiếp theo: M10. |
 | 25/9 | M10 | Xong 5/5. `notebooks/train_colab.ipynb` (sinh từ `notebooks/build.py`, 9 ô code, hợp lệ theo nbformat). Finetune thêm `--push-to-hub --hub-model-id` (`hub_strategy` checkpoint; chạy lại thì tải `last-checkpoint` về `_hub/` rồi train tiếp) và `dtype`; `local_ai/training/hub.py` (đẩy adapter lên repo riêng tư); `configs/training/colab_smoke.json`; mục `smoke-colab`; lệnh `local_ai.evaluation.compare`; `--dry-run` cho `hf-sft` và eval. README có nút Open in Colab. Lỗi gặp: chuỗi có dấu `\"` bị thoát sai khi ghi file (lỗi cú pháp), đã sửa; `help=` thiếu chữ có dấu, test thống nhất bắt được. Tự rà thấy checkpoint tải về nằm trong `output_dir` sẽ bị Trainer đẩy ngược lên Hub, nên chuyển sang `_hub/`. 160 test qua, compileall và secret-scan sạch. Chưa chạy trên Colab thật. Tiếp theo: M11. |
 | 25/9 | M11 | Xong 4/4. `configs/training/colab_light.json` (Qwen3-4B, QLoRA 4bit fp16, batch 1, `max_length` 2048, VRAM ước tính 3,8 GB) và mục `light-colab`. Notebook có ô chọn model (form Colab smoke/light) và ô ước tính thời gian (lệnh mới `local_ai.training.estimate`, báo cả số bước đã train khi Colab từng ngắt). `docs/TRAIN_COLAB.md` hướng dẫn trên iPhone. Đo độ dài thật: stream 2000 dòng từ 3 preset (16 giây) và đếm token bằng tokenizer Qwen3 (không tải trọng số), ra trung bình 491 token/dòng khi cắt ở 1024; batch 4 đệm lên 820 token/dòng. Lỗi gặp: `apply_chat_template(tokenize=True)` của transformers 5 trả dict nên lần đếm đầu sai, đã đổi cách đếm. Test M10 sửa theo cấu trúc notebook mới, không bỏ kiểm tra nào. 171 test qua, compileall và secret-scan sạch. Chưa chạy trên Colab thật. Tiếp theo: M12. |
+| 25/9 | M12 | Xong 3/3. `local_ai/data/quality.py` (thư viện chuẩn) với 4 bộ lọc: ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp (xét từng lượt, bỏ code và LaTeX), gần trùng (MinHash tự viết một hoán vị + LSH, so lại bằng Jaccard thật). Ngưỡng ở `configs/datasets/quality.json`; `hf-sft` bật mặc định (`--no-quality` để tắt), `build --quality`. Mục `quality` trong `manifest.json` ghi trước/sau lọc. Fixture cho từng bộ lọc, có dòng đối chứng phải giữ. Lỗi gặp: MinHash 128 hoán vị mất 21 giây cho 2000 dòng, đổi sang kiểu một hoán vị (1,5 giây); bắt nhầm `\\frac`/`\\cdot`, "1 cm 2 cm", hội thoại nhắc lại công thức qua nhiều lượt, tiếng Việt trong preset code; đã sửa. Trên 2000 dòng thật chỉ loại 1 dòng. 189 test qua, compileall và secret-scan sạch. Tiếp theo: M13. |

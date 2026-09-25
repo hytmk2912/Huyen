@@ -17,7 +17,7 @@ Quy tắc riêng tuần 2:
 | M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | **Xong** | 5/5 (100%) | `tests/test_m9_terminal.py` (11 test) |
 | M10 | Notebook train trên Colab free (0.5B) | **Xong** | 5/5 (100%) | `tests/test_m10_colab.py` (16 test) |
 | M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | **Xong** | 4/4 (100%) | `tests/test_m11_colab_light.py` (11 test) |
-| M12 | Chất lượng dữ liệu | Chưa làm | 0/3 | — |
+| M12 | Chất lượng dữ liệu | **Xong** | 3/3 (100%) | `tests/test_m12_quality.py` (18 test) |
 | M13 | Agent chạy model thật trên Colab | Chưa làm | 0/3 | — |
 | M14 | Tổng kết tuần 2 | Chưa làm | 0/4 | — |
 
@@ -100,9 +100,25 @@ Chưa kiểm chứng: notebook **chưa chạy trên Colab thật** (môi trườ
 Chưa kiểm chứng: notebook **chưa chạy trên Colab thật**; thời gian và VRAM là ước lượng.
 
 ## M12: Chất lượng dữ liệu
-- [ ] 1. Bộ lọc: ngôn ngữ (ưu tiên tiếng Việt), độ dài, lặp từ/câu, gần trùng (MinHash tự viết, không thêm thư viện nặng).
-- [ ] 2. Thống kê trước/sau lọc ghi vào `manifest.json`.
-- [ ] 3. Mỗi bộ lọc có test bằng fixture.
+- [x] 1. `local_ai/data/quality.py`, chỉ dùng thư viện chuẩn; ngưỡng ở `configs/datasets/quality.json`. `hf-sft` bật mặc định (tắt bằng `--no-quality`), `build` bật bằng `--quality`. Các bộ lọc chạy sau bước loại trùng tuyệt đối, trước bước chặn trùng eval:
+  - **ngôn ngữ** (ưu tiên tiếng Việt):
+    - nhận tiếng Việt trước tiên, theo chữ có dấu, nên câu trộn với code hay tiếng Anh vẫn tính là tiếng Việt;
+    - loại chữ không phải Latin, tiếng Việt không dấu, và dòng khác ngôn ngữ nguồn khai báo (preset `vietnamese` phải là tiếng Việt có dấu);
+    - dòng tiếng Việt trong nguồn khác vẫn được giữ;
+  - **độ dài:** câu hỏi dưới 3 ký tự, câu trả lời dưới 2 ký tự, hội thoại quá 16.000 ký tự;
+  - **lặp từ/câu:** xét từng lượt riêng, bỏ qua khối code và lệnh LaTeX. Loại khi có từ lặp liền quá 8 lần, hoặc khi hơn 50% số câu hay cụm 5 từ là bản lặp;
+  - **gần trùng:** MinHash tự viết (kiểu một hoán vị, 128 ngăn), LSH 32 dải, so lại bằng Jaccard thật trên cụm 3 từ, ngưỡng 0,8.
+
+  Thử trên 2000 dòng thật của 3 preset: chạy khoảng 5 giây, chỉ loại 1 dòng (lời giải toán lặp công thức 60%). Bản đầu dùng MinHash 128 hoán vị mất 21 giây và bắt nhầm lệnh LaTeX, bảng số, hội thoại nhiều lượt; đã sửa như trên.
+- [x] 2. `manifest.json` có mục `quality`:
+  - `before` / `after`: số dòng, ngôn ngữ phát hiện được, tỉ lệ tiếng Việt, độ dài;
+  - `removed`: số dòng mỗi bộ lọc đã loại;
+  - `config`: cấu hình đã dùng.
+
+  Khi tắt lọc thì ghi `{"enabled": false}`. Dòng bị loại nằm trong `rejected.jsonl` kèm `quality_filter` và `quality_reason`. Bằng chứng: `PipelineTests`.
+- [x] 3. Fixture `tests/fixtures/quality/{language,length,repetition,near_duplicate}.jsonl`; mỗi dòng ghi kết quả mong đợi. Có cả dòng đối chứng phải giữ: code lặp, LaTeX lặp, dãy số 0, hội thoại nhắc lại qua nhiều lượt, tiếng Việt trong preset code. Đã kiểm tra: nếu bỏ phần xử lý tương ứng thì các dòng đối chứng này bị loại nhầm.
+
+  Bằng chứng: `LanguageFilterTests`, `LengthFilterTests`, `RepetitionFilterTests`, `NearDuplicateTests` (kể cả MinHash ước lượng Jaccard lệch dưới 0,2), `ConfigTests`. 189 test chạy qua; compileall và secret-scan sạch.
 
 ## M13: Agent chạy model thật trên Colab
 - [ ] 1. `notebooks/agent_colab.ipynb`: cài Ollama, kéo 1 model nhỏ (ví dụ `qwen3:4b`), agent gọi qua adapter OpenAI (M3).

@@ -22,7 +22,7 @@ Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![O
 | Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn | Test bằng model giả |
 
 ## Cấu trúc
-- `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); quét khóa bí mật (`secrets.py`).
+- `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
 - `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`); ước tính thời gian train trên Colab (`estimate.py`).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
@@ -151,7 +151,24 @@ Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả c
 - Tỉ lệ được chuẩn hóa về tổng 1.
 - Nếu không ghi `--total`, lệnh lấy tổng số dòng lớn nhất sao cho không preset nào vượt `limit` của nó.
 - `--limit 20` thì mỗi preset chỉ đọc tối đa 20 dòng, hợp để chạy thử.
-- Tỉ lệ tính trên số dòng đọc vào. Dòng bị loại (trùng, sai dạng) làm tỉ lệ cuối lệch nhẹ; số dòng thật của từng nguồn ghi trong `manifest.json`.
+- Tỉ lệ tính trên số dòng đọc vào. Dòng bị loại (trùng, sai dạng, không qua bộ lọc chất lượng) làm tỉ lệ cuối lệch nhẹ; số dòng thật của từng nguồn ghi trong `manifest.json`.
+
+### Bộ lọc chất lượng
+`hf-sft` lọc dữ liệu theo `configs/datasets/quality.json` (tắt bằng `--no-quality`; lệnh `build` bật bằng `--quality`). Các bộ lọc chạy sau bước kiểm tra schema và loại trùng tuyệt đối, theo thứ tự:
+
+| Bộ lọc | Loại dòng nào |
+| --- | --- |
+| `language` (ưu tiên tiếng Việt) | Nhận tiếng Việt trước tiên, theo chữ có dấu, nên câu trộn tiếng Việt với code hay tiếng Anh vẫn tính là tiếng Việt. Loại: chữ không phải Latin (ví dụ tiếng Trung), tiếng Việt không dấu, và dòng có nội dung khác ngôn ngữ nguồn khai báo (preset `vietnamese` phải là tiếng Việt có dấu). Dòng tiếng Việt có dấu trong nguồn khác (ví dụ preset `code`) vẫn được giữ. |
+| `length` | Câu hỏi dưới 3 ký tự, câu trả lời dưới 2 ký tự, hoặc cả hội thoại quá 16.000 ký tự. |
+| `repetition` | Xét từng lượt riêng; bỏ qua khối code và lệnh LaTeX vì chúng lặp là bình thường. Loại lượt có một từ lặp liền quá 8 lần, hoặc (với lượt từ 50 từ) hơn 50% số câu hay cụm 5 từ là bản lặp. |
+| `near_duplicate` | Gần trùng: Jaccard trên cụm 3 từ từ 0,8 trở lên, tìm bằng MinHash tự viết (128 ngăn, LSH 32 dải) rồi so lại bằng Jaccard thật. Giữ dòng có id đứng trước. |
+
+Dòng bị loại nằm trong `rejected.jsonl`, kèm `quality_filter` (tên bộ lọc) và `quality_reason` (lý do). Mục `quality` của `manifest.json` ghi:
+- số dòng, ngôn ngữ, tỉ lệ tiếng Việt và độ dài, **trước và sau** khi lọc;
+- số dòng mỗi bộ lọc đã loại;
+- cấu hình đã dùng.
+
+Thử trên 2000 dòng thật của 3 preset (25/9/2026): bộ lọc chạy khoảng 5 giây và chỉ loại 1 dòng (lời giải toán lặp công thức). 3 dataset này đã được làm sạch sẵn; bộ lọc chủ yếu để chặn dữ liệu bẩn khi thêm dataset mới.
 
 ### Tự khai báo dataset
 Sửa `configs/datasets/hf_sft.json`: điền `hf_dataset.name`, giấy phép lấy từ trang dataset, và chọn `messages_field` (cột hội thoại, hiểu cả dạng role/content lẫn ShareGPT from/value) hoặc `mapping.input` / `mapping.expected_output` (tùy chọn thêm `mapping.context`, `mapping.reasoning`).

@@ -88,13 +88,21 @@ def map_rows(rows: list[dict[str, Any]], spec: dict[str, Any], version: str) -> 
     return records
 
 
-def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None, loader: RowLoader | None = None) -> dict[str, Any]:
-    """Tải -> chuyển đổi -> kiểm tra/loại trùng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json."""
+def quality_config(quality: Any = True) -> Any:
+    """True: bộ lọc chất lượng theo configs/datasets/quality.json; False/None: tắt; hoặc một QualityConfig có sẵn."""
+    if quality is True:
+        from local_ai.data.quality import QualityConfig
+        return QualityConfig.from_file()
+    return quality or None
+
+
+def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None, loader: RowLoader | None = None, quality: Any = True) -> dict[str, Any]:
+    """Tải -> chuyển đổi -> kiểm tra/loại trùng/lọc chất lượng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json."""
     spec = config["hf_dataset"]; validate_spec(spec)
     version = config.get("dataset_version", "hf-v1"); output = Path(output_dir or config.get("output_dir", DEFAULT_SFT_DIR))
     raw = output / "raw.jsonl"; write_jsonl(raw, map_rows(load_hf_rows(spec, loader), spec, version))
     build_config = {"seed": config.get("seed", 0), "formats": config.get("formats", ["sft"]), "hf_dataset": {key: value for key, value in spec.items() if key != "token"}}
-    return build_dataset([raw], output, version, build_config, config.get("eval_sources", []))
+    return build_dataset([raw], output, version, build_config, config.get("eval_sources", []), quality_config(quality))
 
 
 def load_preset(name: str, directory: str | Path = PRESET_DIR) -> dict[str, Any]:
@@ -138,8 +146,9 @@ def mix_counts(weights: dict[str, float], limits: dict[str, int], total: int | N
 
 
 def prepare_hf_mix(weights: dict[str, float], output_dir: str | Path, loader: RowLoader | None = None, total: int | None = None, limit: int | None = None,
-                   version: str = "hf-mix-v1", seed: int = 17, directory: str | Path = PRESET_DIR) -> dict[str, Any]:
-    """Trộn nhiều preset theo tỉ lệ thành một sft.jsonl. `limit` (nếu có) ghi đè số dòng tối đa của mọi preset."""
+                   version: str = "hf-mix-v1", seed: int = 17, directory: str | Path = PRESET_DIR, quality: Any = True) -> dict[str, Any]:
+    """Trộn nhiều preset theo tỉ lệ thành một sft.jsonl. `limit` (nếu có) ghi đè số dòng tối đa của mọi preset.
+    Bộ lọc chất lượng chạy sau khi trộn, nên sft.jsonl có thể ít dòng hơn tổng số dòng đọc vào; số dòng bị loại ghi trong manifest.json."""
     presets = {name: load_preset(name, directory) for name in weights}
     for config in presets.values(): validate_spec(config["hf_dataset"])
     limits = {name: limit or config["hf_dataset"].get("limit") or 1000 for name, config in presets.items()}
@@ -150,4 +159,4 @@ def prepare_hf_mix(weights: dict[str, float], output_dir: str | Path, loader: Ro
     output = Path(output_dir); raw = output / "raw.jsonl"; write_jsonl(raw, records)
     eval_sources = sorted({source for config in presets.values() for source in config.get("eval_sources", [])})
     mix = {name: {"weight": round(weights[name], 4), "rows": counts[name], "dataset": presets[name]["hf_dataset"]["name"], "revision": presets[name]["hf_dataset"].get("revision", "main")} for name in presets}
-    return build_dataset([raw], output, version, {"seed": seed, "formats": ["sft"], "mix": mix}, eval_sources)
+    return build_dataset([raw], output, version, {"seed": seed, "formats": ["sft"], "mix": mix}, eval_sources, quality_config(quality))
