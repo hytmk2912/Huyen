@@ -130,10 +130,16 @@ print("Tài khoản Hugging Face:", HF_USER, "| repo:", HUB_REPO)
 !python -m local_ai.training.hub push-adapter --repo {HUB_REPO} --adapter-dir .runs/colab_{MODEL}/adapter
 print("Xong! Adapter nằm ở https://huggingface.co/" + HUB_REPO + " (chỉ tài khoản của bạn xem được).")
 """),
+        code("buoc-12-so-do", """
+# Bước 12: số đo thật (thời gian train, VRAM, tốc độ chấm) so với ước tính ở Bước 6. Hãy chụp màn hình bảng này gửi lại để sửa ước tính.
+# Số đo cũng được lưu vào repo riêng tư HUB_REPO (thư mục so_do/), nên mất Colab cũng không mất số đo.
+!python -m local_ai.training.calibrate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --eval-before .runs/eval/{MODEL}/truoc/report.json --eval-after .runs/eval/{MODEL}/sau/report.json --push-to-hub --hub-model-id {HUB_REPO}
+"""),
         markdown("ket-qua", """
 ## Kết quả nằm ở đâu
 - **Adapter và checkpoint:** repo riêng tư `https://huggingface.co/<tên-bạn>/huyen-<model>-qlora` (ví dụ `huyen-smoke-qlora`). Thư mục `last-checkpoint` dùng để train tiếp.
 - **Điểm eval:** bảng ở Bước 10. File chi tiết nằm ở `.runs/eval/<model>/truoc/` và `.runs/eval/<model>/sau/` (mất khi Colab tắt, nên hãy chụp màn hình bảng so sánh).
+- **Số đo thật:** bảng ở Bước 12 (thời gian, VRAM, tốc độ chấm so với ước tính), lưu thêm ở `so_do/<model>.json` trong repo riêng tư. Hãy chụp màn hình bảng này gửi lại.
 
 ## Lỗi hay gặp
 - **"Chưa có GPU" hoặc không kết nối được GPU:** chọn T4 ở Runtime → Change runtime type. Hết lượt GPU miễn phí thì đợi vài giờ rồi thử lại.

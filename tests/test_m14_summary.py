@@ -58,7 +58,8 @@ class ReadmeMatchesCodeTests(unittest.TestCase):
 
 class TasksTests(unittest.TestCase):
     def test_week_two_milestones_are_all_done(self):
-        rows = re.findall(r"(?m)^\| (M\d+) \| [^|]+ \| ([^|]+) \| ([^|]+) \|", TASKS.split("# Nhiệm vụ tuần 1", 1)[0])
+        week_two = TASKS.split("# Nhiệm vụ tuần 2", 1)[1].split("# Nhiệm vụ tuần 1", 1)[0]  # tuần 3 được thêm lên đầu file
+        rows = re.findall(r"(?m)^\| (M\d+) \| [^|]+ \| ([^|]+) \| ([^|]+) \|", week_two)
         self.assertEqual([row[0] for row in rows], [f"M{number}" for number in range(8, 15)])
         for milestone, status, progress in rows:
             with self.subTest(milestone): self.assertEqual((status.strip(), progress.strip().endswith("(100%)")), ("**Xong**", True))

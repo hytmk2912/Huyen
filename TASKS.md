@@ -1,3 +1,36 @@
+# Nhiệm vụ tuần 3 (chủ repo chọn từng mốc)
+
+Bắt đầu: 2026-09-25, từ `main` tại commit `12e86fc` (206 test chạy qua; compileall và secret-scan sạch). Nhánh làm việc: `claude/nhiem-vu-tuan-jixv6i`.
+
+Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `lam-moc`; mốc chỉ **Xong** khi đạt mọi tiêu chí và cả ba lệnh kiểm tra đều xanh. Khác tuần 2: 7 mốc M15–M21 (cuối README) chỉ là đề xuất. Chủ repo chọn mốc nào thì mốc đó mới được thêm tiêu chí vào đây.
+
+## Bảng tiến độ tuần 3
+
+| Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
+| --- | --- | --- | --- | --- |
+| M15 | Số đo thật trên Colab | Đang làm (chờ số đo thật) | 3/4 (75%) | `tests/test_m15_measurements.py` (9 test) |
+
+## M15: Số đo thật trên Colab
+Mục tiêu: sửa các hằng số ước tính (`local_ai/training/estimate.py`, `local_ai/models/vram.py`) theo số đo thật khi chủ repo chạy notebook, và ghi bảng số đo thật vào README. Hiện notebook không đo VRAM, và chủ repo khó chép số từ điện thoại, nên cần làm phần ghi số đo trước.
+- [x] 1. Ghi số đo khi chạy thật:
+  - lệnh train ghi `measurements.json` (GPU, VRAM đỉnh, thời gian, bước bắt đầu/kết thúc, số token của lần chạy), ghi trước khi lưu adapter nên được đẩy lên Hub cùng adapter;
+  - báo cáo eval ghi `duration_s`, `output_chars`;
+  - báo cáo agent ghi `duration_s`, và in thời gian cạnh tỉ lệ thành công.
+
+  Bằng chứng: `RealCpuTrainingTests` train thật 2 bước rồi chạy tiếp 1 bước trên CPU (bước bắt đầu 2, token chỉ tính lần chạy tiếp); `FakeGpuTrainingTests` (VRAM, tên GPU, file có trước khi lưu adapter); `ReportDurationTests`.
+- [x] 2. Lệnh `python -m local_ai.training.calibrate`:
+  - so số đo thật với ước tính, in bảng và hằng số đề xuất (`train_tflops`, `TRAINING_FACTOR`, `token_overhead_s`);
+  - lưu `so_do.json`, tùy chọn đẩy lên `so_do/<model>.json` của repo Hugging Face riêng tư;
+  - notebook train có ô **Bước 12** chạy lệnh này.
+  - Hệ số VRAM đo từ model nhỏ bị đánh dấu là không dùng được: ở model 0.5B phần logits lớn hơn trọng số nhiều lần, nên hệ số tính ra rất lớn, ví dụ 18,87 với số đo mẫu.
+  - GPU chưa có hồ sơ (ví dụ CPU, L4) thì chỉ ghi số đo, không đề xuất.
+
+  Bằng chứng: `CalibrateTests`, dùng SỐ ĐO MẪU trong `tests/fixtures/measurements/`, không phải số đo thật.
+- [ ] 3. Có số đo thật từ chủ repo (smoke, light, agent): sửa hằng số trong `estimate.py` và `vram.py`; README có bảng số đo thật. **Bị chặn: chờ chủ repo chạy notebook.** Ngày 25/9, Hugging Face của chủ repo chưa có repo `huyen-smoke-qlora` hay `huyen-light-qlora`, tức là chưa chạy lần nào.
+- [x] 4. Test xanh, kể cả chạy lệnh mới của notebook bằng `--dry-run`. Test M10/M11 được sửa theo notebook mới (thêm ô Bước 12; không bỏ kiểm tra nào); test M14 đọc đúng phần tuần 2 khi tuần 3 được thêm lên đầu `TASKS.md`. 215 test chạy qua; compileall và secret-scan sạch.
+
+---
+
 # Nhiệm vụ tuần 2 (M8–M14)
 
 Bắt đầu: 2026-09-24, từ `main` tại commit `09c93f3` (119 test chạy qua; compileall và secret-scan sạch). Nhánh làm việc: `claude/nhiem-vu-tuan-2`.

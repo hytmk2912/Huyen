@@ -1,0 +1,9 @@
+{
+  "_note": "SỐ ĐO MẪU để test, không phải số đo thật",
+  "status": "completed",
+  "model": "smoke-colab",
+  "cases": 30,
+  "passed": 11,
+  "duration_s": 230.0,
+  "output_chars": 15000
+}

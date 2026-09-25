@@ -3,8 +3,8 @@
 ## Nhiệm vụ tuần
 **Đọc `memory.md` trước khi làm việc.**
 
-Kế hoạch nằm trong `TASKS.md`: tuần 2 (M8–M14) ở đầu file, tuần 1 (M1–M7, đã xong) ở dưới. Mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi gặp nằm trong `memory.md` (nhật ký tuần 1: `archive/memory-tuan-1.md`). Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
-- Mỗi lượt làm tối đa **1 mốc**, theo thứ tự trong `TASKS.md`.
+Kế hoạch nằm trong `TASKS.md`: tuần 3 (chủ repo chọn từng mốc trong M15–M21) ở đầu file, rồi tuần 2 (M8–M14) và tuần 1 (M1–M7), đều đã xong. Mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi gặp nằm trong `memory.md` (nhật ký tuần 1–2 trong `archive/`). Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
+- Mỗi lượt làm tối đa **1 mốc**: mốc chủ repo gọi tên, hoặc mốc đầu tiên chưa xong trong `TASKS.md`.
 - Chỉ đánh dấu một mốc là xong khi test xanh (kèm `compileall` và `secret-scan`) và mọi tiêu chí của mốc đã đạt.
 - Không dùng API trả phí (OpenAI, Anthropic, Gemini...). Chỉ chạy model cục bộ hoặc qua server local.
 - Không tải trọng số model hay dataset lớn. Test không dùng mạng, không cần GPU (dùng model tí hon khởi tạo ngẫu nhiên, loader giả). Dataset thật chỉ đọc streaming với `limit` nhỏ.

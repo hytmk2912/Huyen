@@ -1,0 +1,19 @@
+{
+  "_note": "SỐ ĐO MẪU để test, không phải số đo thật",
+  "model": "light",
+  "source": "Qwen/Qwen3-4B",
+  "params_b": 4.02,
+  "gpu": "Tesla T4",
+  "quantization": "4bit",
+  "dtype": "float16",
+  "per_device_batch_size": 1,
+  "gradient_accumulation_steps": 16,
+  "max_length": 2048,
+  "gradient_checkpointing": true,
+  "start_step": 60,
+  "end_step": 125,
+  "train_seconds": 3000.0,
+  "num_tokens": 520000,
+  "peak_vram_gb": 6.8,
+  "peak_reserved_gb": 7.9
+}

@@ -73,6 +73,17 @@ def push_adapter(repo_id: str, adapter_dir: str | Path, private: bool = True, dr
     return {"status": "pushed", **plan}
 
 
+def upload_file(repo_id: str, path: str | Path, path_in_repo: str, private: bool = True) -> str:
+    """Đẩy một file nhỏ (ví dụ số đo) lên repo; tạo repo riêng tư nếu chưa có. Trả về đường dẫn xem file trên Hub."""
+    check_repo_id(repo_id)
+    from huggingface_hub import HfApi
+
+    api = HfApi()
+    api.create_repo(repo_id=repo_id, private=private, exist_ok=True)
+    api.upload_file(path_or_fileobj=str(path), path_in_repo=path_in_repo, repo_id=repo_id, commit_message=f"Ghi số đo thật: {path_in_repo}")
+    return f"https://huggingface.co/{repo_id}/blob/main/{path_in_repo}"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m local_ai.training.hub", description="Đẩy adapter đã train lên Hugging Face Hub (token đọc từ biến môi trường HF_TOKEN).")
     commands = parser.add_subparsers(dest="command", required=True)

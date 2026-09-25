@@ -30,8 +30,8 @@ PLATFORM = ROOT / "configs" / "models" / "platform.json"
 COLAB_CONFIG = ROOT / "configs" / "training" / "colab_smoke.json"
 COLAB_LINK = "https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb"
 HUB_REPO = "nguoi-dung/huyen-smoke-qlora"
-# M11 thêm ô chọn model (buoc-1-chon-model) và ô ước tính thời gian (buoc-6-uoc-tinh).
-STEPS = ["gioi-thieu", "buoc-1-chon-model", "buoc-2-gpu", "buoc-3-cai-dat", "buoc-4-token", "buoc-5-du-lieu", "buoc-6-uoc-tinh", "buoc-7-cham-truoc", "buoc-8-train", "buoc-9-cham-sau", "buoc-10-so-sanh", "buoc-11-day-adapter", "ket-qua"]
+# M11 thêm ô chọn model (buoc-1-chon-model) và ô ước tính thời gian (buoc-6-uoc-tinh); M15 thêm ô số đo thật (buoc-12-so-do).
+STEPS = ["gioi-thieu", "buoc-1-chon-model", "buoc-2-gpu", "buoc-3-cai-dat", "buoc-4-token", "buoc-5-du-lieu", "buoc-6-uoc-tinh", "buoc-7-cham-truoc", "buoc-8-train", "buoc-9-cham-sau", "buoc-10-so-sanh", "buoc-11-day-adapter", "buoc-12-so-do", "ket-qua"]
 VIETNAMESE = re.compile(r"[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]", re.I)
 
 
@@ -138,8 +138,8 @@ class NotebookTests(unittest.TestCase):
 
     def test_notebook_commands_run_with_dry_run(self):
         outputs = run_notebook_commands(self)  # model mặc định của notebook: smoke
-        self.assertEqual([module for module, _ in outputs], ["local_ai.data", "local_ai.training.estimate", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub"])
-        (_, data), _, (_, before), (_, train), (_, after), (_, compare), (_, push) = outputs
+        self.assertEqual([module for module, _ in outputs], ["local_ai.data", "local_ai.training.estimate", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub", "local_ai.training.calibrate"])
+        (_, data), _, (_, before), (_, train), (_, after), (_, compare), (_, push), _ = outputs
         self.assertEqual(sum(item["rows"] for item in data["presets"].values()), 2000)
         self.assertEqual(data["output"], "data/processed/hf_sft")
         self.assertEqual((before["model"]["name"], after["model"]["name"], after["model"]["max_new_tokens"]), ("smoke", "smoke-colab", 256))

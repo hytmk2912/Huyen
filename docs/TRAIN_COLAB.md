@@ -62,6 +62,7 @@ Trong ô **Bước 1** của notebook, chạm ô chọn ở dòng `MODEL` → ch
 
 ## Bước 6: xem kết quả
 - **Bảng so sánh điểm** ở **Bước 10**. Hãy chụp màn hình, vì mọi file trong Colab (thư mục `.runs/`) mất khi Colab tắt.
+- **Bảng số đo thật** ở **Bước 12**: thời gian train, VRAM và tốc độ chấm, so với ước tính. Hãy chụp màn hình gửi lại để sửa ước tính cho đúng. Bảng này cũng được lưu ở `so_do/<model>.json` trong repo riêng tư.
 - **Adapter và checkpoint** nằm ở repo riêng tư `https://huggingface.co/<tên-bạn>/huyen-<model>-qlora`, ví dụ `huyen-smoke-qlora`. Chỉ tài khoản của bạn xem được. Thư mục `last-checkpoint` trong đó dùng để train tiếp.
 
 ## Khi Colab ngắt giữa chừng

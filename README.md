@@ -27,7 +27,7 @@ Chạy trên Colab miễn phí, không cần máy có GPU:
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
-- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`); ước tính thời gian train trên Colab (`estimate.py`).
+- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`); ước tính thời gian train trên Colab (`estimate.py`); so số đo thật với ước tính (`calibrate.py`).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent; 5 nhiệm vụ mẫu cho agent (`agents/tasks.py`).
@@ -316,7 +316,8 @@ Các ô sau chạy lần lượt:
 7. train QLoRA;
 8. chấm lại model sau khi train;
 9. in bảng so sánh trước/sau;
-10. đẩy adapter lên repo Hugging Face riêng tư.
+10. đẩy adapter lên repo Hugging Face riêng tư;
+11. in bảng số đo thật so với ước tính (thời gian train, VRAM, tốc độ chấm), rồi lưu vào `so_do/<model>.json` trong repo riêng tư.
 
 **Cần chuẩn bị:** token Hugging Face quyền Write, lưu trong Colab Secrets (biểu tượng chìa khóa) với tên `HF_TOKEN`, bật Notebook access. Token không nằm trong notebook hay repo.
 
@@ -324,7 +325,13 @@ Các ô sau chạy lần lượt:
 - Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước (`light`: 10, `smoke`: 25).
 - Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_<model>/_hub/last-checkpoint` rồi train tiếp.
 
-Bước cuối của notebook đẩy adapter lên repo riêng tư bằng lệnh con `push-adapter` của `local_ai.training.hub`. Token đọc từ biến môi trường `HF_TOKEN`; thêm `--dry-run` để chỉ kiểm tra tham số, không gọi mạng.
+Notebook đẩy adapter lên repo riêng tư bằng lệnh con `push-adapter` của `local_ai.training.hub`. Token đọc từ biến môi trường `HF_TOKEN`; thêm `--dry-run` để chỉ kiểm tra tham số, không gọi mạng.
+
+**Số đo thật (M15).** Ô cuối của notebook chạy `python -m local_ai.training.calibrate`, dùng các số đo sau:
+- lệnh train ghi `measurements.json` trong thư mục đầu ra: GPU, VRAM đỉnh, thời gian, bước bắt đầu/kết thúc, số token của lần chạy;
+- báo cáo eval ghi thời gian chấm và độ dài câu trả lời.
+
+Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất cho `estimate.py` và `vram.py`, nhưng không tự sửa code. Hệ số VRAM đo từ model nhỏ (`smoke`) không dùng được cho model lớn, vì ở model nhỏ phần bộ nhớ cho logits lớn hơn trọng số nhiều lần; lệnh sẽ ghi chú điều này. **Chưa có số đo thật nào:** hằng số chỉ được sửa sau khi chủ repo chạy notebook và gửi lại bảng này.
 
 **Ước tính thời gian** (`python -m local_ai.training.estimate`) không tải model, chỉ dựa vào cấu hình và `sft.jsonl`:
 - số token mỗi dòng, kể cả phần đệm khi batch lớn hơn 1;
@@ -340,6 +347,7 @@ python -m local_ai.training.estimate --config configs/training/colab_light.json 
 python -m local_ai.training.finetune --config configs/training/colab_light.json --push-to-hub --hub-model-id ten-ban/huyen-light-qlora --dry-run
 python -m local_ai.evaluation --model light-colab --max-new-tokens 512 --dry-run
 python -m local_ai.evaluation.compare .runs/eval/light/truoc/report.json .runs/eval/light/sau/report.json --dry-run
+python -m local_ai.training.calibrate --config configs/training/colab_light.json --max-new-tokens 512 --dry-run
 ```
 
 Muốn sửa notebook thì sửa nội dung ô trong `notebooks/build.py`, rồi chạy `python notebooks/build.py`; test báo lỗi nếu file `.ipynb` không khớp.
@@ -382,7 +390,7 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
-1. **M15 – Số đo thật trên Colab.** Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
+1. **M15 – Số đo thật trên Colab** (đang làm: đã có phần ghi số đo, chờ số đo thật). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
 2. **M16 – Notebook bền hơn:**
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.

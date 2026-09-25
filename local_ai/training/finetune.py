@@ -13,6 +13,7 @@ import importlib.util
 import json
 import re
 from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -131,6 +132,39 @@ def hub_arguments(config: FinetuneConfig) -> dict[str, Any]:
     return {"push_to_hub": True, "hub_model_id": config.hub_model_id, "hub_strategy": "checkpoint", "hub_private_repo": config.hub_private}
 
 
+MEASUREMENTS = "measurements.json"  # số đo thật của lần train gần nhất, trong output_dir (M15)
+
+
+def checkpoint_step(path: str | None) -> int:
+    """Số bước đã train của checkpoint sắp chạy tiếp; train từ đầu thì là 0."""
+    state = Path(path) / "trainer_state.json" if path else None
+    return int(json.loads(state.read_text(encoding="utf-8")).get("global_step", 0)) if state and state.is_file() else 0
+
+
+def _cuda(torch: Any, name: str, *args: Any) -> Any:
+    """Gọi hàm đo của torch.cuda nếu có. Phần đo lỗi thì bỏ trống, không làm hỏng lượt train."""
+    function = getattr(torch.cuda, name, None)
+    try:
+        return function(*args) if function and torch.cuda.is_available() else None
+    except Exception:
+        return None
+
+
+def training_measurements(torch: Any, config: FinetuneConfig, model: ModelConfig, trainer: Any, result: Any, start_step: int) -> dict[str, Any]:
+    """Số đo thật của lần chạy này để so với ước tính (`python -m local_ai.training.calibrate`): GPU, VRAM đỉnh, thời gian, bước, token."""
+    history = getattr(getattr(trainer, "state", None), "log_history", None) or []
+    # TRL ghi số token thật (không tính phần đệm), đếm lại từ 0 khi chạy tiếp từ checkpoint; log cũ nạp từ checkpoint thì bỏ qua.
+    tokens = [entry["num_tokens"] for entry in history if isinstance(entry.get("num_tokens"), (int, float)) and entry.get("step", start_step + 1) > start_step]
+    gigabytes = lambda value: round(value / 1e9, 2) if isinstance(value, (int, float)) else None
+    runtime = result.metrics.get("train_runtime") if isinstance(getattr(result, "metrics", None), dict) else None
+    return {"model": model.name, "source": model.source, "params_b": model.params_b, "gpu": _cuda(torch, "get_device_name", 0) or "cpu",
+            "quantization": effective_quantization(config, model), "dtype": config.dtype or model.dtype, "per_device_batch_size": config.per_device_batch_size,
+            "gradient_accumulation_steps": config.gradient_accumulation_steps, "max_length": config.max_length, "gradient_checkpointing": config.gradient_checkpointing,
+            "start_step": start_step, "end_step": getattr(result, "global_step", None), "train_seconds": runtime, "num_tokens": max(tokens) if tokens else None,
+            "peak_vram_gb": gigabytes(_cuda(torch, "max_memory_allocated")), "peak_reserved_gb": gigabytes(_cuda(torch, "max_memory_reserved")),
+            "measured_at": datetime.now(timezone.utc).isoformat()}
+
+
 def train(config: FinetuneConfig) -> dict[str, Any]:
     config.validate(); model_config = resolve_base_model(config); quantization = effective_quantization(config, model_config)
     missing = missing_requirements(config)
@@ -166,10 +200,13 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     if resume is None and config.push_to_hub and config.resume is True:  # Colab bị ngắt thì máy mới không còn checkpoint: lấy từ Hub
         downloaded = download_last_checkpoint(config.hub_model_id, config.output_dir); resume = str(downloaded) if downloaded else None
     result = trainer.train(resume_from_checkpoint=resume)
+    measurements = training_measurements(torch, config, model_config, trainer, result, checkpoint_step(resume))
+    # Ghi trước save_model: khi bật --push-to-hub, file này được đẩy lên repo cùng adapter.
+    (Path(config.output_dir) / MEASUREMENTS).write_text(json.dumps(measurements, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     final = Path(config.output_dir) / ("adapter" if config.method == "lora" else "final")
     trainer.save_model(str(final)); tokenizer.save_pretrained(str(final))
     tracker.record_metrics({key: float(value) for key, value in result.metrics.items() if isinstance(value, (int, float))}); tracker.record_checkpoint(str(final))
-    return {"status": "completed", "output": str(final), "steps": getattr(result, "global_step", None), "metrics": result.metrics}
+    return {"status": "completed", "output": str(final), "steps": getattr(result, "global_step", None), "metrics": result.metrics, "measurements": measurements}
 
 
 def main(argv: list[str] | None = None) -> None:

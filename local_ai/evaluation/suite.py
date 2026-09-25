@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -103,6 +104,7 @@ def _bucket(buckets: dict[str, dict[str, Any]], key: str, passed: bool) -> None:
 def run_eval(model: ModelAdapter, cases: list[EvalCase], sandbox: PythonSandbox | None = None) -> dict[str, Any]:
     """Hỏi model từng câu và chấm. Model lỗi (ví dụ server chưa chạy) thì dừng và báo status "error", không chấm tiếp."""
     results, groups, languages = [], {}, {}
+    start = time.monotonic()  # thời gian chấm và độ dài câu trả lời dùng để so với ước tính (M15)
     for case in cases:
         try:
             output = model.generate([Message("user", case.prompt)])
@@ -115,6 +117,7 @@ def run_eval(model: ModelAdapter, cases: list[EvalCase], sandbox: PythonSandbox 
     passed_total = sum(item["passed"] for item in results)
     return {"status": "completed", "model": model.name, "generated_at": datetime.now(timezone.utc).isoformat(), "cases": len(results), "passed": passed_total,
             "accuracy": round(passed_total / len(results), 4) if results else 0.0, "groups": dict(sorted(groups.items())), "languages": dict(sorted(languages.items())),
+            "duration_s": round(time.monotonic() - start, 2), "output_chars": sum(len(item["output"]) for item in results),
             "failures": [{key: item[key] for key in ("id", "group", "language", "scoring", "reason")} | {"output": item["output"][:300]} for item in results if not item["passed"]],
             "results": results}
 

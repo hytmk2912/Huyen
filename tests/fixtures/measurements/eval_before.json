@@ -1,0 +1,9 @@
+{
+  "_note": "SỐ ĐO MẪU để test, không phải số đo thật",
+  "status": "completed",
+  "model": "smoke",
+  "cases": 30,
+  "passed": 8,
+  "duration_s": 200.0,
+  "output_chars": 13000
+}
