@@ -45,17 +45,22 @@ def download_last_checkpoint(repo_id: str, output_dir: str | Path) -> Path | Non
     return target
 
 
-def remote_trainer_state(repo_id: str) -> dict[str, object] | None:
-    """Đọc riêng file `last-checkpoint/trainer_state.json` trên repo (vài KB) để biết đã train tới bước nào; chưa có thì trả None."""
+def download_file(repo_id: str, filename: str) -> Path | None:
+    """Tải một file nhỏ trong repo về cache của huggingface_hub; repo hoặc file chưa có thì trả None."""
     from huggingface_hub import hf_hub_download
     from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
 
     check_repo_id(repo_id)
     try:
-        path = hf_hub_download(repo_id=repo_id, filename=f"{LAST_CHECKPOINT}/trainer_state.json")
+        return Path(hf_hub_download(repo_id=repo_id, filename=filename))
     except (RepositoryNotFoundError, RevisionNotFoundError, EntryNotFoundError):
         return None
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def remote_trainer_state(repo_id: str) -> dict[str, object] | None:
+    """Đọc riêng file `last-checkpoint/trainer_state.json` trên repo (vài KB) để biết đã train tới bước nào; chưa có thì trả None."""
+    path = download_file(repo_id, f"{LAST_CHECKPOINT}/trainer_state.json")
+    return json.loads(path.read_text(encoding="utf-8")) if path else None
 
 
 def push_adapter(repo_id: str, adapter_dir: str | Path, private: bool = True, dry_run: bool = False) -> dict[str, object]:
@@ -71,6 +76,17 @@ def push_adapter(repo_id: str, adapter_dir: str | Path, private: bool = True, dr
     api.create_repo(repo_id=repo_id, private=private, exist_ok=True)
     api.upload_folder(repo_id=repo_id, folder_path=str(folder), commit_message="Đẩy adapter LoRA sau khi train")
     return {"status": "pushed", **plan}
+
+
+def upload_file(repo_id: str, path: str | Path, path_in_repo: str, private: bool = True) -> str:
+    """Đẩy một file nhỏ (ví dụ số đo) lên repo; tạo repo riêng tư nếu chưa có. Trả về đường dẫn xem file trên Hub."""
+    check_repo_id(repo_id)
+    from huggingface_hub import HfApi
+
+    api = HfApi()
+    api.create_repo(repo_id=repo_id, private=private, exist_ok=True)
+    api.upload_file(path_or_fileobj=str(path), path_in_repo=path_in_repo, repo_id=repo_id, commit_message=f"Ghi số đo thật: {path_in_repo}")
+    return f"https://huggingface.co/{repo_id}/blob/main/{path_in_repo}"
 
 
 def main(argv: list[str] | None = None) -> int:

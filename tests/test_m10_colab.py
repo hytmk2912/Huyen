@@ -30,8 +30,8 @@ PLATFORM = ROOT / "configs" / "models" / "platform.json"
 COLAB_CONFIG = ROOT / "configs" / "training" / "colab_smoke.json"
 COLAB_LINK = "https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb"
 HUB_REPO = "nguoi-dung/huyen-smoke-qlora"
-# M11 thêm ô chọn model (buoc-1-chon-model) và ô ước tính thời gian (buoc-6-uoc-tinh).
-STEPS = ["gioi-thieu", "buoc-1-chon-model", "buoc-2-gpu", "buoc-3-cai-dat", "buoc-4-token", "buoc-5-du-lieu", "buoc-6-uoc-tinh", "buoc-7-cham-truoc", "buoc-8-train", "buoc-9-cham-sau", "buoc-10-so-sanh", "buoc-11-day-adapter", "ket-qua"]
+# M11 thêm ô chọn model (buoc-1-chon-model) và ô ước tính thời gian (buoc-6-uoc-tinh); M15 thêm ô số đo thật (buoc-12-so-do).
+STEPS = ["gioi-thieu", "buoc-1-chon-model", "buoc-2-gpu", "buoc-3-cai-dat", "buoc-4-token", "buoc-5-du-lieu", "buoc-6-uoc-tinh", "buoc-7-cham-truoc", "buoc-8-train", "buoc-9-cham-sau", "buoc-10-so-sanh", "buoc-11-day-adapter", "buoc-12-so-do", "ket-qua"]
 VIETNAMESE = re.compile(r"[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]", re.I)
 
 
@@ -51,11 +51,14 @@ def notebook_variables(model: str = "smoke") -> dict[str, str]:
     return {"MODEL": namespace["MODEL"], "MAX_NEW_TOKENS": str(namespace["MAX_NEW_TOKENS"]), "HUB_REPO": f"nguoi-dung/huyen-{model}-qlora"}
 
 
+COMMAND = re.compile(r'run\(f?"(python -m local_ai[^"]*)"')  # từ M16 notebook chạy lệnh bằng run("python -m ...") thay cho !python
+
+
 def notebook_commands(model: str = "smoke") -> list[list[str]]:
-    """Mọi lệnh `!python -m local_ai...` trong notebook, thay các biến {TÊN} bằng giá trị ứng với model đã chọn."""
+    """Mọi lệnh `python -m local_ai...` trong notebook, thay các biến {TÊN} bằng giá trị ứng với model đã chọn."""
     variables = notebook_variables(model)
-    lines = [line.strip() for source in code_cells(load_notebook()).values() for line in source.splitlines()]
-    return [shlex.split(re.sub(r"\{(\w+)\}", lambda match: variables[match.group(1)], line[1:])) for line in lines if line.startswith("!python -m local_ai")]
+    commands = [command for source in code_cells(load_notebook()).values() for command in COMMAND.findall(source)]
+    return [shlex.split(re.sub(r"\{(\w+)\}", lambda match: variables[match.group(1)], command)) for command in commands]
 
 
 def run_notebook_commands(test: unittest.TestCase, model: str = "smoke") -> list[tuple[str, object]]:
@@ -127,8 +130,7 @@ class NotebookTests(unittest.TestCase):
     def test_gpu_install_and_token_cells(self):
         cells = code_cells(load_notebook())
         self.assertIn("torch.cuda.is_available()", cells["buoc-2-gpu"]); self.assertIn("T4", cells["buoc-2-gpu"])
-        install = next(line for line in cells["buoc-3-cai-dat"].splitlines() if "pip install" in line)
-        packages = install.split("pip install", 1)[1].split()[1:]  # bỏ cờ -q
+        packages = re.search(r'"pip install -q ([^"]+)"', cells["buoc-3-cai-dat"]).group(1).split()  # từ M16: run("pip install -q ...")
         self.assertTrue(packages and all(re.fullmatch(r"[a-z][a-z0-9_-]*==[0-9][0-9.]*", name) for name in packages), packages)
         self.assertNotIn("torch", [name.split("==")[0] for name in packages])  # Colab có sẵn torch hợp với GPU, không cài lại
         self.assertIn('userdata.get("HF_TOKEN")', cells["buoc-4-token"])
@@ -138,8 +140,8 @@ class NotebookTests(unittest.TestCase):
 
     def test_notebook_commands_run_with_dry_run(self):
         outputs = run_notebook_commands(self)  # model mặc định của notebook: smoke
-        self.assertEqual([module for module, _ in outputs], ["local_ai.data", "local_ai.training.estimate", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub"])
-        (_, data), _, (_, before), (_, train), (_, after), (_, compare), (_, push) = outputs
+        self.assertEqual([module for module, _ in outputs], ["local_ai.data", "local_ai.training.estimate", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub", "local_ai.training.calibrate"])
+        (_, data), _, (_, before), (_, train), (_, after), (_, compare), (_, push), _ = outputs
         self.assertEqual(sum(item["rows"] for item in data["presets"].values()), 2000)
         self.assertEqual(data["output"], "data/processed/hf_sft")
         self.assertEqual((before["model"]["name"], after["model"]["name"], after["model"]["max_new_tokens"]), ("smoke", "smoke-colab", 256))

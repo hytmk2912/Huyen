@@ -1,6 +1,6 @@
 ---
 name: lam-moc
-description: Làm mốc kế tiếp của nhiệm vụ tuần trong TASKS.md (tuần 2: M8–M14). Dùng khi chủ repo gõ /lam-moc, bảo "làm tiếp nhiệm vụ tuần" hoặc "làm mốc tiếp theo", và khi lượt chạy tự động hằng đêm bắt đầu. Đọc memory.md và TASKS.md, làm đúng một mốc, chạy test/compileall/secret-scan, cập nhật memory.md rồi commit bằng tiếng Việt.
+description: Làm mốc kế tiếp của nhiệm vụ tuần trong TASKS.md (tuần 3: các mốc chủ repo chọn trong M15–M21). Dùng khi chủ repo gõ /lam-moc, bảo "làm tiếp nhiệm vụ tuần" hoặc "làm mốc tiếp theo", và khi lượt chạy tự động hằng đêm bắt đầu. Đọc memory.md và TASKS.md, làm đúng một mốc, chạy test/compileall/secret-scan, cập nhật memory.md rồi commit bằng tiếng Việt.
 ---
 
 # Làm mốc kế tiếp
@@ -8,14 +8,15 @@ description: Làm mốc kế tiếp của nhiệm vụ tuần trong TASKS.md (tu
 Mỗi lần dùng skill này chỉ làm **một** mốc. Làm xong thì dừng, không tự làm tiếp mốc sau.
 
 ## 1. Đọc trạng thái
-1. Nhánh làm việc tuần 2 là `claude/nhiem-vu-tuan-2`: remote có nhánh này thì checkout; chưa có thì tạo mới từ `main` (nếu PR tuần 1 của nhánh `claude/nhiem-vu-tuan` chưa gộp thì tạo từ nhánh đó). Không đẩy lên `main`.
+1. Nhánh làm việc tuần 3 là `claude/nhiem-vu-tuan-jixv6i`: remote có nhánh này thì checkout. Nếu PR của nhánh đã được gộp thì dựng lại nhánh từ `main` mới nhất, giữ nguyên tên. Không đẩy lên `main`.
 2. Chạy `git status` và `git log --oneline -5`. Nếu có thay đổi dở dang không rõ nguồn gốc thì dừng lại và hỏi chủ repo.
 3. Đọc `CLAUDE.md`, `memory.md` và `TASKS.md`.
 4. Chọn mốc:
    - nếu `memory.md` ghi đang làm dở một mốc thì làm tiếp mốc đó;
-   - nếu không, làm mốc tồn của tuần 1 (mục "Tồn tuần 1" trong `memory.md`) trước, rồi mốc đầu tiên (theo thứ tự M8 → M14) chưa **Xong** trong bảng tiến độ tuần 2;
+   - nếu không, làm mốc tồn của tuần trước (mục "Tồn tuần 2" trong `memory.md`) trước, rồi mốc chủ repo vừa gọi tên. Chủ repo không gọi tên mốc nào thì làm mốc đầu tiên chưa **Xong** trong bảng tiến độ tuần 3;
+   - mốc chưa được chủ repo chọn (chưa có tiêu chí trong `TASKS.md`) thì không tự làm;
    - mốc bị chặn 2 lượt liền (mạng, quyền, môi trường): ghi "bị chặn" kèm lý do vào `memory.md` rồi chuyển sang mốc sau. Không đoán mò.
-5. Nếu mọi mốc đã xong hoặc bị chặn: ghi "XONG TUẦN 2 – chờ merge" vào `memory.md`, báo chủ repo rồi dừng. Không tự đặt thêm mốc mới.
+5. Nếu mọi mốc đã chọn đều xong hoặc bị chặn: ghi "XONG TUẦN 3 – chờ merge" vào `memory.md`, báo chủ repo rồi dừng. Không tự đặt thêm mốc mới.
 
 ## 2. Làm mốc
 1. Ghi vào `memory.md`, mục "Mốc đang làm": `Mx — bắt đầu <ngày>`.
@@ -47,7 +48,7 @@ Cả ba lệnh phải xanh. Nếu có lệnh báo lỗi thì sửa. Không sửa
   - cập nhật cột "Tiến độ" và dòng "Tổng";
   - chỉ ghi **Xong** khi đạt 100% tiêu chí và cả ba lệnh kiểm tra đều xanh, còn lại thì ghi **Đang làm**.
 - `memory.md` (giữ dưới 80 dòng, tóm tắt nhật ký cũ):
-  - dòng "TUẦN 2", mục "Tồn tuần 1", checklist M8–M14;
+  - dòng "TUẦN 3", mục "Tồn tuần 2", checklist tuần 3;
   - mục "Mốc đang làm": ghi mốc còn dở, hoặc mốc kế tiếp nếu mốc này đã xong;
   - mục "Việc dở";
   - mục "Lỗi gặp": thêm lỗi mới, xoá dòng của lỗi đã sửa;
@@ -57,7 +58,7 @@ Cả ba lệnh phải xanh. Nếu có lệnh báo lỗi thì sửa. Không sửa
 1. Commit bằng tiếng Việt:
    - dòng đầu dạng `Mx: <tóm tắt>`, hoặc `Mx (dở): <tóm tắt>` nếu mốc chưa xong;
    - phần thân liệt kê các tiêu chí đã đạt và kết quả test.
-2. Đẩy lên `claude/nhiem-vu-tuan-2` (`git push -u origin claude/nhiem-vu-tuan-2`), không đẩy thẳng lên `main`. Chưa có PR mở từ nhánh này vào `main` thì mở một PR (bản nháp); có rồi thì cập nhật checklist M8–M14 trong mô tả PR. Viết bằng tiếng Việt.
+2. Đẩy lên `claude/nhiem-vu-tuan-jixv6i` (`git push -u origin claude/nhiem-vu-tuan-jixv6i`), không đẩy thẳng lên `main`. Chưa có PR mở từ nhánh này vào `main` thì mở một PR (bản nháp); có rồi thì cập nhật checklist tuần 3 trong mô tả PR. Viết bằng tiếng Việt.
 3. Báo lại chủ repo ngắn gọn bằng tiếng Việt:
    - đã làm mốc nào;
    - tiêu chí nào đạt, tiêu chí nào chưa;

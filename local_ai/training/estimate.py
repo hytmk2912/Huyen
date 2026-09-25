@@ -95,7 +95,8 @@ def estimate(config: FinetuneConfig, rows: int | None = None, max_new_tokens: in
     if stats and rows is None: rows, tokens_per_row, source = stats[0], stats[1], "sft.jsonl"
     else: rows, tokens_per_row, source = rows or DEFAULT_ROWS, MEASURED_TOKENS_PER_ROW.get((config.max_length, config.per_device_batch_size), min(config.max_length, UNCUT_TOKENS_PER_ROW)), "đo mẫu"
     steps = training_steps(config, rows)
-    tokens = steps * config.per_device_batch_size * config.gradient_accumulation_steps * tokens_per_row
+    tokens_per_step = config.per_device_batch_size * config.gradient_accumulation_steps * tokens_per_row
+    tokens = steps * tokens_per_step
     passes = 3 if config.gradient_checkpointing else 2
     train_minutes = 2 * model.params_b * 1e9 * tokens * passes / (profile.train_tflops * 1e12) / 60
     done = min(int((trainer_state or {}).get("global_step") or 0), steps)
@@ -105,7 +106,7 @@ def estimate(config: FinetuneConfig, rows: int | None = None, max_new_tokens: in
     quantization = effective_quantization(config, model)
     vram = training_gb(model.params_b, quantization or "bf16")
     return {"gpu": profile.name, "model": model.name, "source": model.source, "params_b": model.params_b, "rows": rows, "tokens_per_row": round(tokens_per_row, 1),
-            "data": source, "max_length": config.max_length, "steps": steps, "done_steps": done, "train_minutes": round(train_minutes, 1),
+            "data": source, "max_length": config.max_length, "steps": steps, "tokens_per_step": round(tokens_per_step, 1), "done_steps": done, "train_minutes": round(train_minutes, 1),
             "remaining_train_minutes": round(train_minutes * (steps - done) / steps, 1), "eval_cases": cases, "max_new_tokens": new_tokens,
             "eval_minutes": round(eval_minutes, 1), "vram_gb": round(vram, 1), "gpu_memory_gb": profile.memory_gb,
             "fits": vram <= profile.memory_gb and config.max_length <= 2048}  # ước tính VRAM của vram.py giả định khoảng 2048 token

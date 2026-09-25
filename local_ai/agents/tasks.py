@@ -14,6 +14,7 @@ import json
 import re
 import shutil
 import sys
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -96,9 +97,13 @@ def run_task(task: AgentTask, model: Any, root: Path, max_iterations: int) -> di
 
 def run_tasks(tasks: list[AgentTask], model_factory: Callable[[AgentTask], Any], root: str | Path, max_iterations: int = 4) -> dict[str, Any]:
     """Chạy lần lượt từng nhiệm vụ; `model_factory(task)` trả adapter cho nhiệm vụ đó (model thật dùng chung một adapter)."""
-    results = [run_task(task, model_factory(task), Path(root), max_iterations) for task in tasks]
+    start, results = time.monotonic(), []
+    for task in tasks:
+        began = time.monotonic()
+        results.append({**run_task(task, model_factory(task), Path(root), max_iterations), "duration_s": round(time.monotonic() - began, 2)})
     passed = sum(item["success"] for item in results)
-    return {"status": "completed", "tasks": results, "passed": passed, "total": len(results), "success_rate": round(passed / len(results), 4) if results else 0.0}
+    return {"status": "completed", "tasks": results, "passed": passed, "total": len(results), "success_rate": round(passed / len(results), 4) if results else 0.0,
+            "duration_s": round(time.monotonic() - start, 2)}
 
 
 def format_report(report: dict[str, Any], model: str, width: int = 400) -> str:
@@ -112,7 +117,7 @@ def format_report(report: dict[str, Any], model: str, width: int = 400) -> str:
         lines.append(f"Trả lời: {item['answer']}")
         lines.append(f"Công cụ đã gọi: {', '.join(item['tools_used']) or 'không có'}" + (f" | Lý do: {item['reason']}" if item["reason"] else ""))
         lines.append("")
-    lines.append(f"Tỉ lệ thành công: {report['passed']}/{report['total']} ({report['success_rate']:.0%})")
+    lines.append(f"Tỉ lệ thành công: {report['passed']}/{report['total']} ({report['success_rate']:.0%}); thời gian: {report['duration_s'] / 60:.1f} phút")
     return "\n".join(lines)
 
 

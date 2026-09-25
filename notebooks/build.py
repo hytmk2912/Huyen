@@ -69,15 +69,18 @@ print("GPU:", torch.cuda.get_device_name(0), "| bộ nhớ:", round(torch.cuda.g
 """),
         code("buoc-3-cai-dat", f"""
 # Bước 3: tải code của repo và cài thư viện (đã ghim phiên bản; không cài lại torch).
-# Chạy lại notebook thì chỉ cập nhật code mới nhất, không tải lại từ đầu.
+# Chạy lại notebook thì chỉ cập nhật code mới nhất, không tải lại từ đầu. Từ đây, lệnh nào lỗi thì Run all dừng ở ô đó.
 import os
 
-if not os.path.isdir("/content/Huyen"):
+if not os.path.isdir("/content/Huyen/local_ai"):
     !git clone --depth 1 {REPO_URL} /content/Huyen
-else:
-    !git -C /content/Huyen pull --ff-only
 %cd /content/Huyen
-!pip install -q {PINNED}
+if not os.path.isdir("local_ai"):
+    raise RuntimeError("Tải code thất bại: chưa có thư mục /content/Huyen/local_ai. Kiểm tra mạng rồi chạy lại ô này.")
+from local_ai.colab import run  # chạy lệnh: lệnh lỗi thì ô báo đỏ và Run all dừng ở đúng chỗ lỗi
+
+run("git pull --ff-only", "Bước 3 (cập nhật code)")
+run("pip install -q {PINNED}", "Bước 3 (cài thư viện)")
 """),
         code("buoc-4-token", """
 # Bước 4: lấy HF_TOKEN từ Colab Secrets (biểu tượng chìa khóa 🔑). Token không bị in ra và không lưu vào notebook.
@@ -99,48 +102,56 @@ print("Tài khoản Hugging Face:", HF_USER, "| repo:", HUB_REPO)
 # Bước 5: lấy 2000 dòng dữ liệu từ 3 preset (code 40%, lập luận 30%, tiếng Việt 30%).
 # Đọc kiểu streaming nên không tải cả dataset. Kết quả nằm ở data/processed/hf_sft/sft.jsonl.
 # Bộ lọc chất lượng (ngôn ngữ, độ dài, lặp, gần trùng) bỏ các dòng kém, nên có thể còn ít hơn 2000 dòng; số dòng bị bỏ ghi trong manifest.json.
-!python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft
+run("python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft", "Bước 5 (lấy dữ liệu)")
 """),
         code("buoc-6-uoc-tinh", """
 # Bước 6: ước tính thời gian train và chấm trên T4 (ước lượng thô, chưa đo trên T4 thật).
 # Nếu Colab từng ngắt giữa chừng, ô này cho biết đã train được bao nhiêu bước; Bước 8 sẽ tự train tiếp từ đó.
-!python -m local_ai.training.estimate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --hub-model-id {HUB_REPO}
+run(f"python -m local_ai.training.estimate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --hub-model-id {HUB_REPO}", "Bước 6 (ước tính)")
 """),
         code("buoc-7-cham-truoc", """
 # Bước 7: chấm model gốc (chưa train) trên bộ 30 câu eval, để lát nữa so sánh.
-# --train-data kiểm tra dữ liệu train không chứa câu hỏi của bộ eval.
-!python -m local_ai.evaluation --model {MODEL} --max-new-tokens {MAX_NEW_TOKENS} --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/truoc
+# --train-data kiểm tra dữ liệu train không chứa câu hỏi của bộ eval. Chấm xong, báo cáo được lưu vào repo riêng tư:
+# Colab ngắt rồi chạy lại thì dùng lại báo cáo đó (cùng model, cùng cài đặt), không phải chấm lại.
+run(f"python -m local_ai.evaluation --model {MODEL} --max-new-tokens {MAX_NEW_TOKENS} --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/truoc --hub-repo {HUB_REPO} --hub-path eval/truoc", "Bước 7 (chấm trước)")
 """),
         code("buoc-8-train", """
 # Bước 8: train QLoRA (nén 4bit, fp16 vì T4 không có bf16). Checkpoint được đẩy lên repo riêng tư HUB_REPO sau mỗi vài chục bước.
 # Colab ngắt giữa chừng? Mở lại notebook, giữ nguyên model đã chọn và Run all: lệnh tự tải last-checkpoint từ Hugging Face về rồi train tiếp.
 # Báo hết bộ nhớ (CUDA out of memory)? Chọn smoke, hoặc giảm max_length / per_device_batch_size trong configs/training/colab_<model>.json.
-!python -m local_ai.training.finetune --config configs/training/colab_{MODEL}.json --push-to-hub --hub-model-id {HUB_REPO}
+run(f"python -m local_ai.training.finetune --config configs/training/colab_{MODEL}.json --push-to-hub --hub-model-id {HUB_REPO}", "Bước 8 (train)")
 """),
         code("buoc-9-cham-sau", """
 # Bước 9: chấm lại model sau khi train (model gốc + adapter vừa train: mục smoke-colab hoặc light-colab trong configs/models/platform.json).
-!python -m local_ai.evaluation --model {MODEL}-colab --max-new-tokens {MAX_NEW_TOKENS} --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/sau
+run(f"python -m local_ai.evaluation --model {MODEL}-colab --max-new-tokens {MAX_NEW_TOKENS} --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/sau", "Bước 9 (chấm sau)")
 """),
         code("buoc-10-so-sanh", """
 # Bước 10: in bảng so sánh điểm trước và sau khi train (theo nhóm câu và theo ngôn ngữ).
-!python -m local_ai.evaluation.compare .runs/eval/{MODEL}/truoc/report.json .runs/eval/{MODEL}/sau/report.json
+run(f"python -m local_ai.evaluation.compare .runs/eval/{MODEL}/truoc/report.json .runs/eval/{MODEL}/sau/report.json", "Bước 10 (so sánh)")
 """),
         code("buoc-11-day-adapter", """
 # Bước 11: đẩy adapter lên repo riêng tư trên Hugging Face để dùng lại sau.
-!python -m local_ai.training.hub push-adapter --repo {HUB_REPO} --adapter-dir .runs/colab_{MODEL}/adapter
+run(f"python -m local_ai.training.hub push-adapter --repo {HUB_REPO} --adapter-dir .runs/colab_{MODEL}/adapter", "Bước 11 (đẩy adapter)")
 print("Xong! Adapter nằm ở https://huggingface.co/" + HUB_REPO + " (chỉ tài khoản của bạn xem được).")
+"""),
+        code("buoc-12-so-do", """
+# Bước 12: số đo thật (thời gian train, VRAM, tốc độ chấm) so với ước tính ở Bước 6. Hãy chụp màn hình bảng này gửi lại để sửa ước tính.
+# Số đo cũng được lưu vào repo riêng tư HUB_REPO (thư mục so_do/), nên mất Colab cũng không mất số đo.
+run(f"python -m local_ai.training.calibrate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --eval-before .runs/eval/{MODEL}/truoc/report.json --eval-after .runs/eval/{MODEL}/sau/report.json --push-to-hub --hub-model-id {HUB_REPO}", "Bước 12 (số đo)")
 """),
         markdown("ket-qua", """
 ## Kết quả nằm ở đâu
 - **Adapter và checkpoint:** repo riêng tư `https://huggingface.co/<tên-bạn>/huyen-<model>-qlora` (ví dụ `huyen-smoke-qlora`). Thư mục `last-checkpoint` dùng để train tiếp.
 - **Điểm eval:** bảng ở Bước 10. File chi tiết nằm ở `.runs/eval/<model>/truoc/` và `.runs/eval/<model>/sau/` (mất khi Colab tắt, nên hãy chụp màn hình bảng so sánh).
+- **Số đo thật:** bảng ở Bước 12 (thời gian, VRAM, tốc độ chấm so với ước tính), lưu thêm ở `so_do/<model>.json` trong repo riêng tư. Hãy chụp màn hình bảng này gửi lại.
 
 ## Lỗi hay gặp
 - **"Chưa có GPU" hoặc không kết nối được GPU:** chọn T4 ở Runtime → Change runtime type. Hết lượt GPU miễn phí thì đợi vài giờ rồi thử lại.
+- **Ô báo đỏ "Bước N lỗi (mã thoát ...)":** lệnh của bước đó lỗi nên Run all dừng lại, các ô sau chưa chạy. Đọc thông báo ngay phía trên dòng đỏ, sửa xong thì chạy lại từ ô đó.
 - **"Chưa đọc được HF_TOKEN":** thêm secret `HF_TOKEN` và bật Notebook access.
 - **401 / 403 khi đẩy lên Hugging Face:** token chưa có quyền Write.
 - **CUDA out of memory:** chọn smoke, hoặc giảm `max_length` / `per_device_batch_size` trong `configs/training/colab_<model>.json`.
-- **Colab ngắt khi đang train:** mở lại notebook, giữ nguyên model đã chọn, Run all. Bước 6 cho biết đã train được bao nhiêu bước.
+- **Colab ngắt khi đang train:** mở lại notebook, giữ nguyên model đã chọn, Run all. Bước 6 cho biết đã train được bao nhiêu bước; Bước 7 dùng lại báo cáo chấm trước đã lưu, không chấm lại.
 """),
     ], "train_colab.ipynb")
 
@@ -173,19 +184,24 @@ else:
 """),
         code("buoc-2-tai-code", f"""
 # Bước 2: tải code của repo. Phần agent chỉ dùng thư viện có sẵn của Python, không cần cài thêm gói pip nào.
+# Từ đây, lệnh nào lỗi thì ô báo đỏ và Run all dừng ở ô đó.
 import os
 
-if not os.path.isdir("/content/Huyen"):
+if not os.path.isdir("/content/Huyen/local_ai"):
     !git clone --depth 1 {REPO_URL} /content/Huyen
-else:
-    !git -C /content/Huyen pull --ff-only
 %cd /content/Huyen
+if not os.path.isdir("local_ai"):
+    raise RuntimeError("Tải code thất bại: chưa có thư mục /content/Huyen/local_ai. Kiểm tra mạng rồi chạy lại ô này.")
+from local_ai.colab import run  # chạy lệnh: lệnh lỗi thì ô báo đỏ và Run all dừng ở đúng chỗ lỗi
+
+run("git pull --ff-only", "Bước 2 (cập nhật code)")
 """),
         code("buoc-3-cai-ollama", f"""
 # Bước 3: cài Ollama bản đã ghim ({OLLAMA_VERSION}). zstd dùng để giải nén bản cài, pciutils giúp Ollama nhận ra GPU.
-!apt-get -qq install -y zstd pciutils > /dev/null
-!curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION={OLLAMA_VERSION} sh
-!ollama --version
+run("apt-get -qq install -y zstd pciutils", "Bước 3 (cài zstd)", quiet=True)
+run("curl -fsSL -o /tmp/ollama_install.sh https://ollama.com/install.sh", "Bước 3 (tải bản cài Ollama)")
+run(["sh", "/tmp/ollama_install.sh"], "Bước 3 (cài Ollama)", env={{"OLLAMA_VERSION": "{OLLAMA_VERSION}"}})
+run("ollama --version", "Bước 3 (kiểm tra Ollama)")
 """),
         code("buoc-4-chay-ollama", """
 # Bước 4: chạy máy chủ Ollama ở nền (log ghi vào /content/ollama.log) và đợi tới khi nó trả lời.
@@ -215,16 +231,16 @@ else:
 """),
         code("buoc-5-tai-model", f"""
 # Bước 5: tải model {OLLAMA_MODEL} (khoảng 2,5 GB). Chạy lại thì Ollama không tải lại.
-!ollama pull {OLLAMA_MODEL}
+run("ollama pull {OLLAMA_MODEL}", "Bước 5 (tải model)")
 """),
         code("buoc-6-kiem-tra", """
 # Bước 6: kiểm tra cấu hình, chưa gọi model: 5 nhiệm vụ, công cụ mỗi nhiệm vụ cần, địa chỉ máy chủ Ollama.
-!python -m local_ai.agents.tasks --model ollama-colab --dry-run
+run("python -m local_ai.agents.tasks --model ollama-colab --dry-run", "Bước 6 (kiểm tra cấu hình)")
 """),
         code("buoc-7-chay-agent", """
 # Bước 7: cho agent làm 5 nhiệm vụ mẫu. Mỗi nhiệm vụ in trace (kế hoạch, công cụ đã gọi, kết quả); dòng cuối là tỉ lệ thành công.
 # TerminalTool chỉ được bật trong thư mục làm việc riêng của từng nhiệm vụ (.runs/agent_tasks/<nhiệm vụ>/workspace).
-!python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/report.json
+run("python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/report.json", "Bước 7 (chạy agent)")
 """),
         markdown("ket-qua", """
 ## Kết quả nằm ở đâu
@@ -233,6 +249,7 @@ else:
 - Model nhỏ đôi khi trả JSON sai dạng hoặc quên gọi công cụ. Khi đó nhiệm vụ không đạt; đây là điều notebook muốn đo.
 
 ## Lỗi hay gặp
+- **Ô báo đỏ "Bước N lỗi (mã thoát ...)":** Run all dừng ở ô đó; đọc thông báo ngay phía trên dòng đỏ, sửa xong thì chạy lại từ ô đó.
 - **"Không kết nối được server model":** Ollama chưa chạy; chạy lại Bước 4 (xem `/content/ollama.log`).
 - **"không trả lời trong 300 giây":** đang chạy trên CPU hoặc máy quá tải; chọn T4 GPU rồi Run all lại.
 - **Bước 3 báo cần zstd:** chạy lại Bước 3 (lệnh apt-get cài zstd nằm ngay đầu ô).
