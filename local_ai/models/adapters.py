@@ -101,7 +101,7 @@ def load_pretrained(config: ModelConfig) -> tuple[Any, Any]:
     dtype = resolve_torch_dtype(torch, config.dtype)
     processor_class = transformers.AutoProcessor if config.kind == "multimodal" else transformers.AutoTokenizer
     processor = processor_class.from_pretrained(config.tokenizer_source or config.source, revision=config.tokenizer_revision or config.revision, local_files_only=config.offline)
-    kwargs = {"revision": config.revision, "local_files_only": config.offline, "torch_dtype": dtype, "device_map": config.device_map}
+    kwargs = {"revision": config.revision, "local_files_only": config.offline, "dtype": dtype, "device_map": config.device_map}
     if config.quantization: kwargs["quantization_config"] = quantization_config(transformers, config.quantization, dtype)
     model = model_loader_class(transformers, config.kind).from_pretrained(config.source, **kwargs)
     if config.adapter_path:

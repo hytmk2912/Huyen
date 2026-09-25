@@ -12,6 +12,7 @@ import argparse
 import importlib.util
 import json
 import re
+import sys
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -165,6 +166,29 @@ def training_measurements(torch: Any, config: FinetuneConfig, model: ModelConfig
             "measured_at": datetime.now(timezone.utc).isoformat()}
 
 
+def trainable_to_float32(torch: Any, model: Any, cast: bool) -> str | None:
+    """Đưa mọi tham số được train (requires_grad) về float32 nếu `cast`, rồi trả về một dòng log ghi dtype của chúng.
+
+    Cần khi train fp16 (GPU T4 không có bf16): GradScaler chỉ nhận gradient float32. TRL 1.x tự đổi tham số LoRA của model
+    nạp 4bit/8bit sang bfloat16 ngay trong SFTTrainer(...), nên train fp16 lỗi ở bước đầu với
+    `"_amp_foreach_non_finite_check_and_unscale_cuda" not implemented for 'BFloat16'`. Vì vậy phải gọi hàm này sau khi
+    tạo SFTTrainer và trước trainer.train() (lúc đó optimizer chưa được tạo).
+    """
+    parameters = getattr(model, "parameters", None)
+    if not callable(parameters): return None
+    sizes: dict[str, int] = {}; changed: dict[str, int] = {}
+    for parameter in parameters():
+        if not parameter.requires_grad: continue
+        if cast and parameter.dtype != torch.float32:
+            changed[str(parameter.dtype)] = changed.get(str(parameter.dtype), 0) + 1
+            parameter.data = parameter.data.to(torch.float32)
+        sizes[str(parameter.dtype)] = sizes.get(str(parameter.dtype), 0) + parameter.numel()
+    if not sizes: return None
+    line = "Tham số được train: " + ", ".join(f"{count:,} tham số {name}".replace(",", ".") for name, count in sorted(sizes.items()))
+    if changed: line += "; đã đổi " + ", ".join(f"{count} tensor {name}" for name, count in sorted(changed.items())) + " sang torch.float32 trước khi train"
+    return line
+
+
 def train(config: FinetuneConfig) -> dict[str, Any]:
     config.validate(); model_config = resolve_base_model(config); quantization = effective_quantization(config, model_config)
     missing = missing_requirements(config)
@@ -181,7 +205,7 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     # sft.jsonl chỉ có chữ, nên kể cả model multimodal cũng dùng tokenizer (không cần phần xử lý ảnh).
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.tokenizer_source or model_config.source, revision=model_config.tokenizer_revision or model_config.revision, local_files_only=model_config.offline)
     if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
-    model_kwargs = {"revision": model_config.revision, "torch_dtype": dtype, "device_map": model_config.device_map, "local_files_only": model_config.offline}
+    model_kwargs = {"revision": model_config.revision, "dtype": dtype, "device_map": model_config.device_map, "local_files_only": model_config.offline}
     if quantization: model_kwargs["quantization_config"] = quantization_config(transformers, quantization, dtype)
     model = model_loader_class(transformers, model_config.kind).from_pretrained(model_config.source, **model_kwargs)
     model.config.use_cache = not config.gradient_checkpointing
@@ -199,6 +223,10 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     resume = resume_target(config)
     if resume is None and config.push_to_hub and config.resume is True:  # Colab bị ngắt thì máy mới không còn checkpoint: lấy từ Hub
         downloaded = download_last_checkpoint(config.hub_model_id, config.output_dir); resume = str(downloaded) if downloaded else None
+    # Train fp16 hoặc QLoRA: tham số được train phải là float32 (xem trainable_to_float32). bf16 không nén thì giữ nguyên,
+    # vì full fine-tune bf16 mà đổi sang float32 sẽ tốn gấp đôi bộ nhớ.
+    summary = trainable_to_float32(torch, getattr(trainer, "model", None), cast=dtype == torch.float16 or bool(quantization))
+    if summary: print(summary, file=sys.stderr, flush=True)
     result = trainer.train(resume_from_checkpoint=resume)
     measurements = training_measurements(torch, config, model_config, trainer, result, checkpoint_step(resume))
     # Ghi trước save_model: khi bật --push-to-hub, file này được đẩy lên repo cùng adapter.

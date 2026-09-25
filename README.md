@@ -146,6 +146,8 @@ Gateway hàng đợi job (`python -m local_ai.runtime.gateway`) cũng **tắt s�
 
 **Trước khi dùng, hãy đọc lại giấy phép trên dataset card** (trang giới thiệu dataset). Giấy phép trong preset được ghi kèm trạng thái "cần kiểm tra lại trên dataset card", vì dữ liệu có thể được dịch hoặc sinh từ model khác, và giấy phép gốc có thể chặt hơn.
 
+Kết quả đọc giấy phép và nguồn gốc của 3 dataset (ngày 25/9) nằm trong [`docs/GIAY_PHEP_DATASET.md`](docs/GIAY_PHEP_DATASET.md). Tóm tắt: `code` phải ghi nguồn; `vietnamese` được dịch từ dữ liệu gốc có giấy phép **cấm dùng thương mại**, nên chỉ dùng cá nhân hoặc nghiên cứu.
+
 ```bash
 python -m local_ai.data list-presets                                          # xem các preset
 python -m local_ai.data hf-sft --config configs/datasets/presets/code.json    # một preset
@@ -396,11 +398,11 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
-1. **M15 – Số đo thật trên Colab** (đang làm: đã có phần ghi số đo, chờ số đo thật). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
-2. **M16 – Notebook bền hơn** (đang làm):
+1. **M15 – Số đo thật trên Colab** (bị chặn: đã có phần ghi số đo, chờ chủ repo chạy notebook để có số đo thật). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
+2. **M16 – Notebook bền hơn** (xong):
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
-3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh; đổi `torch_dtype` sang `dtype` theo transformers 5.x.
+3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.)
 4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
 5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train.
 6. **M20 – Dữ liệu:**

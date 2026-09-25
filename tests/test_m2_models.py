@@ -93,7 +93,7 @@ class ModelLoadingTests(unittest.TestCase):
     def test_multimodal_uses_processor_and_multimodal_class(self):
         adapter, calls = loaded_with(model("primary"))
         self.assertEqual([call[0] for call in calls], ["AutoProcessor", "AutoModelForMultimodalLM"])
-        self.assertEqual(calls[1][2]["torch_dtype"], "torch.bfloat16")
+        self.assertEqual(calls[1][2]["dtype"], "torch.bfloat16")
         self.assertNotIn("quantization_config", calls[1][2])
         self.assertEqual(adapter.model.loaded_by, "AutoModelForMultimodalLM")
 
@@ -139,7 +139,7 @@ class DtypeFallbackTests(unittest.TestCase):
     def test_quantized_compute_dtype_follows_fallback(self):
         with contextlib.redirect_stderr(io.StringIO()):
             _, calls = loaded_with(replace(model("primary"), quantization="4bit"), cuda=True, bf16=False)
-        self.assertEqual(calls[1][2]["torch_dtype"], "torch.float16")
+        self.assertEqual(calls[1][2]["dtype"], "torch.float16")
         self.assertEqual(calls[1][2]["quantization_config"][1]["bnb_4bit_compute_dtype"], "torch.float16")
 
 

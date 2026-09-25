@@ -1,5 +1,5 @@
 {
-  "_comment": "Preset tiếng Việt: hội thoại nhiều lượt dạng ShareGPT (from/value), giữ nguyên mọi lượt. Dữ liệu có thể được dịch hoặc sinh từ model khác, nên giấy phép gốc có thể hạn chế hơn Apache-2.0. Đọc lại dataset card trước khi dùng.",
+  "_comment": "Preset tiếng Việt: hội thoại nhiều lượt dạng ShareGPT (from/value), giữ nguyên mọi lượt. Dữ liệu là bản dịch của ChatAlpaca (sinh bằng ChatGPT từ Stanford Alpaca, giấy phép CC BY-NC 4.0), nên dù card ghi Apache-2.0, chỉ dùng cá nhân hoặc nghiên cứu, không dùng thương mại. Chi tiết: docs/GIAY_PHEP_DATASET.md.",
   "description": "Trò chuyện tiếng Việt nhiều lượt",
   "dataset_version": "preset-vietnamese-v1",
   "seed": 17,

@@ -13,3 +13,5 @@ data/processed/
 *.safetensors
 *.gguf
 *.pt
+*.bin
+.ruff_cache/

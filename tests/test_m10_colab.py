@@ -252,7 +252,7 @@ class FinetuneHubTests(unittest.TestCase):
         self.assertEqual({key: args[key] for key in ("push_to_hub", "hub_model_id", "hub_strategy", "hub_private_repo", "fp16", "bf16")},
                          {"push_to_hub": True, "hub_model_id": HUB_REPO, "hub_strategy": "checkpoint", "hub_private_repo": True, "fp16": True, "bf16": False})
         load = next(value for name, value in calls if name == "AutoModelForCausalLM")
-        self.assertEqual((load["torch_dtype"], load["quantization_config"][1]["load_in_4bit"]), ("fp16", True))
+        self.assertEqual((load["dtype"], load["quantization_config"][1]["load_in_4bit"]), ("fp16", True))
         self.assertIn(("train", None), calls)  # lần chạy đầu: Hub chưa có checkpoint thì train từ đầu
 
     def test_rerun_resumes_from_hub_checkpoint(self):
