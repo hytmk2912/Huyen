@@ -1,0 +1,73 @@
+{
+  "_note": "SỐ ĐO THẬT: chép nguyên file so_do/smoke.json do Bước 12 của notebook train_colab đẩy lên repo riêng tư Hytmk2912/huyen-smoke-qlora (chạy trên Colab T4 ngày 25/9/2026). Báo cáo chấm lúc đó tính cả thời gian nạp model.",
+  "model": "smoke",
+  "gpu": "Tesla T4",
+  "profile": "T4",
+  "train": {
+    "steps": 125,
+    "estimated_minutes": 13.3,
+    "measured_minutes": 14.9,
+    "effective_tflops": 5.358
+  },
+  "vram": {
+    "estimated_gb": 1.3,
+    "measured_gb": 2.5,
+    "implied_training_factor": 9.07
+  },
+  "eval": {
+    "before": {
+      "model": "smoke",
+      "passed": 16,
+      "cases": 30,
+      "measured_minutes": 2.2,
+      "estimated_max_minutes": 3.9,
+      "seconds_per_token": 0.0439,
+      "estimated_seconds_per_token": 0.0302
+    },
+    "after": {
+      "model": "smoke-colab",
+      "passed": 14,
+      "cases": 30,
+      "measured_minutes": 2.6,
+      "estimated_max_minutes": 3.9,
+      "seconds_per_token": 0.0741,
+      "estimated_seconds_per_token": 0.0302
+    }
+  },
+  "agent": null,
+  "proposals": {
+    "train_tflops": {
+      "current": 6.0,
+      "measured": 5.36
+    },
+    "TRAINING_FACTOR": {
+      "current": 1.25,
+      "measured": 9.07,
+      "note": "đo với max_length 1024, batch 4; trọng số chỉ 0.28 GB nên KHÔNG dùng số này để sửa hệ số, hãy dùng số đo của model lớn hơn (ví dụ light)",
+      "reliable": false
+    },
+    "token_overhead_s": {
+      "current": 0.025,
+      "measured": 0.0538
+    }
+  },
+  "measurements": {
+    "model": "smoke",
+    "source": "Qwen/Qwen2.5-0.5B-Instruct",
+    "params_b": 0.49,
+    "gpu": "Tesla T4",
+    "quantization": "4bit",
+    "dtype": "float16",
+    "per_device_batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "max_length": 1024,
+    "gradient_checkpointing": true,
+    "start_step": 0,
+    "end_step": 125,
+    "train_seconds": 896.8903,
+    "num_tokens": 1013077.0,
+    "peak_vram_gb": 2.19,
+    "peak_reserved_gb": 2.5,
+    "measured_at": "2026-09-25T11:30:14.314231+00:00"
+  }
+}

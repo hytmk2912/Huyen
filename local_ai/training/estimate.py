@@ -1,6 +1,7 @@
 """Ước tính thời gian train và chấm eval trên GPU của Colab (mặc định T4), chỉ từ cấu hình và file dữ liệu: không tải model.
 
-Đây là ước lượng thô, **chưa đo trên T4 thật**; chạy thật xong thì sửa các hằng số dưới đây cho đúng:
+Đây là ước lượng thô. Mới có một lần đo thật trên T4 (`smoke`, 25/9/2026): thông lượng train đã sửa theo số đo đó;
+thời gian chấm và VRAM chưa sửa, chờ số đo của `light` (xem `python -m local_ai.training.calibrate`). Cách tính:
 - số bước = ceil(số dòng ÷ (per_device_batch_size × gradient_accumulation_steps)) × epochs, hoặc max_steps nếu lớn hơn 0;
 - số token mỗi dòng ≈ số ký tự ÷ CHARS_PER_TOKEN + TEMPLATE_TOKENS × số lượt hội thoại, không quá max_length.
   Hai hằng số này khớp với tokenizer Qwen3 trên 2000 dòng thật của 3 preset (đo ngày 25/9/2026: trung bình 491 token/dòng
@@ -40,14 +41,18 @@ UNCUT_TOKENS_PER_ROW = 562  # trung bình khi không cắt, batch 1: dùng cho c
 class GpuProfile:
     name: str
     memory_gb: float
-    train_tflops: float  # thông lượng hiệu dụng khi train LoRA/QLoRA fp16 (giả định, chưa đo)
+    train_tflops: float  # thông lượng hiệu dụng khi train LoRA/QLoRA fp16
     memory_gbps: float  # băng thông bộ nhớ hiệu dụng khi sinh chữ
     token_overhead_s: float  # thời gian cố định cho mỗi token khi sinh bằng transformers (gọi kernel, Python)
 
 
-# T4: đỉnh lý thuyết 65 TFLOPS fp16, băng thông 320 GB/s, khoảng 15 GB dùng được. Train QLoRA bằng transformers
-# thường chỉ đạt khoảng 10% đỉnh, nên lấy 6 TFLOPS; sinh chữ lấy 60% băng thông.
-GPUS = {"T4": GpuProfile("T4", memory_gb=15.0, train_tflops=6.0, memory_gbps=190.0, token_overhead_s=0.025)}
+# T4: đỉnh lý thuyết 65 TFLOPS fp16, băng thông 320 GB/s, khoảng 15 GB dùng được.
+# - train_tflops: đo thật 5,36 TFLOPS khi train `smoke` (QLoRA 4bit, fp16, 125 bước trong 14,9 phút, 25/9/2026; số đo lưu ở
+#   tests/fixtures/measurements/that_smoke_t4_2026-09-25.json). Trước đó giả định 6 (khoảng 10% đỉnh). Model lớn hơn có thể
+#   dùng GPU hiệu quả hơn, nên cần so lại khi có số đo của `light`.
+# - memory_gbps, token_overhead_s: giả định (sinh chữ lấy 60% băng thông), chưa đo được: báo cáo chấm của lần chạy `smoke`
+#   tính cả thời gian nạp model.
+GPUS = {"T4": GpuProfile("T4", memory_gb=15.0, train_tflops=5.4, memory_gbps=190.0, token_overhead_s=0.025)}
 
 
 def row_tokens(row: dict[str, Any], max_length: int) -> int:
@@ -117,7 +122,7 @@ def _number(value: float) -> str:
 
 
 def format_estimate(plan: dict[str, Any], resumed_from: str | None = None) -> str:
-    lines = [f"Ước tính cho model {plan['model']} ({plan['source']}, {_number(plan['params_b'])} tỷ tham số) trên GPU {plan['gpu']}. Đây là ước lượng thô, chưa đo trên {plan['gpu']} thật.",
+    lines = [f"Ước tính cho model {plan['model']} ({plan['source']}, {_number(plan['params_b'])} tỷ tham số) trên GPU {plan['gpu']}. Đây là ước lượng thô; thông lượng train đo từ một lần chạy thật trên T4 (model smoke), thời gian chấm chưa đo.",
              f"- Dữ liệu: {plan['rows']} dòng, trung bình khoảng {round(plan['tokens_per_row'])} token/dòng kể cả phần đệm (cắt ở {plan['max_length']} token; {'đếm từ sft.jsonl' if plan['data'] == 'sft.jsonl' else 'chưa có sft.jsonl nên dùng số đo mẫu'}).",
              f"- VRAM khi train: khoảng {_number(plan['vram_gb'])} GB / {_number(plan['gpu_memory_gb'])} GB của {plan['gpu']}." + ("" if plan["fits"] else " CẢNH BÁO: có thể thiếu bộ nhớ, hãy giảm max_length hoặc chọn model nhỏ hơn."),
              f"- Train: {plan['steps']} bước, khoảng {round(plan['train_minutes'])} phút."]

@@ -308,8 +308,8 @@ Notebook `notebooks/train_colab.ipynb` train trên GPU T4 miễn phí của Cola
 
 | Model | Cấu hình train | Chấm sau khi train | Thời gian ước tính (train + 2 lần chấm) |
 | --- | --- | --- | --- |
-| `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 21 phút |
-| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 3,8 GB | `light-colab` | khoảng 109 phút |
+| `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 23 phút |
+| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 3,8 GB | `light-colab` | khoảng 118 phút |
 
 Các ô sau chạy lần lượt:
 1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
@@ -339,15 +339,32 @@ Notebook đẩy adapter lên repo riêng tư bằng lệnh con `push-adapter` c�
 - lệnh train ghi `measurements.json` trong thư mục đầu ra: GPU, VRAM đỉnh, thời gian, bước bắt đầu/kết thúc, số token của lần chạy;
 - báo cáo eval ghi thời gian chấm và độ dài câu trả lời.
 
-Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất cho `estimate.py` và `vram.py`, nhưng không tự sửa code. Hệ số VRAM đo từ model nhỏ (`smoke`) không dùng được cho model lớn, vì ở model nhỏ phần bộ nhớ cho logits lớn hơn trọng số nhiều lần; lệnh sẽ ghi chú điều này. **Chưa có số đo thật nào:** hằng số chỉ được sửa sau khi chủ repo chạy notebook và gửi lại bảng này.
+Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất cho `estimate.py` và `vram.py`, nhưng không tự sửa code. Hệ số VRAM đo từ model nhỏ (`smoke`) không dùng được cho model lớn, vì ở model nhỏ phần bộ nhớ cho logits lớn hơn trọng số nhiều lần; lệnh sẽ ghi chú điều này.
+
+**Số đo thật trên Colab** (GPU Tesla T4, file `so_do/<model>.json` trong repo riêng tư; bản chép của `smoke` ở `tests/fixtures/measurements/that_smoke_t4_2026-09-25.json`):
+
+| Mục | `smoke` (25/9/2026) | `light` | Agent (`qwen3:4b`) |
+| --- | --- | --- | --- |
+| Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | chưa chạy | — |
+| VRAM khi train | 2,5 GB (ước tính 1,3 GB) | chưa chạy | — |
+| Loss | 1,48 (bước 5) → 1,27 (bước 125) | chưa chạy | — |
+| Chấm 30 câu (tối đa 256 token/câu) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | chưa chạy | — |
+| Điểm eval trước → sau | 16/30 → 14/30 | chưa chạy | — |
+| Nhiệm vụ agent | — | — | chưa chạy |
+
+Đã sửa theo số đo này: thông lượng train của T4 trong `estimate.py` (6 → 5,4 TFLOPS). Chưa sửa:
+- hệ số VRAM (`TRAINING_FACTOR` trong `vram.py`): số đo của `smoke` không dùng được cho model lớn, chờ số đo của `light`;
+- tốc độ chấm (`token_overhead_s`): báo cáo chấm lần này tính cả thời gian tải và nạp model. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`), nên lần chạy `light` sẽ đo được đúng.
+
+Điểm sau khi train của `smoke` giảm 2 câu (16 → 14 trên 30). Với 30 câu, chênh 2 câu có thể chỉ là ngẫu nhiên. Báo cáo chấm sau khi train không được đẩy lên Hugging Face, nên chưa xem được câu nào sai thêm.
 
 **Ước tính thời gian** (`python -m local_ai.training.estimate`) không tải model, chỉ dựa vào cấu hình và `sft.jsonl`:
 - số token mỗi dòng, kể cả phần đệm khi batch lớn hơn 1;
-- thông lượng giả định của T4.
+- thông lượng train của T4 (5,4 TFLOPS, đo khi train `smoke`).
 
-Đây là ước lượng thô, chưa đo trên T4 thật; cách tính ghi ở đầu `local_ai/training/estimate.py`.
+Đây là ước lượng thô: thông lượng train đã sửa theo lần đo thật của `smoke` (bảng trên), các phần khác chưa đo; cách tính ghi ở đầu `local_ai/training/estimate.py`.
 
-Nút Colab mở notebook ở nhánh `main`, nên chỉ dùng được sau khi gộp PR tuần 2. **Notebook chưa chạy thử trên Colab thật.** Test `tests/test_m10_colab.py` và `tests/test_m11_colab_light.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run` với cả 2 model, ví dụ:
+Nút Colab mở notebook ở nhánh `main`. Notebook đã chạy xong trên Colab thật với `smoke` (25/9); **`light` chưa chạy thử trên Colab thật.** Test `tests/test_m10_colab.py` và `tests/test_m11_colab_light.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run` với cả 2 model, ví dụ:
 
 ```bash
 python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft --dry-run
@@ -398,7 +415,7 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
-1. **M15 – Số đo thật trên Colab** (bị chặn: đã có phần ghi số đo, chờ chủ repo chạy notebook để có số đo thật). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
+1. **M15 – Số đo thật trên Colab** (đang làm: đã có số đo thật của `smoke`, chờ `light` và agent). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
 2. **M16 – Notebook bền hơn** (xong):
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.

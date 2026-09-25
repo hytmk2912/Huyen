@@ -104,7 +104,16 @@ def _bucket(buckets: dict[str, dict[str, Any]], key: str, passed: bool) -> None:
 def run_eval(model: ModelAdapter, cases: list[EvalCase], sandbox: PythonSandbox | None = None) -> dict[str, Any]:
     """Hỏi model từng câu và chấm. Model lỗi (ví dụ server chưa chạy) thì dừng và báo status "error", không chấm tiếp."""
     results, groups, languages = [], {}, {}
-    start = time.monotonic()  # thời gian chấm và độ dài câu trả lời dùng để so với ước tính (M15)
+    start = time.monotonic()
+    # Model Hugging Face chỉ được nạp khi hỏi câu đầu tiên. Nạp trước ở đây để thời gian chấm (so với ước tính, M15)
+    # không tính thời gian tải và nạp model; thời gian nạp ghi riêng ở load_s.
+    if getattr(model, "model", False) is None and callable(getattr(model, "load", None)):
+        try:
+            model.load()
+        except Exception as error:
+            return {"status": "error", "model": model.name, "error": f"Model lỗi khi nạp: {type(error).__name__}: {error}", "answered": 0, "cases": len(cases)}
+    load_s = round(time.monotonic() - start, 2)
+    start = time.monotonic()
     for case in cases:
         try:
             output = model.generate([Message("user", case.prompt)])
@@ -117,7 +126,7 @@ def run_eval(model: ModelAdapter, cases: list[EvalCase], sandbox: PythonSandbox 
     passed_total = sum(item["passed"] for item in results)
     return {"status": "completed", "model": model.name, "generated_at": datetime.now(timezone.utc).isoformat(), "cases": len(results), "passed": passed_total,
             "accuracy": round(passed_total / len(results), 4) if results else 0.0, "groups": dict(sorted(groups.items())), "languages": dict(sorted(languages.items())),
-            "duration_s": round(time.monotonic() - start, 2), "output_chars": sum(len(item["output"]) for item in results),
+            "duration_s": round(time.monotonic() - start, 2), "load_s": load_s, "output_chars": sum(len(item["output"]) for item in results),
             "failures": [{key: item[key] for key in ("id", "group", "language", "scoring", "reason")} | {"output": item["output"][:300]} for item in results if not item["passed"]],
             "results": results}
 

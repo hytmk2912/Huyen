@@ -10,20 +10,19 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Checklist tuần 3
 Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào được chọn thì mới có tiêu chí trong `TASKS.md`.
-- [ ] M15 Số đo thật trên Colab (đã chọn 25/9; **bị chặn**: chờ số đo thật)
+- [ ] M15 Số đo thật trên Colab (đã chọn 25/9; **đang làm**: có số đo `smoke`, chờ `light` và agent)
 - [x] M16 Notebook bền hơn (xong 25/9)
 - M17 Model chính: LoRA chỉ phần ngôn ngữ (phần `dtype` đã làm khi rà soát 25/9) · M18 Agent dùng model đã train (GGUF) · M19 Mở rộng eval · M20 Dữ liệu: gần trùng train/eval, thêm preset tiếng Việt · M21 Tổng kết tuần 3 (chưa chọn)
 
 ## Mốc đang làm
-- Không có mốc dở. M15 vẫn chờ số đo thật; mốc kế tiếp: mốc chủ repo chọn (M17–M21).
-- 25/9 chiều: chủ repo chạy `train_colab` (`smoke`, T4) lần đầu. Bước 7 xong (16/30 câu đạt, báo cáo đã lên Hugging Face); Bước 8 lỗi ở bước 0/125 vì TRL đổi tham số LoRA sang bf16 trong khi T4 train fp16. Đã sửa (gộp vào PR #10), chờ chủ repo chạy lại.
-- M15 **bị chặn** 3 lượt liền (25/9): Hugging Face của chủ repo chỉ có `personal-ai-hytmk` (18/9), chưa có repo `huyen-*-qlora`, nên chưa có số đo thật (tiêu chí 3). PR #9 đã gộp (`4eaf1e9`); cần chủ repo chạy notebook train; không đoán số. Phần ghi số đo và lệnh `calibrate` đã xong.
-  - Khi chủ repo chạy xong notebook: đọc `so_do/<model>.json` trong repo riêng tư `Hytmk2912/huyen-<model>-qlora` (connector Hugging Face đọc được), hoặc xem ảnh chụp bảng Bước 12;
-  - sau đó sửa `GPUS["T4"]` trong `estimate.py`, sửa `TRAINING_FACTOR` (chỉ theo số đo của `light`), rồi thêm bảng số đo thật vào README.
+- **M15 — đang làm** (tiêu chí 3 đạt 1/3 nguồn số đo). Đã có số đo thật của `smoke` (`Hytmk2912/huyen-smoke-qlora`, 25/9): đã sửa `train_tflops` của T4 (6 → 5,4), thêm bảng số đo vào README, và sửa cách đo thời gian chấm (không tính thời gian nạp model, ghi `load_s` riêng).
+  - Còn chờ chủ repo: chạy `train_colab` với `light`, rồi `agent_colab`.
+  - Khi có số đo `light`: đọc `so_do/light.json` trong `Hytmk2912/huyen-light-qlora`; sửa `TRAINING_FACTOR` trong `vram.py` (hệ số `light` đáng tin), `token_overhead_s` (báo cáo mới có `load_s`), so lại `train_tflops`; điền cột `light` trong bảng README.
+  - Khi có báo cáo agent: điền cột Agent trong bảng README. Xong cả 3 nguồn thì M15 mới xong.
 
 ## Việc chủ repo tự làm (rà soát M1–M16 ngày 25/9)
 1. Tạo token Hugging Face quyền **Write**, thêm vào Colab Secrets tên `HF_TOKEN` và bật Notebook access.
-2. Chạy `notebooks/train_colab.ipynb` với `smoke` (khoảng 30 phút; hướng dẫn `docs/TRAIN_COLAB.md`), rồi với `light` (khoảng 2 giờ; Colab ngắt thì Run all lại). Xong thì gọi M15.
+2. ~~Chạy `train_colab` với `smoke`~~ (xong 25/9). Chạy lại với `light` (khoảng 2 giờ; Colab ngắt thì Run all lại). Xong thì gọi M15.
 3. Chạy `notebooks/agent_colab.ipynb`, gửi tỉ lệ thành công và trace của nhiệm vụ không đạt.
 4. Đổi mật khẩu rsync (user `huyen`) đã lộ trong lịch sử commit `e6bc723` (file `cpu_hub.sh`, `gpu_8h.sh`, đã xóa nhưng lịch sử vẫn công khai). Không chép mật khẩu vào đâu cả.
 5. Quyết định PR #4: đề nghị đóng (xung đột khoảng 65 file, xóa agent; phần sửa dữ liệu đã có trong `main`).
@@ -34,7 +33,8 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 10. Model chính 27B cần GPU 24 GB trở lên (Colab free không đủ). Chọn mốc tiếp theo trong M17–M21.
 
 ## Việc dở
-- Nhánh làm việc tuần 3: `claude/nhiem-vu-tuan-jixv6i` (nhánh phiên được giao; dựng lại từ `main` tại `4eaf1e9` sau khi gộp PR #9).
+- Nhánh làm việc tuần 3: `claude/nhiem-vu-tuan-jixv6i` (nhánh phiên được giao; dựng lại từ `main` tại `40e23a5` sau khi gộp PR #10).
+- Điểm `smoke` sau khi train giảm 16 → 14/30, nhưng báo cáo chấm sau (Bước 9) không được đẩy lên Hub nên chưa xem được câu sai thêm. Muốn đẩy thì phải làm cách khác Bước 7 (Bước 9 luôn chấm lại): việc ngoài M15, hỏi chủ repo trước.
 
 ## Lỗi còn tồn
 | Lỗi | Nơi |
@@ -49,3 +49,4 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 | 25/9 | M15 (kiểm tra lại) | Chủ repo gọi M15. Hugging Face vẫn chưa có repo `huyen-*-qlora` (chỉ có `personal-ai-hytmk` từ 18/9), PR #9 chưa gộp: tiêu chí 3 vẫn bị chặn, không sửa hằng số. Không đổi code. |
 | 25/9 | Rà soát M1–M16 | Chủ repo nhờ rà soát việc cần chủ repo làm, việc làm được thì làm luôn. PR #9 đã gộp (`4eaf1e9`); dựng lại nhánh từ `main`. Đã làm: nạp model dùng `dtype` thay `torch_dtype` (hết cảnh báo transformers 5.x); secret-scan bắt kiểu mật khẩu shell từng lộ (`BIẾN_PASS="${BIẾN_PASS:-...}"`); `.gitignore` thêm `*.bin`, `.ruff_cache/` (lấy từ PR #4); `docs/GIAY_PHEP_DATASET.md` (`vietnamese` gốc CC BY-NC 4.0: không thương mại); README cập nhật trạng thái M15/M16. Kiểm tra: nhánh `codex/...` đã gộp hết (xóa bị từ chối quyền, chuyển cho chủ repo); PR #4 nên đóng; `hytmk2912/Agent` không truy cập được; Hugging Face chưa có số đo. Test mới `tests/test_ra_soat_m1_m16.py` (6 test). |
 | 25/9 | Sửa lỗi Bước 8 trên T4 | Chủ repo chạy `smoke` trên T4: Bước 8 lỗi `_amp_foreach_non_finite_check_and_unscale_cuda ... 'BFloat16'`. Nguyên nhân: TRL 1.13 đổi tham số LoRA của model nạp 4bit sang bf16 ngay trong `SFTTrainer(...)`; train fp16 thì GradScaler không nhận gradient bf16. transformers 5.17 vẫn đọc `torch_dtype` (chỉ cảnh báo), nên không phải do `torch_dtype`. Sửa: `trainable_to_float32` đổi tham số được train sang float32 sau khi tạo SFTTrainer, trước `trainer.train()` (khi train fp16 hoặc QLoRA), in dtype ra log. Test `tests/test_sua_loi_fp16_t4.py` (4 test, có test TRL thật cho thấy tham số LoRA thành bf16 rồi được đổi về float32 và train được). Gộp vào PR #10. |
+| 25/9 | M15 (dở) | Chủ repo chạy lại `smoke` sau PR #10: train xong 125 bước. Số đo thật (`so_do/smoke.json`): train 14,9 phút (ước tính 13,3), 5,36 TFLOPS, VRAM 2,5 GB (ước tính 1,3), chấm 2,2 và 2,6 phút, điểm 16 → 14/30. Sửa `train_tflops` T4 6 → 5,4, tính lại thời gian trong README và `docs/TRAIN_COLAB.md`, thêm bảng số đo thật. Lỗi gặp: `duration_s` của eval tính cả thời gian tải và nạp model (model nạp lười ở câu đầu), nên `token_overhead_s` đề xuất (0,054) không dùng được; sửa: eval nạp model trước khi bấm giờ, ghi `load_s`, `calibrate` đánh dấu báo cáo cũ. 240 test qua, compileall và secret-scan sạch. Tiếp theo: chờ `light` và agent. |
