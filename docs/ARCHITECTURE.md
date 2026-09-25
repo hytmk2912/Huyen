@@ -115,6 +115,7 @@ Import không mở cổng mạng, không tạo thư mục.
   8. đẩy adapter.
 
   Hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`.
+- `agent_colab.ipynb`: cài Ollama (ghim bản 0.34.4) → tải `qwen3:4b` → chạy máy chủ ở `localhost:11434` → agent làm 5 nhiệm vụ mẫu qua adapter kiểu OpenAI (mục `ollama-colab`).
 
 ### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
 `AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
@@ -124,8 +125,20 @@ Import không mở cổng mạng, không tạo thư mục.
 
 `python -m local_ai.demo [--model <tên>]` là demo agent dùng công cụ máy tính.
 
+Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham số nào (`ToolRegistry.register(name, tool, description)`). Agent gửi danh sách này, lịch sử quan sát và mẫu JSON cần trả về trong prompt, để model thật biết gọi công cụ thế nào.
+
+`agents/tasks.py` (`python -m local_ai.agents.tasks`) chạy 5 nhiệm vụ mẫu trong `data/eval/agent_tasks_v1.jsonl` với `calculator` và `TerminalTool`:
+- `TerminalTool` chỉ bật trong thư mục làm việc riêng của từng nhiệm vụ;
+- nhiệm vụ đạt khi câu trả lời đúng và agent đã gọi mọi công cụ cần dùng;
+- lệnh in trace và tỉ lệ thành công;
+- model là server kiểu OpenAI (`--model`, ví dụ `ollama-colab`) hoặc câu trả lời mẫu (`--scripted`).
+
 ## Kiểm thử
 - `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1, `tests/test_m8_…` trở đi là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m13_agent_colab.py`:
+  - kiểm tra notebook agent hợp lệ;
+  - chạy 5 nhiệm vụ với công cụ thật, qua câu trả lời mẫu và qua server HTTP giả nói chuẩn OpenAI;
+  - kiểm tra prompt có gửi danh sách công cụ.
 - `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
 - `tests/test_m10_colab.py` kiểm tra notebook hợp lệ (nbformat), khớp với `notebooks/build.py`, và chạy mọi lệnh của notebook bằng `--dry-run`; Hugging Face Hub và thư viện train đều là module giả. `tests/test_m11_colab_light.py` chạy lại các lệnh đó với model `light`. Test này cũng kiểm tra cấu hình vừa T4, ước tính thời gian, và việc số phút ghi trong tài liệu khớp với ước tính.
 - `tests/test_consistency.py` giữ repo thống nhất: file mẫu dataset và preset cùng quy tắc (streaming, `limit` ≤ 1000, trạng thái giấy phép), cùng một thư mục `data/processed/hf_sft`, mọi lệnh con có trợ giúp, chữ cho người dùng bằng tiếng Việt.

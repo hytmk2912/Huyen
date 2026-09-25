@@ -18,7 +18,7 @@ Quy tắc riêng tuần 2:
 | M10 | Notebook train trên Colab free (0.5B) | **Xong** | 5/5 (100%) | `tests/test_m10_colab.py` (16 test) |
 | M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | **Xong** | 4/4 (100%) | `tests/test_m11_colab_light.py` (11 test) |
 | M12 | Chất lượng dữ liệu | **Xong** | 3/3 (100%) | `tests/test_m12_quality.py` (18 test) |
-| M13 | Agent chạy model thật trên Colab | Chưa làm | 0/3 | — |
+| M13 | Agent chạy model thật trên Colab | **Xong** | 3/3 (100%) | `tests/test_m13_agent_colab.py` (11 test) |
 | M14 | Tổng kết tuần 2 | Chưa làm | 0/4 | — |
 
 ## M8: Gộp repo Agent, phần 1: đưa code vào
@@ -121,9 +121,29 @@ Chưa kiểm chứng: notebook **chưa chạy trên Colab thật**; thời gian 
   Bằng chứng: `LanguageFilterTests`, `LengthFilterTests`, `RepetitionFilterTests`, `NearDuplicateTests` (kể cả MinHash ước lượng Jaccard lệch dưới 0,2), `ConfigTests`. 189 test chạy qua; compileall và secret-scan sạch.
 
 ## M13: Agent chạy model thật trên Colab
-- [ ] 1. `notebooks/agent_colab.ipynb`: cài Ollama, kéo 1 model nhỏ (ví dụ `qwen3:4b`), agent gọi qua adapter OpenAI (M3).
-- [ ] 2. Làm 5 nhiệm vụ mẫu bằng calculator và `TerminalTool` (lệnh trong allowlist như `ls`, `cat`), in trace và tỉ lệ thành công.
-- [ ] 3. Notebook hợp lệ, test dry-run xanh.
+- [x] 1. `notebooks/agent_colab.ipynb` (sinh từ `notebooks/build.py`):
+  - cài Ollama bản ghim `OLLAMA_VERSION=0.34.4`, bản mới nhất lúc viết, cùng `zstd` mà bản cài `.tar.zst` cần;
+  - chạy `ollama serve` ở nền, đợi tới khi trả lời;
+  - kéo `qwen3:4b` (2,5 GB, đã kiểm tra tag còn trên kho Ollama);
+  - agent gọi model qua adapter OpenAI của M3, dùng mục mới `ollama-colab` (`http://localhost:11434/v1`).
+
+  Phần agent chỉ dùng thư viện chuẩn, không `pip install`. Bằng chứng: `OpenAIAdapterTests.test_five_tasks_through_openai_compatible_server` (5 nhiệm vụ qua server HTTP giả nói chuẩn OpenAI).
+- [x] 2. Lệnh mới `python -m local_ai.agents.tasks` chạy 5 nhiệm vụ trong `data/eval/agent_tasks_v1.jsonl`:
+  - 2 nhiệm vụ calculator, `ls`, `cat`, và `cat` rồi calculator;
+  - mỗi nhiệm vụ chạy trong thư mục làm việc riêng, chép từ `data/eval/agent_workspace/`, và chỉ bật TerminalTool trong đó;
+  - in trace và tỉ lệ thành công;
+  - nhiệm vụ đạt khi câu trả lời đúng **và** agent đã gọi mọi công cụ cần dùng;
+  - `--scripted` chạy bằng câu trả lời mẫu, ra 5/5.
+
+  Sửa thêm để model thật dùng được công cụ:
+  - `ToolRegistry` có mô tả công cụ;
+  - agent gửi danh sách công cụ, lịch sử quan sát và mẫu JSON trong prompt;
+  - agent hiểu `arguments` dạng chuỗi JSON.
+
+  Bằng chứng: `TaskTests` (có ca sai đáp án, thiếu công cụ, JSON hỏng, thử `cat /etc/passwd` và `rm`), `ToolDescriptionTests`.
+- [x] 3. Notebook hợp lệ theo nbformat, khớp `build.py`, không có output, mỗi ô code có chú thích `# Bước N:`, không có token. `test_notebook_commands_run_with_dry_run` chạy 2 lệnh `!python -m local_ai...` của notebook bằng `--dry-run`. 200 test chạy qua; compileall và secret-scan sạch.
+
+Chưa kiểm chứng: **chưa chạy với Ollama và `qwen3:4b` thật** (không tải model trong môi trường phát triển), nên chưa biết tỉ lệ thành công thật; thời gian 5–15 phút là ước đoán.
 
 ## M14: Tổng kết tuần 2
 - [ ] 1. Cập nhật README, `docs/ARCHITECTURE.md`, lộ trình.

@@ -140,8 +140,11 @@ class TerminalTool:
             with self.config.log_path.open("a", encoding="utf-8") as handle: handle.write(line + "\n")
 
 
+TERMINAL_DESCRIPTION = 'Run one allowed shell command (no pipes or redirects) in the working folder, for example ls or cat <file>. Arguments: {"command": "cat notes.txt"}'
+
+
 def register_terminal(registry: Any, tool: TerminalTool | None = None, name: str = "terminal") -> TerminalTool:
     """Đăng ký TerminalTool vào ToolRegistry của agent. Công cụ đang tắt thì mọi lần gọi đều bị từ chối (agent nhận lỗi, không sập)."""
     tool = tool or TerminalTool()
-    registry.register(name, tool)
+    registry.register(name, tool, TERMINAL_DESCRIPTION)
     return tool

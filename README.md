@@ -26,7 +26,7 @@ Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![O
 - `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`); ước tính thời gian train trên Colab (`estimate.py`).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
-- `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
+- `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent; 5 nhiệm vụ mẫu cho agent (`agents/tasks.py`).
 - `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc. `docs/TRAIN_COLAB.md`: train trên Colab bằng iPhone.
@@ -337,6 +337,42 @@ python -m local_ai.evaluation.compare .runs/eval/light/truoc/report.json .runs/e
 ```
 
 Muốn sửa notebook thì sửa nội dung ô trong `notebooks/build.py`, rồi chạy `python notebooks/build.py`; test báo lỗi nếu file `.ipynb` không khớp.
+
+## Agent chạy model thật trên Colab
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb)
+
+Notebook `notebooks/agent_colab.ipynb` chạy theo các bước:
+1. cài Ollama bản đã ghim (0.34.4);
+2. tải model `qwen3:4b` (khoảng 2,5 GB);
+3. cho agent của repo làm 5 nhiệm vụ mẫu, gọi model qua adapter kiểu OpenAI (mục `ollama-colab` trong danh sách model).
+
+Notebook không cần token và không cần cài gói pip nào.
+
+Các nhiệm vụ nằm trong `data/eval/agent_tasks_v1.jsonl`, dùng 2 công cụ:
+- `calculator`;
+- `TerminalTool`: chỉ bật trong thư mục làm việc riêng của từng nhiệm vụ, chép từ `data/eval/agent_workspace/`.
+
+| Nhiệm vụ | Công cụ phải dùng |
+| --- | --- |
+| Tính (17 * 23) + 158 | calculator |
+| Tính tiền 3 áo giá 125.000 đồng, giảm 10% | calculator |
+| Liệt kê file trong thư mục làm việc | terminal (`ls`) |
+| Đọc mã số đơn hàng trong `ghi_chu.txt` | terminal (`cat`) |
+| Tính tổng cột `so_luong` của `du_lieu.csv` | terminal, rồi calculator |
+
+Một nhiệm vụ chỉ tính là đạt khi câu trả lời đúng **và** agent đã thật sự gọi mọi công cụ cần dùng, để không tính trường hợp model đoán mò. Lệnh in trace từng nhiệm vụ (kế hoạch, công cụ đã gọi, kết quả) và tỉ lệ thành công ở cuối:
+
+```bash
+python -m local_ai.agents.tasks --scripted                   # dùng câu trả lời mẫu, không cần model: 5/5
+python -m local_ai.agents.tasks --model ollama-colab --dry-run
+python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/report.json   # cần Ollama đang chạy
+```
+
+Để model thật biết gọi công cụ nào, agent gửi kèm trong prompt danh sách công cụ, cách truyền tham số và các kết quả trước đó.
+
+**Chưa chạy với Ollama thật** (môi trường phát triển không tải model). Test `tests/test_m13_agent_colab.py` gồm:
+- kiểm tra notebook hợp lệ và chạy lệnh của nó bằng `--dry-run`;
+- chạy 5 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Các việc dưới đây chỉ là đề xuất sau tuần 1, chưa làm; chủ repo chọn việc nào thì mới đưa vào kế hoạch:

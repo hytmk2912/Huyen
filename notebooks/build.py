@@ -11,6 +11,9 @@ HERE = Path(__file__).resolve().parent
 REPO_URL = "https://github.com/hytmk2912/Huyen.git"
 # Phiên bản đã chạy thử trong repo (xem README). Không cài lại torch: Colab có sẵn bản hợp với GPU.
 PINNED = "transformers==5.17.0 trl==1.13.0 peft==0.21.0 datasets==5.0.1 accelerate==1.15.0 bitsandbytes==0.50.2"
+# Notebook agent: Ollama bản mới nhất lúc viết (25/9/2026) và model qwen3:4b (khoảng 2,5 GB), trùng mục ollama-colab trong configs/models/platform.json.
+OLLAMA_VERSION = "0.34.4"
+OLLAMA_MODEL = "qwen3:4b"
 
 
 def markdown(cell_id: str, text: str) -> dict:
@@ -142,7 +145,103 @@ print("Xong! Adapter nằm ở https://huggingface.co/" + HUB_REPO + " (chỉ t�
     ], "train_colab.ipynb")
 
 
-NOTEBOOKS = {"train_colab.ipynb": train_colab}
+def agent_colab() -> dict:
+    return notebook([
+        markdown("gioi-thieu", f"""
+# Agent chạy model thật trên Colab (Ollama + {OLLAMA_MODEL})
+
+Notebook này cài Ollama, tải model `{OLLAMA_MODEL}` (khoảng 2,5 GB), rồi cho agent của repo làm 5 nhiệm vụ mẫu bằng 2 công cụ:
+- **calculator**: tính biểu thức số học;
+- **terminal** (TerminalTool): chạy lệnh trong danh sách cho phép như `ls`, `cat`, chỉ trong thư mục làm việc riêng của từng nhiệm vụ.
+
+Agent gọi model qua adapter kiểu OpenAI của repo (`http://localhost:11434/v1`). Mỗi nhiệm vụ in trace (kế hoạch, công cụ đã gọi, kết quả), cuối cùng in tỉ lệ thành công.
+
+**Không cần token Hugging Face.** Nên chọn GPU T4 (menu Runtime → Change runtime type); chạy trên CPU cũng được nhưng rất chậm.
+
+**Cách chạy:** menu Runtime → Run all. Thời gian ước tính: cài đặt và tải model khoảng 5 phút, 5 nhiệm vụ khoảng 5–15 phút (qwen3 suy nghĩ trước khi trả lời). Con số này chưa đo trên Colab thật.
+"""),
+        code("buoc-1-gpu", """
+# Bước 1: kiểm tra GPU. Ollama chạy được trên CPU nhưng chậm hơn nhiều.
+# Nên chọn T4: menu Runtime → Change runtime type → T4 GPU → Save, rồi Run all lại.
+import shutil
+import subprocess
+
+if shutil.which("nvidia-smi"):
+    print(subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"], capture_output=True, text=True).stdout)
+else:
+    print("Chưa có GPU: vẫn chạy được trên CPU nhưng rất chậm. Nên chọn T4 GPU rồi Run all lại.")
+"""),
+        code("buoc-2-tai-code", f"""
+# Bước 2: tải code của repo. Phần agent chỉ dùng thư viện có sẵn của Python, không cần cài thêm gói pip nào.
+import os
+
+if not os.path.isdir("/content/Huyen"):
+    !git clone --depth 1 {REPO_URL} /content/Huyen
+else:
+    !git -C /content/Huyen pull --ff-only
+%cd /content/Huyen
+"""),
+        code("buoc-3-cai-ollama", f"""
+# Bước 3: cài Ollama bản đã ghim ({OLLAMA_VERSION}). zstd dùng để giải nén bản cài, pciutils giúp Ollama nhận ra GPU.
+!apt-get -qq install -y zstd pciutils > /dev/null
+!curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION={OLLAMA_VERSION} sh
+!ollama --version
+"""),
+        code("buoc-4-chay-ollama", """
+# Bước 4: chạy máy chủ Ollama ở nền (log ghi vào /content/ollama.log) và đợi tới khi nó trả lời.
+# Chạy lại notebook khi Ollama đang chạy thì không mở thêm máy chủ mới.
+import subprocess
+import time
+import urllib.request
+
+
+def ollama_ready():
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/version", timeout=2)
+        return True
+    except OSError:
+        return False
+
+
+if not ollama_ready():
+    subprocess.Popen(["ollama", "serve"], stdout=open("/content/ollama.log", "w"), stderr=subprocess.STDOUT)
+for _ in range(60):
+    if ollama_ready():
+        print("Ollama đã chạy.")
+        break
+    time.sleep(1)
+else:
+    raise RuntimeError("Ollama chưa chạy sau 60 giây; hãy xem file /content/ollama.log")
+"""),
+        code("buoc-5-tai-model", f"""
+# Bước 5: tải model {OLLAMA_MODEL} (khoảng 2,5 GB). Chạy lại thì Ollama không tải lại.
+!ollama pull {OLLAMA_MODEL}
+"""),
+        code("buoc-6-kiem-tra", """
+# Bước 6: kiểm tra cấu hình, chưa gọi model: 5 nhiệm vụ, công cụ mỗi nhiệm vụ cần, địa chỉ máy chủ Ollama.
+!python -m local_ai.agents.tasks --model ollama-colab --dry-run
+"""),
+        code("buoc-7-chay-agent", """
+# Bước 7: cho agent làm 5 nhiệm vụ mẫu. Mỗi nhiệm vụ in trace (kế hoạch, công cụ đã gọi, kết quả); dòng cuối là tỉ lệ thành công.
+# TerminalTool chỉ được bật trong thư mục làm việc riêng của từng nhiệm vụ (.runs/agent_tasks/<nhiệm vụ>/workspace).
+!python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/report.json
+"""),
+        markdown("ket-qua", """
+## Kết quả nằm ở đâu
+- **Trace và tỉ lệ thành công:** in ngay dưới Bước 7. Chi tiết (JSON) ở `.runs/agent_tasks/report.json`; file này mất khi Colab tắt, nên hãy chụp màn hình.
+- Một nhiệm vụ chỉ tính là **đạt** khi câu trả lời đúng **và** agent đã thật sự gọi công cụ cần dùng (không tính trường hợp model tự đoán).
+- Model nhỏ đôi khi trả JSON sai dạng hoặc quên gọi công cụ. Khi đó nhiệm vụ không đạt; đây là điều notebook muốn đo.
+
+## Lỗi hay gặp
+- **"Không kết nối được server model":** Ollama chưa chạy; chạy lại Bước 4 (xem `/content/ollama.log`).
+- **"không trả lời trong 300 giây":** đang chạy trên CPU hoặc máy quá tải; chọn T4 GPU rồi Run all lại.
+- **Bước 3 báo cần zstd:** chạy lại Bước 3 (lệnh apt-get cài zstd nằm ngay đầu ô).
+- **`ollama pull` lỗi mạng:** chạy lại Bước 5; phần đã tải được giữ lại.
+"""),
+    ], "agent_colab.ipynb")
+
+
+NOTEBOOKS = {"train_colab.ipynb": train_colab, "agent_colab.ipynb": agent_colab}
 
 
 def render(builder) -> str:
