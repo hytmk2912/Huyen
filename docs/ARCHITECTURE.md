@@ -1,7 +1,7 @@
 # Kiến trúc
 
 ## Phạm vi
-Repo dùng để **fine-tune và đánh giá model có sẵn trên Hugging Face**, chạy cục bộ. Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ). Repo không chứa trọng số model và không gọi API trả phí.
+Repo dùng để **fine-tune và đánh giá model có sẵn trên Hugging Face**, chạy cục bộ hoặc trên Colab miễn phí. Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ). Repo cũng có một agent nhỏ dùng công cụ (calculator, `TerminalTool`) để thử model. Repo không chứa trọng số model và không gọi API trả phí.
 
 Mọi bước đều điều khiển bằng file cấu hình JSON trong `configs/`. Các phần nằm ngoài repo được chọn qua cấu hình: trọng số model, dataset, server model và khóa truy cập (chỉ đọc từ biến môi trường).
 
@@ -11,6 +11,12 @@ Luồng chính:
 preset / dataset Hugging Face ──► local_ai.data (kiểm tra, loại trùng, lọc chất lượng, chặn trùng với eval) ──► sft.jsonl
 sft.jsonl ──► local_ai.training.finetune (full | LoRA | QLoRA) ──► adapter (.runs/<tên>/adapter)
 model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
+```
+
+Trên Colab (tuần 2), `notebooks/train_colab.ipynb` gọi đúng các lệnh trên. Trong lúc train, checkpoint được đẩy lên repo Hugging Face riêng tư để chạy tiếp khi Colab ngắt. `notebooks/agent_colab.ipynb` chạy Ollama ở `localhost` rồi cho agent làm các nhiệm vụ mẫu:
+
+```
+Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── AutonomousAgent ──► calculator, TerminalTool (thư mục làm việc riêng)
 ```
 
 ## Thành phần
@@ -134,19 +140,40 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
 - model là server kiểu OpenAI (`--model`, ví dụ `ollama-colab`) hoặc câu trả lời mẫu (`--scripted`).
 
 ## Kiểm thử
-- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1, `tests/test_m8_…` trở đi là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1; `tests/test_m8_…` đến `tests/test_m14_…` là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
+- `tests/test_m8_runtime.py`, `tests/test_m9_terminal.py`:
+  - kiểm tra runtime gộp từ repo Agent: chuỗi chèn lệnh chỉ được in ra như chữ, không được chạy;
+  - `TerminalTool` chặn tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc;
+  - gateway tắt mặc định;
+  - kiểm tra bằng AST rằng không nơi nào gọi với `shell=True`.
+- `tests/test_m10_colab.py`, `tests/test_m11_colab_light.py`:
+  - notebook hợp lệ (nbformat) và khớp với `notebooks/build.py`;
+  - mọi lệnh của notebook chạy được bằng `--dry-run`, với cả model `smoke` lẫn `light`;
+  - Hugging Face Hub và thư viện train là module giả;
+  - số phút ghi trong tài liệu khớp với ước tính.
+- `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
 - `tests/test_m13_agent_colab.py`:
   - kiểm tra notebook agent hợp lệ;
   - chạy 5 nhiệm vụ với công cụ thật, qua câu trả lời mẫu và qua server HTTP giả nói chuẩn OpenAI;
   - kiểm tra prompt có gửi danh sách công cụ.
-- `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
-- `tests/test_m10_colab.py` kiểm tra notebook hợp lệ (nbformat), khớp với `notebooks/build.py`, và chạy mọi lệnh của notebook bằng `--dry-run`; Hugging Face Hub và thư viện train đều là module giả. `tests/test_m11_colab_light.py` chạy lại các lệnh đó với model `light`. Test này cũng kiểm tra cấu hình vừa T4, ước tính thời gian, và việc số phút ghi trong tài liệu khớp với ước tính.
+- `tests/test_m14_summary.py` giữ README khớp code:
+  - mọi lệnh và notebook đều có trong README;
+  - nút Colab trỏ đúng file;
+  - README nhắc tới mọi cấu hình train và tài liệu;
+  - bảng tiến độ tuần 2 đầy đủ.
 - `tests/test_consistency.py` giữ repo thống nhất: file mẫu dataset và preset cùng quy tắc (streaming, `limit` ≤ 1000, trạng thái giấy phép), cùng một thư mục `data/processed/hf_sft`, mọi lệnh con có trợ giúp, chữ cho người dùng bằng tiếng Việt.
-- `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
 - Lệnh kiểm tra trước khi đẩy: xem `CLAUDE.md`.
 
 ## An toàn và giới hạn
 - Chỉ gọi model cục bộ hoặc server trong mạng nội bộ, không gọi API trả phí. Khóa chỉ đọc từ biến môi trường.
 - `PythonSandbox` chỉ tách code ra một tiến trình riêng, có giới hạn thời gian. Nó không cách ly an toàn trước code độc hại; khi chấm code của model lạ, hãy chạy trong container.
-- Chưa kiểm chứng trên GPU thật: QLoRA, model ảnh + chữ, số VRAM ước tính và notebook Colab. Chi tiết trong `memory.md`.
+- `TerminalTool` và gateway tắt mặc định. Lệnh `local_ai.agents.tasks` chỉ bật `TerminalTool` trong thư mục làm việc riêng của từng nhiệm vụ.
+- Chưa kiểm chứng trên GPU hay model thật:
+  - QLoRA và model ảnh + chữ;
+  - số VRAM và thời gian ước tính;
+  - 2 notebook Colab;
+  - agent với Ollama + `qwen3:4b`.
+
+  Chi tiết trong `memory.md`; lộ trình tuần 3 (đề xuất) ở cuối `README.md`.
 - Interface giao dịch (`TradingAnalysisTool`) chỉ để phân tích, không đặt lệnh.

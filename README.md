@@ -3,23 +3,27 @@
 Repo dùng để fine-tune model có sẵn trên Hugging Face, mọi bước đều điều khiển bằng file cấu hình:
 
 ```
-dataset Hugging Face → kiểm tra, loại trùng, chặn rò rỉ eval → sft.jsonl → fine-tune LoRA/QLoRA → đánh giá
+dataset Hugging Face → kiểm tra, loại trùng, lọc chất lượng, chặn rò rỉ eval → sft.jsonl → fine-tune LoRA/QLoRA → đánh giá
 ```
 
 Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ, 27,78 tỷ tham số); các model khác nằm trong `configs/models/platform.json`. Repo không tự tải model: test chạy được mà không cần mạng hay GPU.
 
-Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ, việc dở và lỗi còn tồn: `memory.md`.
+Kế hoạch tuần 1–2 (M1–M14) và bằng chứng từng mốc: `TASKS.md`. Tiến độ, việc chủ repo tự làm và lỗi còn tồn: `memory.md`.
 
-Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`).
+Chạy trên Colab miễn phí, không cần máy có GPU:
+- train model nhỏ: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`);
+- agent với model thật (Ollama): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb).
 
-## Trạng thái sau tuần 1
+## Trạng thái sau tuần 1 và tuần 2
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
 | --- | --- | --- |
-| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval | Test bằng fixture; **chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây |
-| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ; GPU không bf16 thì dùng fp16 | **Chạy thật LoRA trên CPU** với model tí hon (khoảng 6 giây). QLoRA và model ảnh + chữ **mới test bằng module giả**, chưa chạy trên GPU |
-| Eval | 30 câu Việt + Anh, 4 cách chấm, báo cáo JSON + Markdown | Test đủ 4 cách chấm; **chạy thật** với model tí hon sau khi train |
-| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI) | Test bằng server HTTP giả; **chưa chạy với server thật** |
-| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn | Test bằng model giả |
+| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json` | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng |
+| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ; GPU không bf16 thì dùng fp16. **Tuần 2:** đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian trên T4 | **Chạy thật LoRA trên CPU** với model tí hon (khoảng 6 giây). QLoRA, model ảnh + chữ và phần đẩy lên Hugging Face **mới test bằng module giả**, chưa chạy trên GPU |
+| Eval | 30 câu Việt + Anh, 4 cách chấm, báo cáo JSON + Markdown. **Tuần 2:** bảng so sánh trước/sau khi train | Test đủ 4 cách chấm; **chạy thật** với model tí hon sau khi train |
+| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | Test bằng server HTTP giả; **chưa chạy với server thật** |
+| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn. **Tuần 2:** prompt gửi danh sách công cụ; 5 nhiệm vụ mẫu với calculator và TerminalTool | Test bằng model giả và server OpenAI giả (5/5 nhiệm vụ); **chưa chạy với model thật** |
+| Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm |
+| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); hướng dẫn trên iPhone | Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run`. **Chưa chạy trên Colab thật** |
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
@@ -320,6 +324,8 @@ Các ô sau chạy lần lượt:
 - Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước (`light`: 10, `smoke`: 25).
 - Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_<model>/_hub/last-checkpoint` rồi train tiếp.
 
+Bước cuối của notebook đẩy adapter lên repo riêng tư bằng lệnh con `push-adapter` của `local_ai.training.hub`. Token đọc từ biến môi trường `HF_TOKEN`; thêm `--dry-run` để chỉ kiểm tra tham số, không gọi mạng.
+
 **Ước tính thời gian** (`python -m local_ai.training.estimate`) không tải model, chỉ dựa vào cấu hình và `sft.jsonl`:
 - số token mỗi dòng, kể cả phần đệm khi batch lớn hơn 1;
 - thông lượng giả định của T4.
@@ -375,12 +381,19 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 - chạy 5 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
-Các việc dưới đây chỉ là đề xuất sau tuần 1, chưa làm; chủ repo chọn việc nào thì mới đưa vào kế hoạch:
-1. Chạy thật smoke → light → primary trên GPU, đo VRAM và thời gian thật, sửa hệ số ước tính trong `vram.py`.
-2. Với model chính (ảnh + chữ), chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh; kiểm tra QLoRA chạy được trên GPU 24 GB.
-3. Thử adapter server local với Ollama và llama.cpp thật; hỗ trợ gửi ảnh qua server (`image_url` dạng base64).
-4. Mở rộng bộ eval (nhiều câu hơn, câu dùng công cụ nhiều bước) và tự chạy eval ngay sau mỗi lần train.
-5. Đổi `torch_dtype` sang `dtype` theo transformers 5.x.
-6. Quyết định PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B).
+Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
+1. **M15 – Số đo thật trên Colab.** Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
+2. **M16 – Notebook bền hơn:**
+   - dừng Run all khi một lệnh `!python` lỗi;
+   - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
+3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh; đổi `torch_dtype` sang `dtype` theo transformers 5.x.
+4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
+5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train.
+6. **M20 – Dữ liệu:**
+   - chặn gần trùng giữa dữ liệu train và eval bằng MinHash của M12 (hiện chỉ chặn trùng chính xác và trùng câu hỏi);
+   - thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép.
+7. **M21 – Tổng kết tuần 3.**
 
-Kế hoạch tuần 1 (M1–M7) và bằng chứng từng mốc nằm trong `TASKS.md`.
+Việc cần chủ repo quyết định: PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B).
+
+Kế hoạch tuần 1–2 (M1–M14) và bằng chứng từng mốc nằm trong `TASKS.md`.

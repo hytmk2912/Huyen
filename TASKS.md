@@ -19,7 +19,8 @@ Quy tắc riêng tuần 2:
 | M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | **Xong** | 4/4 (100%) | `tests/test_m11_colab_light.py` (11 test) |
 | M12 | Chất lượng dữ liệu | **Xong** | 3/3 (100%) | `tests/test_m12_quality.py` (18 test) |
 | M13 | Agent chạy model thật trên Colab | **Xong** | 3/3 (100%) | `tests/test_m13_agent_colab.py` (11 test) |
-| M14 | Tổng kết tuần 2 | Chưa làm | 0/4 | — |
+| M14 | Tổng kết tuần 2 | **Xong** | 4/4 (100%) | `tests/test_m14_summary.py` (6 test) |
+| **Tổng** | 7 mốc tuần 2 | **Xong** | 7/7 (100%) | 206 test chạy qua; compileall và secret-scan sạch |
 
 ## M8: Gộp repo Agent, phần 1: đưa code vào
 - [x] 1. Lấy được repo Agent. `hytmk2912/Agent` không truy cập được từ phiên (có thể đang riêng tư); `huyenytmk2912/agent` công khai, đã `git clone`, commit `78a3e25`.
@@ -146,10 +147,22 @@ Chưa kiểm chứng: notebook **chưa chạy trên Colab thật**; thời gian 
 Chưa kiểm chứng: **chưa chạy với Ollama và `qwen3:4b` thật** (không tải model trong môi trường phát triển), nên chưa biết tỉ lệ thành công thật; thời gian 5–15 phút là ước đoán.
 
 ## M14: Tổng kết tuần 2
-- [ ] 1. Cập nhật README, `docs/ARCHITECTURE.md`, lộ trình.
-- [ ] 2. `memory.md`: % tiến độ từng phần; danh sách việc chủ repo phải tự làm (chạy notebook nào, archive repo Agent cũ...); đề xuất 7 mốc tuần 3.
-- [ ] 3. README khớp code.
-- [ ] 4. Mọi test xanh.
+- [x] 1. Cập nhật README, `docs/ARCHITECTURE.md` và lộ trình.
+  - README:
+    - bảng "Trạng thái sau tuần 1 và tuần 2" (thêm 2 dòng Runtime và Notebook Colab, ghi rõ phần nào chưa chạy thật);
+    - 2 nút Open in Colab ở đầu file;
+    - lộ trình đề xuất 7 mốc tuần 3 (M15–M21), gom các việc còn lại của tuần 1 và 2.
+  - ARCHITECTURE: phạm vi, luồng chạy trên Colab và luồng agent + Ollama, phần kiểm thử theo mốc, danh sách phần chưa kiểm chứng.
+- [x] 2. `memory.md`:
+  - % tiến độ từng phần (tính theo hạng mục đã chạy thật);
+  - việc chủ repo tự làm (chạy 2 notebook, token HF quyền Write, archive repo Agent cũ, PR #4...);
+  - 7 mốc đề xuất cho tuần 3, giống README.
+- [x] 3. README khớp code: `tests/test_m14_summary.py`, cùng test cờ lệnh của M7.
+  - Mọi module chạy được bằng `python -m` đều có trong README (bổ sung `local_ai.training.hub`).
+  - Mọi notebook có nút Colab trỏ đúng file.
+  - README nhắc tới mọi cấu hình train, `quality.json`, `terminal.json`, `gateway.json`, file nhiệm vụ agent và mọi tài liệu trong `docs/`.
+  - Bảng tiến độ tuần 2 đủ 7 mốc.
+- [x] 4. Mọi test xanh: 206 test chạy qua; compileall và secret-scan sạch.
 
 ---
 
