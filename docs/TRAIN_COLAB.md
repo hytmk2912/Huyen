@@ -86,3 +86,4 @@ Bước 7 không chấm lại model gốc: lần đầu chấm xong, báo cáo �
 | Ô báo đỏ "Bước N lỗi (mã thoát ...)" | Lệnh của bước đó lỗi nên **Run all** dừng ngay ở ô này; các ô sau chưa chạy. Đọc thông báo ngay phía trên dòng đỏ, sửa xong thì chạy lại từ ô đó (menu Runtime → Run after). |
 | pip in dòng "ERROR: pip's dependency resolver ..." khi cài thư viện | Thường chỉ là xung đột với gói có sẵn của Colab. Nếu các ô sau vẫn chạy được thì có thể bỏ qua. |
 | Colab ngắt giữa chừng | Xem mục "Khi Colab ngắt giữa chừng". |
+| Bước 8 báo `NotImplementedError: "_amp_foreach_non_finite_check_and_unscale_cuda" not implemented for 'BFloat16'` | Lỗi cũ, đã sửa ngày 25/9 (PR #10). Chỉ cần **Run all** lại: Bước 3 tự tải code mới. Log Bước 8 có dòng "Tham số được train: ... torch.float32" là đã có bản sửa. |
