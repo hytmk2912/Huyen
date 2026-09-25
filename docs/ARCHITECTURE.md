@@ -22,7 +22,7 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 | `configs/models/platform.json` | Danh sách model: `backend` (`transformers` hoặc `openai_compatible`), `kind` (`text`/`multimodal`), `params_b`, `quantization`, `adapter_path`, `max_new_tokens`, `base_url`, `timeout_s`, `api_key_env`. |
 | `configs/datasets/presets/*.json` | 3 preset dataset (`code`, `reasoning`, `vietnamese`): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". |
 | `configs/datasets/hf_sft.json` | Mẫu để tự khai báo một dataset. |
-| `configs/training/sft.json`, `qlora_primary.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, siêu tham số, `max_steps`, `require_gpu`. |
+| `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
 
 `ModelConfig` kiểm tra giá trị ngay khi nạp; giá trị sai thì báo lỗi bằng tiếng Việt. Test `test_every_config_key_is_read_by_code` bảo đảm không có khóa cấu hình nào thừa.
 
@@ -58,8 +58,11 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 `finetune.py` là khung SFT dùng transformers, trl và peft:
 - chạy `full`, `lora`, hoặc QLoRA (`lora` cùng `quantization: "4bit"`);
 - chạy tiếp từ `checkpoint-N` mới nhất;
+- `--push-to-hub --hub-model-id <tên>/<repo>`: Trainer đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư (`hub_strategy` checkpoint). Máy mới (ví dụ Colab vừa bị ngắt) không có `checkpoint-N` thì tải `last-checkpoint` về `output_dir/_hub/` rồi train tiếp. Thư mục bắt đầu bằng `_` nên Trainer không đẩy ngược nó lên Hub;
 - thiếu GPU hoặc thư viện thì trả `"status": "skipped"`;
 - từ chối model chạy qua server và từ chối full fine-tune trên model đã nén.
+
+`hub.py`: kiểm tra tên repo, tải `last-checkpoint`, đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`). Token chỉ đọc từ biến môi trường `HF_TOKEN`; `huggingface_hub` chỉ được import khi gọi Hub.
 
 `RunTracker` ghi cấu hình, chỉ số và đường dẫn adapter vào thư mục của lượt chạy.
 
@@ -69,6 +72,8 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
   - bỏ khối `<think>` trước khi chấm;
   - báo cáo theo nhóm và theo ngôn ngữ.
 - Lệnh: `python -m local_ai.evaluation --model <tên> | --scripted`. Tùy chọn `--train-data` từ chối chạy nếu dữ liệu train chứa câu eval.
+- `--max-new-tokens` ghi đè độ dài câu trả lời; `--dry-run` chỉ in kế hoạch, không nạp model.
+- `compare.py` (`python -m local_ai.evaluation.compare TRUOC SAU`): bảng so sánh 2 báo cáo theo nhóm và ngôn ngữ, kèm câu mới đạt và câu mới trượt.
 - Bộ đề `data/eval/eval_v1.jsonl`: 30 câu Việt + Anh, mỗi câu có đáp án mẫu.
 - `benchmarks.py` là phần chấm khớp đúng cũ, vẫn giữ lại.
 
@@ -86,6 +91,10 @@ Viết lại bằng thư viện chuẩn từ repo Agent (commit `78a3e25`; xem `
 
 Import không mở cổng mạng, không tạo thư mục.
 
+### Notebook Colab (`notebooks/`)
+`notebooks/build.py` sinh các notebook (không kèm output, thư viện ghim phiên bản, mỗi ô có chú thích tiếng Việt). Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test chạy được đúng các lệnh đó bằng `--dry-run`:
+- `train_colab.ipynb`: model `smoke` trên GPU T4 → dữ liệu 2000 dòng → chấm trước → QLoRA fp16 (`configs/training/colab_smoke.json`), đẩy checkpoint lên Hub → chấm sau (`smoke-colab`) → bảng so sánh → đẩy adapter.
+
 ### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
 `AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
 - công cụ lỗi thì agent ghi vào trace rồi thử lại;
@@ -95,7 +104,8 @@ Import không mở cổng mạng, không tạo thư mục.
 `python -m local_ai.demo [--model <tên>]` là demo agent dùng công cụ máy tính.
 
 ## Kiểm thử
-- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1, `tests/test_m8_…` trở đi là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m10_colab.py` kiểm tra notebook hợp lệ (nbformat), khớp với `notebooks/build.py`, và chạy mọi lệnh của notebook bằng `--dry-run`; Hugging Face Hub và thư viện train đều là module giả.
 - `tests/test_consistency.py` giữ repo thống nhất: file mẫu dataset và preset cùng quy tắc (streaming, `limit` ≤ 1000, trạng thái giấy phép), cùng một thư mục `data/processed/hf_sft`, mọi lệnh con có trợ giúp, chữ cho người dùng bằng tiếng Việt.
 - `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
 - Lệnh kiểm tra trước khi đẩy: xem `CLAUDE.md`.
@@ -103,5 +113,5 @@ Import không mở cổng mạng, không tạo thư mục.
 ## An toàn và giới hạn
 - Chỉ gọi model cục bộ hoặc server trong mạng nội bộ, không gọi API trả phí. Khóa chỉ đọc từ biến môi trường.
 - `PythonSandbox` chỉ tách code ra một tiến trình riêng, có giới hạn thời gian. Nó không cách ly an toàn trước code độc hại; khi chấm code của model lạ, hãy chạy trong container.
-- Chưa kiểm chứng trên GPU thật: QLoRA, model ảnh + chữ, và số VRAM ước tính. Chi tiết trong `memory.md`.
+- Chưa kiểm chứng trên GPU thật: QLoRA, model ảnh + chữ, số VRAM ước tính và notebook Colab. Chi tiết trong `memory.md`.
 - Interface giao dịch (`TradingAnalysisTool`) chỉ để phân tích, không đặt lệnh.

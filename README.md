@@ -10,6 +10,8 @@ Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ, 27,7
 
 Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ, việc dở và lỗi còn tồn: `memory.md`.
 
+Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn ở mục "Train trên Colab miễn phí").
+
 ## Trạng thái sau tuần 1
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
 | --- | --- | --- |
@@ -21,13 +23,14 @@ Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ,
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); quét khóa bí mật (`secrets.py`).
-- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA).
+- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
-- `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`.
+- `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
 - `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc.
+- `notebooks/`: notebook Colab, sinh từ `notebooks/build.py` (lưu không kèm output).
 - `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent, nhật ký tuần 1).
 
 ## Cài đặt và kiểm tra
@@ -232,6 +235,8 @@ Báo cáo ghi vào `.runs/eval/<model>-<thời điểm>/`, hoặc thư mục ghi
 - `report.json`: kết quả từng câu;
 - `report.md`: tỉ lệ đạt theo nhóm và theo ngôn ngữ, cùng danh sách câu không đạt kèm lý do.
 
+So sánh 2 lần chấm (ví dụ trước và sau khi train): `python -m local_ai.evaluation.compare <trước>/report.json <sau>/report.json`. Lệnh in bảng tỉ lệ đạt theo nhóm và theo ngôn ngữ, mức thay đổi (điểm %), cùng các câu mới đạt và mới trượt. `--max-new-tokens` ghi đè độ dài câu trả lời tối đa để chấm nhanh hơn; `--dry-run` chỉ in kế hoạch, không nạp model.
+
 Nhóm câu eval (`code`, `reasoning`, `tool_use`) là cách chia riêng của bộ eval, khác với `domain` của dữ liệu train (`coding`, `math_logic`, `chat`...).
 
 Nếu model lỗi (ví dụ server chưa chạy), lệnh dừng và ghi `status: "error"`. Model chạy bằng transformers mà máy thiếu torch hoặc transformers thì lệnh báo bỏ qua.
@@ -267,6 +272,35 @@ python -m local_ai.evaluation --model primary-qlora
 ```
 
 Số VRAM lấy từ `python -m local_ai.models.vram` (batch 1, khoảng 2048 token, bật gradient checkpointing). Đây chỉ là ước lượng; khi chạy thật, hãy đo lại và sửa hệ số trong `local_ai/models/vram.py`. Chạy `light` sau khi xong `smoke` thì luôn ghi `--output-dir` khác, để không chạy tiếp nhầm checkpoint của model khác.
+
+## Train trên Colab miễn phí
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb)
+
+Notebook `notebooks/train_colab.ipynb` train model `smoke` (Qwen2.5-0.5B) trên GPU T4 miễn phí của Colab. Các ô chạy lần lượt:
+1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
+2. tải repo, cài thư viện đã ghim phiên bản (không cài lại torch);
+3. đọc `HF_TOKEN` từ Colab Secrets;
+4. lấy 2000 dòng từ 3 preset;
+5. chấm model gốc;
+6. train QLoRA (4bit, fp16) bằng `configs/training/colab_smoke.json`;
+7. chấm lại model sau khi train (mục `smoke-colab` trong danh sách model);
+8. in bảng so sánh trước/sau;
+9. đẩy adapter lên repo Hugging Face riêng tư.
+
+**Cần chuẩn bị:** token Hugging Face quyền Write, lưu trong Colab Secrets (biểu tượng chìa khóa) với tên `HF_TOKEN`, bật Notebook access. Token không nằm trong notebook hay repo.
+
+**Colab ngắt giữa chừng:** mở lại notebook và chạy Run all. Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước. Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_smoke/_hub/last-checkpoint` rồi train tiếp.
+
+Nút Colab mở notebook ở nhánh `main`, nên chỉ dùng được sau khi gộp PR tuần 2. **Notebook chưa chạy thử trên Colab thật.** Test `tests/test_m10_colab.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run`, ví dụ:
+
+```bash
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft --dry-run
+python -m local_ai.training.finetune --config configs/training/colab_smoke.json --push-to-hub --hub-model-id ten-ban/huyen-smoke-qlora --dry-run
+python -m local_ai.evaluation --model smoke-colab --max-new-tokens 256 --dry-run
+python -m local_ai.evaluation.compare .runs/eval/truoc/report.json .runs/eval/sau/report.json --dry-run
+```
+
+Muốn sửa notebook thì sửa nội dung ô trong `notebooks/build.py`, rồi chạy `python notebooks/build.py`; test báo lỗi nếu file `.ipynb` không khớp.
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Các việc dưới đây chỉ là đề xuất sau tuần 1, chưa làm; chủ repo chọn việc nào thì mới đưa vào kế hoạch:

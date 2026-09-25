@@ -31,6 +31,7 @@ def main() -> None:
     source.add_argument("--preset", action="append", help="Tên preset, có thể kèm tỉ lệ trộn: --preset code:0.5 --preset vietnamese:0.5 (lặp lại để trộn nhiều preset)")
     hf.add_argument("--dataset", help="Ghi đè hf_dataset.name (chỉ dùng với --config)"); hf.add_argument("--output", help="Thư mục đầu ra (mặc định: output_dir trong cấu hình, hoặc data/processed/hf_sft khi trộn preset)")
     hf.add_argument("--limit", type=int, help="Số dòng tối đa đọc từ mỗi dataset"); hf.add_argument("--total", type=int, help="Tổng số dòng đọc khi trộn preset, chia theo tỉ lệ")
+    hf.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch (preset, số dòng mỗi preset, thư mục đầu ra), không tải dữ liệu")
     commands.add_parser("list-presets", help="Liệt kê các preset dataset trong configs/datasets/presets/")
     commands.add_parser("secret-scan", help="Quét repo tìm khóa/mật khẩu bị lộ")
     args = parser.parse_args()
@@ -39,6 +40,18 @@ def main() -> None:
         for item in list_presets():
             print(f"{item['name']}: {item['dataset']}@{item['revision'][:8]} | domain {item['domain']} | ngôn ngữ {item['language']} | tối đa {item['limit']} dòng | giấy phép {item['license']} ({item['license_status']})\n    {item['description']}")
         return
+    if args.command == "hf-sft" and args.dry_run:
+        from local_ai.data.hub import DEFAULT_SFT_DIR, load_preset, mix_counts, parse_mix, validate_spec
+        if args.preset:
+            weights = parse_mix(args.preset); presets = {name: load_preset(name) for name in weights}
+            for preset in presets.values(): validate_spec(preset["hf_dataset"])
+            counts = mix_counts(weights, {name: args.limit or preset["hf_dataset"].get("limit") or 1000 for name, preset in presets.items()}, args.total)
+            plan = {"presets": {name: {"dataset": presets[name]["hf_dataset"]["name"], "revision": presets[name]["hf_dataset"].get("revision"), "weight": round(weights[name], 4), "rows": counts[name]} for name in presets}, "output": args.output or DEFAULT_SFT_DIR}
+        else:
+            config = json.loads(Path(args.config).read_text(encoding="utf-8")); spec = config["hf_dataset"]
+            if args.dataset: spec["name"] = args.dataset
+            validate_spec(spec); plan = {"dataset": spec["name"], "limit": args.limit or spec.get("limit"), "streaming": spec.get("streaming"), "output": args.output or config.get("output_dir", DEFAULT_SFT_DIR)}
+        print(json.dumps({"status": "dry-run", **plan}, ensure_ascii=False, indent=2)); return
     if args.command == "hf-sft" and args.preset:
         from local_ai.data.hub import DEFAULT_SFT_DIR, parse_mix, prepare_hf_mix
         print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or DEFAULT_SFT_DIR, total=args.total, limit=args.limit), indent=2, ensure_ascii=False)); _exit_after_stream(); return

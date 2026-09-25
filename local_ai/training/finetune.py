@@ -18,7 +18,8 @@ from typing import Any, Literal
 
 from local_ai.config.settings import find_model_config
 from local_ai.experiments.tracking import RunTracker, seed_everything
-from local_ai.models.adapters import QUANTIZATIONS, ModelConfig, model_loader_class, quantization_config, resolve_torch_dtype
+from local_ai.models.adapters import QUANTIZATIONS, TORCH_DTYPES, ModelConfig, model_loader_class, quantization_config, resolve_torch_dtype
+from local_ai.training.hub import check_repo_id, download_last_checkpoint, downloaded_checkpoint
 from local_ai.training.plans import TrainingPlan
 
 FinetuneMethod = Literal["full", "lora"]
@@ -54,6 +55,10 @@ class FinetuneConfig:
     require_gpu: bool = True
     max_steps: int = -1  # > 0 thì dừng sau đúng số bước này (ví dụ chạy thử 2 bước), bỏ qua epochs
     quantization: str | None = None  # None: theo danh sách model; "4bit" | "8bit": nén khi nạp (QLoRA); "none": không nén
+    dtype: str | None = None  # ghi đè dtype của model gốc, ví dụ "float16" cho GPU T4 trên Colab
+    push_to_hub: bool = False  # đẩy checkpoint lên Hugging Face Hub trong lúc train (hub_strategy "checkpoint") để chạy lại thì train tiếp
+    hub_model_id: str | None = None  # repo nhận checkpoint, dạng tên-người-dùng/tên-repo; token đọc từ biến môi trường HF_TOKEN
+    hub_private: bool = True
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "FinetuneConfig":
@@ -63,6 +68,8 @@ class FinetuneConfig:
     def validate(self) -> None:
         if self.method not in ("full", "lora"): raise ValueError(f"Không hỗ trợ method finetune: {self.method}; hãy dùng 'full' hoặc 'lora'")
         if self.quantization not in (None, "none", *QUANTIZATIONS): raise ValueError(f"quantization phải là 4bit, 8bit hoặc none, không phải '{self.quantization}'")
+        if self.dtype is not None and self.dtype not in TORCH_DTYPES: raise ValueError(f"dtype phải là một trong {', '.join(TORCH_DTYPES)}, không phải '{self.dtype}'")
+        if self.push_to_hub: check_repo_id(self.hub_model_id)
         TrainingPlan("sft", self.dataset_path, self.base_model, self.seed, self.output_dir).validate()
 
 
@@ -105,14 +112,23 @@ def latest_checkpoint(output_dir: str | Path) -> Path | None:
 
 
 def resume_target(config: FinetuneConfig) -> str | None:
+    """Checkpoint để chạy tiếp: checkpoint-N mới nhất trên máy, nếu không có thì `last-checkpoint` đã tải từ Hub (thư mục `_hub/`)."""
     if config.resume is False: return None
     if isinstance(config.resume, str): return config.resume
-    checkpoint = latest_checkpoint(config.output_dir); return str(checkpoint) if checkpoint else None
+    checkpoint = latest_checkpoint(config.output_dir) or downloaded_checkpoint(config.output_dir)
+    return str(checkpoint) if checkpoint else None
 
 
 def describe(config: FinetuneConfig) -> dict[str, Any]:
     model = resolve_base_model(config); quantization = effective_quantization(config, model)
-    return {"method": config.method, "quantization": quantization, "qlora": config.method == "lora" and quantization is not None, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "kind": model.kind, "params_b": model.params_b, "dtype": model.dtype}, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "resume_from": resume_target(config), "config": asdict(config)}
+    hub = {"push_to_hub": config.push_to_hub, "hub_model_id": config.hub_model_id, "private": config.hub_private, "hub_strategy": "checkpoint", "resume_from_hub": config.push_to_hub and config.resume is True} if config.push_to_hub else {"push_to_hub": False}
+    return {"method": config.method, "quantization": quantization, "qlora": config.method == "lora" and quantization is not None, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "kind": model.kind, "params_b": model.params_b, "dtype": config.dtype or model.dtype}, "hub": hub, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "resume_from": resume_target(config), "config": asdict(config)}
+
+
+def hub_arguments(config: FinetuneConfig) -> dict[str, Any]:
+    """Tham số đẩy checkpoint lên Hub cho SFTConfig; token do thư viện tự đọc từ biến môi trường HF_TOKEN."""
+    if not config.push_to_hub: return {}
+    return {"push_to_hub": True, "hub_model_id": config.hub_model_id, "hub_strategy": "checkpoint", "hub_private_repo": config.hub_private}
 
 
 def train(config: FinetuneConfig) -> dict[str, Any]:
@@ -127,7 +143,7 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     from trl import SFTConfig, SFTTrainer
 
     seed_everything(config.seed)
-    dtype = resolve_torch_dtype(torch, model_config.dtype)
+    dtype = resolve_torch_dtype(torch, config.dtype or model_config.dtype)
     # sft.jsonl chỉ có chữ, nên kể cả model multimodal cũng dùng tokenizer (không cần phần xử lý ảnh).
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.tokenizer_source or model_config.source, revision=model_config.tokenizer_revision or model_config.revision, local_files_only=model_config.offline)
     if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
@@ -143,10 +159,13 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
         from peft import LoraConfig
         peft_config = LoraConfig(r=config.lora.r, lora_alpha=config.lora.alpha, lora_dropout=config.lora.dropout, target_modules=config.lora.target_modules, task_type="CAUSAL_LM")
     dataset = load_dataset("json", data_files=config.dataset_path, split="train").select_columns(["messages"])
-    args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, max_steps=config.max_steps, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[])
+    args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, max_steps=config.max_steps, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[], **hub_arguments(config))
     tracker = RunTracker(config.output_dir, describe(config))
     trainer = SFTTrainer(model=model, args=args, train_dataset=dataset, processing_class=tokenizer, peft_config=peft_config)
-    result = trainer.train(resume_from_checkpoint=resume_target(config))
+    resume = resume_target(config)
+    if resume is None and config.push_to_hub and config.resume is True:  # Colab bị ngắt thì máy mới không còn checkpoint: lấy từ Hub
+        downloaded = download_last_checkpoint(config.hub_model_id, config.output_dir); resume = str(downloaded) if downloaded else None
+    result = trainer.train(resume_from_checkpoint=resume)
     final = Path(config.output_dir) / ("adapter" if config.method == "lora" else "final")
     trainer.save_model(str(final)); tokenizer.save_pretrained(str(final))
     tracker.record_metrics({key: float(value) for key, value in result.metrics.items() if isinstance(value, (int, float))}); tracker.record_checkpoint(str(final))
@@ -157,9 +176,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m local_ai.training.finetune")
     parser.add_argument("--config", required=True, help="File cấu hình huấn luyện (JSON)"); parser.add_argument("--method", choices=("full", "lora"), help="Ghi đè cách huấn luyện: full hoặc lora"); parser.add_argument("--base-model", help="Ghi đè tên model gốc trong danh sách model"); parser.add_argument("--dataset-path", help="Ghi đè đường dẫn sft.jsonl"); parser.add_argument("--output-dir", help="Ghi đè thư mục đầu ra")
     parser.add_argument("--quantization", choices=("4bit", "8bit", "none"), help="Ghi đè kiểu nén khi nạp model gốc: 4bit (QLoRA), 8bit hoặc none")
+    parser.add_argument("--dtype", choices=TORCH_DTYPES, help="Ghi đè dtype của model gốc, ví dụ float16 cho GPU T4")
+    parser.add_argument("--push-to-hub", action="store_true", help="Đẩy checkpoint lên Hugging Face Hub trong lúc train; chạy lại thì tự tải last-checkpoint về để train tiếp (token lấy từ biến môi trường HF_TOKEN)")
+    parser.add_argument("--hub-model-id", help="Repo nhận checkpoint, dạng tên-người-dùng/tên-repo (mặc định riêng tư)")
     parser.add_argument("--no-resume", action="store_true", help="Không chạy tiếp từ checkpoint cũ, bắt đầu lại từ đầu"); parser.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch đã phân giải, không import thư viện huấn luyện")
     args = parser.parse_args(argv)
-    config = load_finetune_config(args.config, method=args.method, base_model=args.base_model, dataset_path=args.dataset_path, output_dir=args.output_dir, quantization=args.quantization, resume=False if args.no_resume else None)
+    config = load_finetune_config(args.config, method=args.method, base_model=args.base_model, dataset_path=args.dataset_path, output_dir=args.output_dir, quantization=args.quantization, dtype=args.dtype, push_to_hub=True if args.push_to_hub else None, hub_model_id=args.hub_model_id, resume=False if args.no_resume else None)
     print(json.dumps(describe(config) if args.dry_run else train(config), indent=2, default=str))
 
 

@@ -15,7 +15,7 @@ Quy tắc riêng tuần 2:
 | --- | --- | --- | --- | --- |
 | M8 | Gộp repo Agent, phần 1: đưa code runtime vào | **Xong** | 4/4 (100%) | `tests/test_m8_runtime.py` (14 test) |
 | M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | **Xong** | 5/5 (100%) | `tests/test_m9_terminal.py` (11 test) |
-| M10 | Notebook train trên Colab free (0.5B) | Chưa làm | 0/5 | — |
+| M10 | Notebook train trên Colab free (0.5B) | **Xong** | 5/5 (100%) | `tests/test_m10_colab.py` (16 test) |
 | M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | Chưa làm | 0/4 | — |
 | M12 | Chất lượng dữ liệu | Chưa làm | 0/3 | — |
 | M13 | Agent chạy model thật trên Colab | Chưa làm | 0/3 | — |
@@ -48,11 +48,30 @@ Quy tắc riêng tuần 2:
 - [x] 5. Có test chặn chèn lệnh: `;` `&&` `&` `|` `$()` backtick, xuống dòng, `\r`, `<` `>`, cả dạng chuỗi lẫn dạng list, và không lệnh nào được chạy. Lệnh ngoài allowlist (`rm`, `curl`, `bash`, `/bin/ls`, `git push`...) bị từ chối. Timeout dừng lệnh `sleep 30` sau 0,5 giây. Bằng chứng: `InjectionTests` (3 test), `AllowedCommandTests.test_timeout_stops_the_command`.
 
 ## M10: Notebook train trên Colab free (0.5B)
-- [ ] 1. `notebooks/train_colab.ipynb`; README có nút "Open in Colab" trỏ tới notebook ở nhánh `main`.
-- [ ] 2. Các ô: kiểm tra GPU (không có thì hướng dẫn chọn T4) → clone repo, cài thư viện (không cài lại torch) → đọc `HF_TOKEN` từ Colab Secrets → lấy 2000 dòng từ preset → QLoRA model smoke ở fp16 → eval trước/sau, in bảng so sánh → đẩy adapter lên repo HF private.
-- [ ] 3. Finetune có tùy chọn đẩy checkpoint lên HF (`hub_strategy` checkpoint); chạy lại thì tải `last-checkpoint` về và train tiếp.
-- [ ] 4. Notebook hợp lệ (nbformat), lưu không kèm output, ghim phiên bản thư viện, mỗi ô có chú thích tiếng Việt.
-- [ ] 5. Test chạy các lệnh của notebook bằng `--dry-run`.
+- [x] 1. `notebooks/train_colab.ipynb` (sinh từ `notebooks/build.py`). README có nút "Open in Colab" ở đầu file và ở mục "Train trên Colab miễn phí", trỏ tới notebook ở nhánh `main`. Bằng chứng: `ReadmeTests`.
+- [x] 2. 9 ô code đúng thứ tự:
+  1. kiểm tra GPU (không có thì hướng dẫn chọn T4);
+  2. clone repo, cài thư viện, không cài lại torch;
+  3. đọc `HF_TOKEN` từ Colab Secrets (`userdata.get`);
+  4. `hf-sft --total 2000` từ 3 preset;
+  5. chấm model gốc `smoke`;
+  6. QLoRA 4bit fp16 (`configs/training/colab_smoke.json`);
+  7. chấm lại `smoke-colab` (mục mới trong danh sách model, trỏ tới adapter vừa train);
+  8. in bảng so sánh bằng lệnh mới `python -m local_ai.evaluation.compare`;
+  9. đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`).
+
+  Bằng chứng: `NotebookTests`, `CompareTests`, `HubTests.test_push_adapter_creates_private_repo_and_uploads`.
+- [x] 3. Finetune thêm `--push-to-hub --hub-model-id` (khóa `push_to_hub`, `hub_model_id`, `hub_private`): truyền `hub_strategy="checkpoint"` cho `SFTConfig`. Chạy lại mà máy không còn `checkpoint-N` thì tải `last-checkpoint` về `output_dir/_hub/` rồi train tiếp. Repo chưa có checkpoint thì train từ đầu; lỗi khác (mất mạng, sai quyền) thì báo ra, không lặng lẽ train lại. Thêm `dtype` (ghi đè dtype, `float16` cho T4). Bằng chứng: `FinetuneHubTests`, `HubTests`.
+- [x] 4. Notebook hợp lệ theo `nbformat.validate` (nbformat 5.11.1), không có output, `execution_count` rỗng. `pip install` ghim `==` cho mọi gói, không có torch. Mỗi ô code mở đầu bằng chú thích `# Bước N: ...` tiếng Việt. Không có token trong notebook. Bằng chứng: `NotebookTests`.
+- [x] 5. `test_notebook_commands_run_with_dry_run` lấy mọi dòng `!python -m local_ai...` trong notebook, thêm `--dry-run` rồi chạy thật (với `HF_HUB_OFFLINE=1`). Thêm `--dry-run` cho `hf-sft`, eval và `compare`. Test kiểm tra thêm:
+  - dữ liệu đủ 2000 dòng;
+  - QLoRA fp16 đẩy vào đúng repo;
+  - so sánh đúng 2 báo cáo;
+  - adapter được đẩy đúng là adapter vừa train và vừa chấm.
+
+  160 test chạy qua; compileall và secret-scan sạch.
+
+Chưa kiểm chứng: notebook **chưa chạy trên Colab thật** (môi trường phát triển không có GPU); thời gian 20–40 phút ghi trong notebook là ước đoán.
 
 ## M11: Colab cho Qwen3-4B + hướng dẫn iPhone
 - [ ] 1. `configs/training/colab_light.json`: QLoRA 4-bit, fp16, batch 1, `max_length` vừa T4.
