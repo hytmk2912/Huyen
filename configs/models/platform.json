@@ -58,6 +58,16 @@
       "capabilities": ["chat", "reasoning", "coding", "tool_calling"]
     },
     {
+      "name": "ollama-colab",
+      "backend": "openai_compatible",
+      "base_url": "http://localhost:11434/v1",
+      "source": "qwen3:4b",
+      "kind": "text",
+      "params_b": 4.02,
+      "timeout_s": 300,
+      "capabilities": ["chat", "reasoning", "tool_calling"]
+    },
+    {
       "name": "llamacpp",
       "backend": "openai_compatible",
       "base_url": "http://localhost:8080/v1",
@@ -99,6 +109,30 @@
       "dtype": "bfloat16",
       "device_map": "auto",
       "capabilities": ["chat", "reasoning", "coding"],
+      "offline": false
+    },
+    {
+      "name": "smoke-colab",
+      "source": "Qwen/Qwen2.5-0.5B-Instruct",
+      "kind": "text",
+      "params_b": 0.49,
+      "adapter_path": ".runs/colab_smoke/adapter",
+      "dtype": "float16",
+      "device_map": "auto",
+      "max_new_tokens": 256,
+      "capabilities": ["chat", "evaluation"],
+      "offline": false
+    },
+    {
+      "name": "light-colab",
+      "source": "Qwen/Qwen3-4B",
+      "kind": "text",
+      "params_b": 4.02,
+      "adapter_path": ".runs/colab_light/adapter",
+      "dtype": "float16",
+      "device_map": "auto",
+      "max_new_tokens": 512,
+      "capabilities": ["chat", "reasoning"],
       "offline": false
     }
   ]

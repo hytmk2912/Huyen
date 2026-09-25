@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -23,9 +25,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cases", default=str(DEFAULT_CASES), help="File câu hỏi eval (JSONL)")
     parser.add_argument("--output", help="Thư mục ghi báo cáo (mặc định .runs/eval/<model>-<thời điểm>)")
     parser.add_argument("--train-data", action="append", default=[], help="File dữ liệu train (train.jsonl hoặc sft.jsonl) cần kiểm tra trùng với eval; lặp lại được")
+    parser.add_argument("--max-new-tokens", type=int, help="Ghi đè số token tối đa model được sinh cho mỗi câu (nhỏ hơn thì chấm nhanh hơn)")
+    parser.add_argument("--dry-run", action="store_true", help="Chỉ kiểm tra tham số và in kế hoạch, không nạp model")
     args = parser.parse_args(argv)
 
     cases = load_cases(args.cases)
+    if args.dry_run:
+        plan = {"status": "dry-run", "cases": len(cases), "output": args.output or ".runs/eval/<model>-<thời điểm>", "train_data": {path: Path(path).is_file() for path in args.train_data}}
+        if not args.scripted:
+            config = find_model_config(args.models, args.model)
+            plan["model"] = {"name": config.name, "backend": config.backend, "source": config.source, "adapter_path": config.adapter_path, "max_new_tokens": args.max_new_tokens or config.max_new_tokens}
+        print(json.dumps(plan, ensure_ascii=False, indent=2)); return 0
     missing_files = [path for path in args.train_data if not Path(path).is_file()]
     if missing_files:
         print(f"Không tìm thấy file dữ liệu train: {', '.join(missing_files)}", file=sys.stderr)
@@ -38,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         model = ScriptedModelAdapter("scripted-reference", [case.reference or "" for case in cases])
     else:
         config = find_model_config(args.models, args.model)
+        if args.max_new_tokens: config = replace(config, max_new_tokens=args.max_new_tokens)
         missing = [name for name in ("torch", "transformers") if config.backend == "transformers" and importlib.util.find_spec(name) is None]
         if missing:
             print(f"Bỏ qua: thiếu thư viện {', '.join(missing)} để chạy model '{config.name}' (status skipped).", file=sys.stderr)

@@ -1,0 +1,25 @@
+{
+  "_comment": "Công cụ chạy lệnh (TerminalTool) cho agent. TẮT mặc định: muốn bật thì đổi enabled thành true trong một bản sao của file này, hoặc bật rõ ràng trong code. Chỉ chạy lệnh có name trong allowed_commands; lệnh chạy dạng list, không qua shell, trong thư mục workspace; mọi lệnh (kể cả bị từ chối) được ghi vào log_path. Mỗi lệnh: subcommands (lệnh con được phép, ví dụ git status), exact_args (chỉ cho đúng các bộ tham số này), deny_options (tham số bị cấm, so theo tiền tố), max_args. Đường dẫn tương đối tính từ thư mục gốc repo. Danh sách lệnh lấy từ ALLOWED_PREFIXES của repo Agent gốc (xem docs/GOP_AGENT.md).",
+  "enabled": false,
+  "workspace": ".runs/terminal/workspace",
+  "log_path": ".runs/terminal/log.jsonl",
+  "timeout_s": 30,
+  "max_output": 12000,
+  "allowed_commands": [
+    {"name": "pwd", "max_args": 0},
+    {"name": "ls", "max_args": 8},
+    {"name": "cat", "max_args": 8},
+    {"name": "head", "max_args": 8},
+    {"name": "tail", "max_args": 8, "deny_options": ["-f", "-F", "--follow", "--retry"]},
+    {"name": "grep", "max_args": 12, "deny_options": ["-R", "--dereference-recursive"]},
+    {"name": "find", "max_args": 12, "deny_options": ["-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf", "-fls", "-L", "-follow"]},
+    {"name": "git", "subcommands": ["status", "log"], "max_args": 8, "deny_options": ["--output", "-o", "--ext-diff", "--exec"]},
+    {"name": "python", "exact_args": [["--version"]]},
+    {"name": "python3", "exact_args": [["--version"]]},
+    {"name": "node", "exact_args": [["--version"]]},
+    {"name": "npm", "exact_args": [["--version"]]},
+    {"name": "uname", "max_args": 2},
+    {"name": "whoami", "max_args": 0},
+    {"name": "date", "max_args": 3, "deny_options": ["-s", "--set", "-f", "--file"]}
+  ]
+}

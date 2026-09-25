@@ -23,7 +23,7 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
     for name, text in (("inspect", "In 3 bản ghi đầu của file dữ liệu"), ("validate", "Kiểm tra schema, đếm bản ghi hợp lệ và bị loại"), ("deduplicate", "Đếm bản ghi trùng nội dung"), ("stats", "Thống kê domain, nguồn, độ dài")):
         item = commands.add_parser(name, help=text); item.add_argument("path", help="File dữ liệu (.jsonl, .json, .csv hoặc .parquet)")
-    build = commands.add_parser("build", help="Kiểm tra, loại trùng, chặn trùng với eval rồi xuất train.jsonl, sft.jsonl, manifest.json"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[])
+    build = commands.add_parser("build", help="Kiểm tra, loại trùng, chặn trùng với eval rồi xuất train.jsonl, sft.jsonl, manifest.json"); build.add_argument("sources", nargs="+"); build.add_argument("--output", required=True); build.add_argument("--version", required=True); build.add_argument("--config", required=True); build.add_argument("--eval-source", action="append", default=[]); build.add_argument("--quality", action="store_true", help="Bật bộ lọc chất lượng (ngôn ngữ, độ dài, lặp, gần trùng) theo configs/datasets/quality.json")
     generate = commands.add_parser("generate", help="Kiểm chứng bản ghi do model thầy sinh ra (math, python, tool_call)"); generate.add_argument("teacher_output", help="Các bản ghi JSONL do TeacherModel đã sinh ra"); generate.add_argument("--output", required=True); generate.add_argument("--verifier", choices=("math", "python", "tool_call"), required=True)
     hf = commands.add_parser("hf-sft", help="Tải dataset từ Hugging Face, kiểm tra rồi xuất sft.jsonl")
     source = hf.add_mutually_exclusive_group(required=True)
@@ -31,6 +31,8 @@ def main() -> None:
     source.add_argument("--preset", action="append", help="Tên preset, có thể kèm tỉ lệ trộn: --preset code:0.5 --preset vietnamese:0.5 (lặp lại để trộn nhiều preset)")
     hf.add_argument("--dataset", help="Ghi đè hf_dataset.name (chỉ dùng với --config)"); hf.add_argument("--output", help="Thư mục đầu ra (mặc định: output_dir trong cấu hình, hoặc data/processed/hf_sft khi trộn preset)")
     hf.add_argument("--limit", type=int, help="Số dòng tối đa đọc từ mỗi dataset"); hf.add_argument("--total", type=int, help="Tổng số dòng đọc khi trộn preset, chia theo tỉ lệ")
+    hf.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch (preset, số dòng mỗi preset, thư mục đầu ra), không tải dữ liệu")
+    hf.add_argument("--no-quality", action="store_true", help="Tắt bộ lọc chất lượng (mặc định bật theo configs/datasets/quality.json)")
     commands.add_parser("list-presets", help="Liệt kê các preset dataset trong configs/datasets/presets/")
     commands.add_parser("secret-scan", help="Quét repo tìm khóa/mật khẩu bị lộ")
     args = parser.parse_args()
@@ -39,15 +41,30 @@ def main() -> None:
         for item in list_presets():
             print(f"{item['name']}: {item['dataset']}@{item['revision'][:8]} | domain {item['domain']} | ngôn ngữ {item['language']} | tối đa {item['limit']} dòng | giấy phép {item['license']} ({item['license_status']})\n    {item['description']}")
         return
+    if args.command == "hf-sft" and args.dry_run:
+        from local_ai.data.hub import DEFAULT_SFT_DIR, load_preset, mix_counts, parse_mix, validate_spec
+        if args.preset:
+            weights = parse_mix(args.preset); presets = {name: load_preset(name) for name in weights}
+            for preset in presets.values(): validate_spec(preset["hf_dataset"])
+            counts = mix_counts(weights, {name: args.limit or preset["hf_dataset"].get("limit") or 1000 for name, preset in presets.items()}, args.total)
+            plan = {"presets": {name: {"dataset": presets[name]["hf_dataset"]["name"], "revision": presets[name]["hf_dataset"].get("revision"), "weight": round(weights[name], 4), "rows": counts[name]} for name in presets}, "output": args.output or DEFAULT_SFT_DIR}
+        else:
+            config = json.loads(Path(args.config).read_text(encoding="utf-8")); spec = config["hf_dataset"]
+            if args.dataset: spec["name"] = args.dataset
+            validate_spec(spec); plan = {"dataset": spec["name"], "limit": args.limit or spec.get("limit"), "streaming": spec.get("streaming"), "output": args.output or config.get("output_dir", DEFAULT_SFT_DIR)}
+        from local_ai.data.quality import DEFAULT_QUALITY, QualityConfig
+        if not args.no_quality: QualityConfig.from_file()  # cấu hình lọc sai thì báo ngay, trước khi tải dữ liệu
+        plan["quality"] = "tắt" if args.no_quality else str(DEFAULT_QUALITY.relative_to(DEFAULT_QUALITY.parents[2]))
+        print(json.dumps({"status": "dry-run", **plan}, ensure_ascii=False, indent=2)); return
     if args.command == "hf-sft" and args.preset:
         from local_ai.data.hub import DEFAULT_SFT_DIR, parse_mix, prepare_hf_mix
-        print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or DEFAULT_SFT_DIR, total=args.total, limit=args.limit), indent=2, ensure_ascii=False)); _exit_after_stream(); return
+        print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or DEFAULT_SFT_DIR, total=args.total, limit=args.limit, quality=not args.no_quality), indent=2, ensure_ascii=False)); _exit_after_stream(); return
     if args.command == "hf-sft":
         from local_ai.data.hub import prepare_hf_sft
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
         if args.dataset: config["hf_dataset"]["name"] = args.dataset
         if args.limit: config["hf_dataset"]["limit"] = args.limit
-        print(json.dumps(prepare_hf_sft(config, args.output), indent=2)); _exit_after_stream(); return
+        print(json.dumps(prepare_hf_sft(config, args.output, quality=not args.no_quality), indent=2, ensure_ascii=False)); _exit_after_stream(); return
     if args.command == "secret-scan":
         findings = scan_secrets(Path(".")); print(json.dumps({"findings": findings}, indent=2));
         if findings: raise SystemExit("Phát hiện có thể lộ thông tin bí mật. Hãy đổi các khóa bị lộ và xóa chúng khỏi repo trước khi tiếp tục.")
@@ -66,6 +83,7 @@ def main() -> None:
     if args.command == "deduplicate":
         unique, duplicates = deduplicate(records); print(json.dumps({"unique": len(unique), "duplicates": len(duplicates)}, indent=2)); return
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
-    print(json.dumps(build_dataset(args.sources, args.output, args.version, config, args.eval_source), indent=2))
+    from local_ai.data.hub import quality_config
+    print(json.dumps(build_dataset(args.sources, args.output, args.version, config, args.eval_source, quality_config(args.quality)), indent=2, ensure_ascii=False))
 
 if __name__ == "__main__": main()

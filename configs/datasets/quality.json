@@ -1,0 +1,7 @@
+{
+  "_comment": "Ngưỡng của các bộ lọc chất lượng (local_ai/data/quality.py). Lệnh hf-sft dùng mặc định (tắt bằng --no-quality); lệnh build bật bằng --quality. Thứ tự lọc: ngôn ngữ → độ dài → lặp → gần trùng; dòng bị loại ghi vào rejected.jsonl kèm lý do, thống kê trước/sau lọc ghi vào manifest.json (mục quality). Ưu tiên tiếng Việt: nhận tiếng Việt theo chữ có dấu trước tiên; nguồn ghi language vi thì nội dung phải là tiếng Việt có dấu; tiếng Việt không dấu (vi-khong-dau) và chữ không phải Latin (other) bị loại. Ngưỡng lặp đặt cao để không loại nhầm lời giải toán hay code: thử trên 2000 dòng thật của 3 preset (25/9/2026) chỉ loại 1 dòng (lời giải toán lặp công thức 60%). near_duplicate: Jaccard trên cụm 3 từ, MinHash 128 ngăn, LSH 32 dải, rồi so kỹ bằng Jaccard thật.",
+  "language": {"enabled": true, "allowed": ["vi", "en", "unknown"], "match_source_language": true},
+  "length": {"enabled": true, "min_prompt_chars": 3, "min_answer_chars": 2, "max_total_chars": 16000},
+  "repetition": {"enabled": true, "min_words": 50, "max_word_run": 8, "max_duplicate_sentence_ratio": 0.5, "ngram_words": 5, "max_duplicate_ngram_ratio": 0.5},
+  "near_duplicate": {"enabled": true, "threshold": 0.8, "shingle_words": 3, "permutations": 128, "bands": 32, "seed": 17}
+}

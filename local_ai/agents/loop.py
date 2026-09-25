@@ -74,25 +74,30 @@ class AutonomousAgent:
 
     def _run(self, request: str, trace: list[str]) -> AgentResult:
         planner = self.router.select("reasoning")
-        plan = self._ask(planner, f"Plan this task: {request}")
+        tools = self.tools.describe()  # model phải biết có công cụ nào và gọi với tham số gì
+        plan = self._ask(planner, f"Plan this task: {request}\nAvailable tools: {json.dumps(tools, ensure_ascii=False)}")
         trace.append(f"plan: {plan}")
-        observation = ""
+        observation, history = "", []
         for attempt in range(self.max_iterations):
             decision = _parse_json_object(self._ask(planner, json.dumps({
-                "request": request, "plan": plan, "observation": observation, "attempt": attempt,
-                "instruction": "Return JSON with tool, arguments, and expected fields.",
-            })))
+                "request": request, "plan": plan, "tools": tools, "observation": observation, "previous_observations": history[-4:], "attempt": attempt,
+                "instruction": 'Return JSON with tool, arguments, and expected fields, for example {"tool": "<tool name>", "arguments": {...}, "expected": "..."}.',
+            }, ensure_ascii=False)))
             if not isinstance(decision.get("tool"), str):
                 observation = "Invalid decision: the model must return JSON with a tool name."
                 trace.append(f"error: {observation}")
                 continue
-            result = self.tools.execute(ToolCall(decision["tool"], decision.get("arguments", {})))
+            arguments = decision.get("arguments", {})
+            if isinstance(arguments, str):  # model nhỏ hay trả arguments dạng chuỗi JSON
+                arguments = _parse_json_object(arguments)
+            result = self.tools.execute(ToolCall(decision["tool"], arguments if isinstance(arguments, dict) else {}))
             observation = result.output
+            history.append(f"{result.name}({json.dumps(arguments, ensure_ascii=False)}) -> {observation[:2000]}")
             trace.append(f"tool[{result.name}]: {observation}")
             verdict = self._ask(planner, json.dumps({
-                "request": request, "observation": observation,
-                "instruction": "Return JSON with complete boolean and answer or correction.",
-            }))
+                "request": request, "observation": observation, "previous_observations": history[-4:],
+                "instruction": 'Return JSON with complete boolean and answer or correction: {"complete": true, "answer": "<final answer>"} or {"complete": false, "correction": "<next step>"}.',
+            }, ensure_ascii=False))
             evaluation = _parse_json_object(verdict)
             trace.append(f"evaluation: {verdict}")
             if evaluation.get("complete") and result.success and "answer" in evaluation:

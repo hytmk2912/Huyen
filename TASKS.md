@@ -1,4 +1,172 @@
-# Nhiệm vụ 1 tuần
+# Nhiệm vụ tuần 2 (M8–M14)
+
+Bắt đầu: 2026-09-24, từ `main` tại commit `09c93f3` (119 test chạy qua; compileall và secret-scan sạch). Nhánh làm việc: `claude/nhiem-vu-tuan-2`.
+
+Cách làm và cách chấm giống tuần 1 (xem phần tuần 1 bên dưới): mỗi lượt làm **tối đa 1 mốc** bằng skill `lam-moc`. Làm các mốc tồn của tuần 1 trước (hiện không có), rồi M8 → M14. Mốc chỉ **Xong** khi đạt mọi tiêu chí và cả ba lệnh kiểm tra đều xanh.
+
+Quy tắc riêng tuần 2:
+- Notebook lưu không kèm output, ghim phiên bản thư viện, mỗi ô có chú thích tiếng Việt dễ hiểu (chủ repo dùng điện thoại).
+- Notebook không chạy được trong môi trường phát triển: chỉ kiểm tra hợp lệ và chạy thử lệnh của nó bằng `--dry-run`.
+- Token chỉ đọc từ biến môi trường hoặc Colab Secrets, không ghi vào repo hay notebook.
+
+## Bảng tiến độ tuần 2
+
+| Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
+| --- | --- | --- | --- | --- |
+| M8 | Gộp repo Agent, phần 1: đưa code runtime vào | **Xong** | 4/4 (100%) | `tests/test_m8_runtime.py` (14 test) |
+| M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | **Xong** | 5/5 (100%) | `tests/test_m9_terminal.py` (11 test) |
+| M10 | Notebook train trên Colab free (0.5B) | **Xong** | 5/5 (100%) | `tests/test_m10_colab.py` (16 test) |
+| M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | **Xong** | 4/4 (100%) | `tests/test_m11_colab_light.py` (11 test) |
+| M12 | Chất lượng dữ liệu | **Xong** | 3/3 (100%) | `tests/test_m12_quality.py` (18 test) |
+| M13 | Agent chạy model thật trên Colab | **Xong** | 3/3 (100%) | `tests/test_m13_agent_colab.py` (11 test) |
+| M14 | Tổng kết tuần 2 | **Xong** | 4/4 (100%) | `tests/test_m14_summary.py` (6 test) |
+| **Tổng** | 7 mốc tuần 2 | **Xong** | 7/7 (100%) | 206 test chạy qua; compileall và secret-scan sạch |
+
+## M8: Gộp repo Agent, phần 1: đưa code vào
+- [x] 1. Lấy được repo Agent. `hytmk2912/Agent` không truy cập được từ phiên (có thể đang riêng tư); `huyenytmk2912/agent` công khai, đã `git clone`, commit `78a3e25`.
+- [x] 2. `docs/GOP_AGENT.md`: phần đưa vào (bảng đối chiếu), phần để M9, phần bỏ (FastAPI, uvicorn, pydantic, python-dotenv), 7 rủi ro bảo mật (nghiêm trọng nhất: chèn lệnh qua `shell=True`), commit gốc đã lấy. Code gốc cất nguyên văn ở `archive/agent-goc/`.
+- [x] 3. Runtime nằm trong `local_ai/runtime/` (`executor.py`, `jobs.py`, `auth.py`), chỉ dùng thư viện chuẩn, bịt ngay lỗ hổng chèn lệnh (chạy lệnh dạng list, không shell). **Repo Agent không có test nào**, nên "test gốc" không có để chép; thay bằng test mới kiểm tra đúng hành vi của `agent_runtime.py` và `gateway.py` gốc cùng các chỗ sửa an toàn. Bằng chứng: `tests/test_m8_runtime.py` (14 test, gồm chuỗi chèn lệnh `;` `&&` `|` `$()` backtick, xuống dòng chỉ được in ra như chữ).
+- [x] 4. Test cũ và test của runtime đều xanh: 133 test chạy qua; compileall và secret-scan sạch.
+
+## M9: Gộp repo Agent, phần 2: tool chạy lệnh
+- [x] 1. `TerminalTool` (`local_ai/runtime/terminal.py`) dựng trên `run_command` của M8:
+  - chỉ chạy lệnh có trong allowlist ở `configs/tools/terminal.json` (đúng danh sách `ALLOWED_PREFIXES` của Agent gốc);
+  - không dùng shell, tham số truyền dạng list, có timeout;
+  - ghi log JSONL từng lệnh, kể cả lệnh bị từ chối;
+  - chặn thêm tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc.
+  - Bổ sung khi rà lại: chặn `date -s`/`--set` (đổi đồng hồ hệ thống khi chạy bằng root) và tham số ngắn viết gộp (`date -us...`, `tail -qf`).
+
+  Bằng chứng: `AllowedCommandTests`, `InjectionTests.test_dangerous_options_and_paths_are_rejected`; test M8 kiểm tra bằng AST rằng không nơi nào trong `local_ai/` gọi với `shell=True`.
+- [x] 2. Tool tắt mặc định (`"enabled": false`). Muốn bật phải khai báo rõ: `enabled: true` trong cấu hình, hoặc `TerminalTool(enabled=True)`. Khi đang tắt, mọi lần gọi bị từ chối kèm lý do. Bằng chứng: `ConfigTests`, `AgentRegistrationTests.test_disabled_terminal_fails_safely`.
+- [x] 3. Gateway HTTP (`local_ai/runtime/gateway.py`, `configs/runtime/gateway.json`):
+  - tắt mặc định;
+  - chỉ nghe `127.0.0.1` (`0.0.0.0` hay `localhost` đều bị từ chối);
+  - bắt buộc token dài ít nhất 16 ký tự, đọc từ biến môi trường; thiếu token thì không bật;
+  - không có endpoint chạy lệnh qua mạng.
+
+  Bằng chứng: `GatewayTests` (2 test).
+- [x] 4. Đăng ký vào `ToolRegistry` bằng `register_terminal`; agent gọi `{"tool": "terminal", ...}` và hoàn thành việc; tool đang tắt thì agent nhận lỗi, không sập. Bằng chứng: `AgentRegistrationTests` (2 test).
+- [x] 5. Có test chặn chèn lệnh: `;` `&&` `&` `|` `$()` backtick, xuống dòng, `\r`, `<` `>`, cả dạng chuỗi lẫn dạng list, và không lệnh nào được chạy. Lệnh ngoài allowlist (`rm`, `curl`, `bash`, `/bin/ls`, `git push`...) bị từ chối. Timeout dừng lệnh `sleep 30` sau 0,5 giây. Bằng chứng: `InjectionTests` (3 test), `AllowedCommandTests.test_timeout_stops_the_command`.
+
+## M10: Notebook train trên Colab free (0.5B)
+- [x] 1. `notebooks/train_colab.ipynb` (sinh từ `notebooks/build.py`). README có nút "Open in Colab" ở đầu file và ở mục "Train trên Colab miễn phí", trỏ tới notebook ở nhánh `main`. Bằng chứng: `ReadmeTests`.
+- [x] 2. 9 ô code đúng thứ tự:
+  1. kiểm tra GPU (không có thì hướng dẫn chọn T4);
+  2. clone repo, cài thư viện, không cài lại torch;
+  3. đọc `HF_TOKEN` từ Colab Secrets (`userdata.get`);
+  4. `hf-sft --total 2000` từ 3 preset;
+  5. chấm model gốc `smoke`;
+  6. QLoRA 4bit fp16 (`configs/training/colab_smoke.json`);
+  7. chấm lại `smoke-colab` (mục mới trong danh sách model, trỏ tới adapter vừa train);
+  8. in bảng so sánh bằng lệnh mới `python -m local_ai.evaluation.compare`;
+  9. đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`).
+
+  Bằng chứng: `NotebookTests`, `CompareTests`, `HubTests.test_push_adapter_creates_private_repo_and_uploads`.
+- [x] 3. Finetune thêm `--push-to-hub --hub-model-id` (khóa `push_to_hub`, `hub_model_id`, `hub_private`): truyền `hub_strategy="checkpoint"` cho `SFTConfig`. Chạy lại mà máy không còn `checkpoint-N` thì tải `last-checkpoint` về `output_dir/_hub/` rồi train tiếp. Repo chưa có checkpoint thì train từ đầu; lỗi khác (mất mạng, sai quyền) thì báo ra, không lặng lẽ train lại. Thêm `dtype` (ghi đè dtype, `float16` cho T4). Bằng chứng: `FinetuneHubTests`, `HubTests`.
+- [x] 4. Notebook hợp lệ theo `nbformat.validate` (nbformat 5.11.1), không có output, `execution_count` rỗng. `pip install` ghim `==` cho mọi gói, không có torch. Mỗi ô code mở đầu bằng chú thích `# Bước N: ...` tiếng Việt. Không có token trong notebook. Bằng chứng: `NotebookTests`.
+- [x] 5. `test_notebook_commands_run_with_dry_run` lấy mọi dòng `!python -m local_ai...` trong notebook, thêm `--dry-run` rồi chạy thật (với `HF_HUB_OFFLINE=1`). Thêm `--dry-run` cho `hf-sft`, eval và `compare`. Test kiểm tra thêm:
+  - dữ liệu đủ 2000 dòng;
+  - QLoRA fp16 đẩy vào đúng repo;
+  - so sánh đúng 2 báo cáo;
+  - adapter được đẩy đúng là adapter vừa train và vừa chấm.
+
+  160 test chạy qua; compileall và secret-scan sạch.
+
+Chưa kiểm chứng: notebook **chưa chạy trên Colab thật** (môi trường phát triển không có GPU); thời gian 20–40 phút ghi trong notebook là ước đoán.
+
+## M11: Colab cho Qwen3-4B + hướng dẫn iPhone
+- [x] 1. `configs/training/colab_light.json`: model `light` (Qwen3-4B), QLoRA 4bit, fp16, batch 1 (tích lũy 16 bước), `save_steps` 10.
+  - `max_length` là 2048: VRAM ước tính 3,8 GB trên 15 GB của T4, và 2048 đúng bằng độ dài mà `vram.py` giả định.
+  - Đo trên 2000 dòng thật của 3 preset: cắt ở 2048 thì 16 dòng bị cắt; cắt ở 1024 thì tới 308 dòng.
+  - Thêm mục `light-colab` (adapter vừa train, `max_new_tokens` 512 để Qwen3 có chỗ cho phần `<think>`).
+
+  Bằng chứng: `LightConfigTests`.
+- [x] 2. Notebook có ô **Bước 1: chọn model**: form Colab `MODEL = "smoke"  # @param ["smoke", "light"]`. Mọi lệnh sau đó dùng `colab_{MODEL}.json`, `{MODEL}-colab` và repo `huyen-{MODEL}-qlora` riêng cho từng model.
+  - **Ước tính thời gian:** ô **Bước 6** chạy lệnh mới `python -m local_ai.training.estimate` (`local_ai/training/estimate.py`). Lệnh in số bước, số phút train, số phút chấm, VRAM so với T4, và số bước đã train nếu có checkpoint trên máy hoặc trên Hub.
+  - Ước tính theo 2000 dòng: `smoke` khoảng 21 phút, `light` khoảng 109 phút, chưa tính cài đặt. Đây là ước lượng thô, chưa đo trên T4 thật.
+  - **Tự train tiếp khi Colab ngắt:** lệnh train đẩy checkpoint lên Hub, chạy lại thì tải `last-checkpoint` về (từ M10); ô ước tính báo "Đã train N/125 bước".
+
+  Bằng chứng: `NotebookChoiceTests`, `EstimateTests`.
+- [x] 3. `docs/TRAIN_COLAB.md` hướng dẫn trên iPhone:
+  - chuẩn bị token Write, tắt tự khóa màn hình;
+  - mở link (bật "Yêu cầu trang web cho máy tính" trong Safari);
+  - chọn T4, thêm `HF_TOKEN` vào Secrets (bật Notebook access);
+  - chọn model, Run all (các hộp thoại sẽ gặp);
+  - kết quả nằm đâu, khi Colab ngắt thì làm gì;
+  - bảng lỗi hay gặp.
+
+  README và notebook có link tới tài liệu này. Bằng chứng: `GuideTests` (kiểm tra đủ các bước, và số phút trong tài liệu và README khớp với ước tính).
+- [x] 4. `test_light_notebook_commands_run_with_dry_run` chạy mọi lệnh của notebook với `MODEL = "light"` bằng `--dry-run`. Test M10 được sửa theo cấu trúc notebook mới (thêm 2 ô, đánh số lại, thay biến `{MODEL}`, `{MAX_NEW_TOKENS}`); không bỏ kiểm tra nào. 171 test chạy qua; compileall và secret-scan sạch.
+
+Chưa kiểm chứng: notebook **chưa chạy trên Colab thật**; thời gian và VRAM là ước lượng.
+
+## M12: Chất lượng dữ liệu
+- [x] 1. `local_ai/data/quality.py`, chỉ dùng thư viện chuẩn; ngưỡng ở `configs/datasets/quality.json`. `hf-sft` bật mặc định (tắt bằng `--no-quality`), `build` bật bằng `--quality`. Các bộ lọc chạy sau bước loại trùng tuyệt đối, trước bước chặn trùng eval:
+  - **ngôn ngữ** (ưu tiên tiếng Việt):
+    - nhận tiếng Việt trước tiên, theo chữ có dấu, nên câu trộn với code hay tiếng Anh vẫn tính là tiếng Việt;
+    - loại chữ không phải Latin, tiếng Việt không dấu, và dòng khác ngôn ngữ nguồn khai báo (preset `vietnamese` phải là tiếng Việt có dấu);
+    - dòng tiếng Việt trong nguồn khác vẫn được giữ;
+  - **độ dài:** câu hỏi dưới 3 ký tự, câu trả lời dưới 2 ký tự, hội thoại quá 16.000 ký tự;
+  - **lặp từ/câu:** xét từng lượt riêng, bỏ qua khối code và lệnh LaTeX. Loại khi có từ lặp liền quá 8 lần, hoặc khi hơn 50% số câu hay cụm 5 từ là bản lặp;
+  - **gần trùng:** MinHash tự viết (kiểu một hoán vị, 128 ngăn), LSH 32 dải, so lại bằng Jaccard thật trên cụm 3 từ, ngưỡng 0,8.
+
+  Thử trên 2000 dòng thật của 3 preset: chạy khoảng 5 giây, chỉ loại 1 dòng (lời giải toán lặp công thức 60%). Bản đầu dùng MinHash 128 hoán vị mất 21 giây và bắt nhầm lệnh LaTeX, bảng số, hội thoại nhiều lượt; đã sửa như trên.
+- [x] 2. `manifest.json` có mục `quality`:
+  - `before` / `after`: số dòng, ngôn ngữ phát hiện được, tỉ lệ tiếng Việt, độ dài;
+  - `removed`: số dòng mỗi bộ lọc đã loại;
+  - `config`: cấu hình đã dùng.
+
+  Khi tắt lọc thì ghi `{"enabled": false}`. Dòng bị loại nằm trong `rejected.jsonl` kèm `quality_filter` và `quality_reason`. Bằng chứng: `PipelineTests`.
+- [x] 3. Fixture `tests/fixtures/quality/{language,length,repetition,near_duplicate}.jsonl`; mỗi dòng ghi kết quả mong đợi. Có cả dòng đối chứng phải giữ: code lặp, LaTeX lặp, dãy số 0, hội thoại nhắc lại qua nhiều lượt, tiếng Việt trong preset code. Đã kiểm tra: nếu bỏ phần xử lý tương ứng thì các dòng đối chứng này bị loại nhầm.
+
+  Bằng chứng: `LanguageFilterTests`, `LengthFilterTests`, `RepetitionFilterTests`, `NearDuplicateTests` (kể cả MinHash ước lượng Jaccard lệch dưới 0,2), `ConfigTests`. 189 test chạy qua; compileall và secret-scan sạch.
+
+## M13: Agent chạy model thật trên Colab
+- [x] 1. `notebooks/agent_colab.ipynb` (sinh từ `notebooks/build.py`):
+  - cài Ollama bản ghim `OLLAMA_VERSION=0.34.4`, bản mới nhất lúc viết, cùng `zstd` mà bản cài `.tar.zst` cần;
+  - chạy `ollama serve` ở nền, đợi tới khi trả lời;
+  - kéo `qwen3:4b` (2,5 GB, đã kiểm tra tag còn trên kho Ollama);
+  - agent gọi model qua adapter OpenAI của M3, dùng mục mới `ollama-colab` (`http://localhost:11434/v1`).
+
+  Phần agent chỉ dùng thư viện chuẩn, không `pip install`. Bằng chứng: `OpenAIAdapterTests.test_five_tasks_through_openai_compatible_server` (5 nhiệm vụ qua server HTTP giả nói chuẩn OpenAI).
+- [x] 2. Lệnh mới `python -m local_ai.agents.tasks` chạy 5 nhiệm vụ trong `data/eval/agent_tasks_v1.jsonl`:
+  - 2 nhiệm vụ calculator, `ls`, `cat`, và `cat` rồi calculator;
+  - mỗi nhiệm vụ chạy trong thư mục làm việc riêng, chép từ `data/eval/agent_workspace/`, và chỉ bật TerminalTool trong đó;
+  - in trace và tỉ lệ thành công;
+  - nhiệm vụ đạt khi câu trả lời đúng **và** agent đã gọi mọi công cụ cần dùng;
+  - `--scripted` chạy bằng câu trả lời mẫu, ra 5/5.
+
+  Sửa thêm để model thật dùng được công cụ:
+  - `ToolRegistry` có mô tả công cụ;
+  - agent gửi danh sách công cụ, lịch sử quan sát và mẫu JSON trong prompt;
+  - agent hiểu `arguments` dạng chuỗi JSON.
+
+  Bằng chứng: `TaskTests` (có ca sai đáp án, thiếu công cụ, JSON hỏng, thử `cat /etc/passwd` và `rm`), `ToolDescriptionTests`.
+- [x] 3. Notebook hợp lệ theo nbformat, khớp `build.py`, không có output, mỗi ô code có chú thích `# Bước N:`, không có token. `test_notebook_commands_run_with_dry_run` chạy 2 lệnh `!python -m local_ai...` của notebook bằng `--dry-run`. 200 test chạy qua; compileall và secret-scan sạch.
+
+Chưa kiểm chứng: **chưa chạy với Ollama và `qwen3:4b` thật** (không tải model trong môi trường phát triển), nên chưa biết tỉ lệ thành công thật; thời gian 5–15 phút là ước đoán.
+
+## M14: Tổng kết tuần 2
+- [x] 1. Cập nhật README, `docs/ARCHITECTURE.md` và lộ trình.
+  - README:
+    - bảng "Trạng thái sau tuần 1 và tuần 2" (thêm 2 dòng Runtime và Notebook Colab, ghi rõ phần nào chưa chạy thật);
+    - 2 nút Open in Colab ở đầu file;
+    - lộ trình đề xuất 7 mốc tuần 3 (M15–M21), gom các việc còn lại của tuần 1 và 2.
+  - ARCHITECTURE: phạm vi, luồng chạy trên Colab và luồng agent + Ollama, phần kiểm thử theo mốc, danh sách phần chưa kiểm chứng.
+- [x] 2. `memory.md`:
+  - % tiến độ từng phần (tính theo hạng mục đã chạy thật);
+  - việc chủ repo tự làm (chạy 2 notebook, token HF quyền Write, archive repo Agent cũ, PR #4...);
+  - 7 mốc đề xuất cho tuần 3, giống README.
+- [x] 3. README khớp code: `tests/test_m14_summary.py`, cùng test cờ lệnh của M7.
+  - Mọi module chạy được bằng `python -m` đều có trong README (bổ sung `local_ai.training.hub`).
+  - Mọi notebook có nút Colab trỏ đúng file.
+  - README nhắc tới mọi cấu hình train, `quality.json`, `terminal.json`, `gateway.json`, file nhiệm vụ agent và mọi tài liệu trong `docs/`.
+  - Bảng tiến độ tuần 2 đủ 7 mốc.
+- [x] 4. Mọi test xanh: 206 test chạy qua; compileall và secret-scan sạch.
+
+---
+
+# Nhiệm vụ tuần 1 (M1–M7, đã xong)
 
 **Đã xong cả 7 mốc và đã gộp vào `main` ngày 24/9 (PR #6, commit gộp `63bdc61`).**
 

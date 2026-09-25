@@ -12,7 +12,7 @@ from pathlib import Path
 from local_ai.agents.loop import AutonomousAgent
 from local_ai.config.settings import find_model_config, load_settings
 from local_ai.models.router import ModelRouter, ScriptedModelAdapter, create_adapter
-from local_ai.tools.core import ToolRegistry, calculator
+from local_ai.tools.core import CALCULATOR_DESCRIPTION, ToolRegistry, calculator
 
 ROOT = Path(__file__).parent.parent
 
@@ -28,7 +28,7 @@ def run_demo(model_name: str | None = None, models_path: str | Path = ROOT / "co
     else:
         model = create_adapter(find_model_config(models_path, model_name))
     tools = ToolRegistry()
-    tools.register("calculator", calculator)
+    tools.register("calculator", calculator, CALCULATOR_DESCRIPTION)
     result = AutonomousAgent(ModelRouter([model], default=model.name), tools, settings.max_iterations).run(request)
     if not result.completed:
         raise RuntimeError(result.answer)
