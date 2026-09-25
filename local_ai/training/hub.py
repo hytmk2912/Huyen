@@ -45,6 +45,19 @@ def download_last_checkpoint(repo_id: str, output_dir: str | Path) -> Path | Non
     return target
 
 
+def remote_trainer_state(repo_id: str) -> dict[str, object] | None:
+    """Đọc riêng file `last-checkpoint/trainer_state.json` trên repo (vài KB) để biết đã train tới bước nào; chưa có thì trả None."""
+    from huggingface_hub import hf_hub_download
+    from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
+
+    check_repo_id(repo_id)
+    try:
+        path = hf_hub_download(repo_id=repo_id, filename=f"{LAST_CHECKPOINT}/trainer_state.json")
+    except (RepositoryNotFoundError, RevisionNotFoundError, EntryNotFoundError):
+        return None
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
 def push_adapter(repo_id: str, adapter_dir: str | Path, private: bool = True, dry_run: bool = False) -> dict[str, object]:
     """Tạo repo (mặc định riêng tư) nếu chưa có rồi đẩy thư mục adapter lên. `dry_run` chỉ kiểm tra tham số, không gọi mạng."""
     check_repo_id(repo_id)

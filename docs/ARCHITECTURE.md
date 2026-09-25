@@ -22,7 +22,7 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 | `configs/models/platform.json` | Danh sách model: `backend` (`transformers` hoặc `openai_compatible`), `kind` (`text`/`multimodal`), `params_b`, `quantization`, `adapter_path`, `max_new_tokens`, `base_url`, `timeout_s`, `api_key_env`. |
 | `configs/datasets/presets/*.json` | 3 preset dataset (`code`, `reasoning`, `vietnamese`): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". |
 | `configs/datasets/hf_sft.json` | Mẫu để tự khai báo một dataset. |
-| `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
+| `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json`, `colab_light.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
 
 `ModelConfig` kiểm tra giá trị ngay khi nạp; giá trị sai thì báo lỗi bằng tiếng Việt. Test `test_every_config_key_is_read_by_code` bảo đảm không có khóa cấu hình nào thừa.
 
@@ -62,7 +62,14 @@ model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấ
 - thiếu GPU hoặc thư viện thì trả `"status": "skipped"`;
 - từ chối model chạy qua server và từ chối full fine-tune trên model đã nén.
 
-`hub.py`: kiểm tra tên repo, tải `last-checkpoint`, đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`). Token chỉ đọc từ biến môi trường `HF_TOKEN`; `huggingface_hub` chỉ được import khi gọi Hub.
+`hub.py`: kiểm tra tên repo, tải `last-checkpoint`, đọc `trainer_state.json` trên repo để biết đã train tới bước nào, đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`). Token chỉ đọc từ biến môi trường `HF_TOKEN`; `huggingface_hub` chỉ được import khi gọi Hub.
+
+`estimate.py` (`python -m local_ai.training.estimate`) ước tính thời gian train và chấm trên T4, không tải model:
+- số token mỗi dòng đếm từ `sft.jsonl` (kể cả phần đệm khi batch lớn hơn 1);
+- phép tính ≈ 2 × số tham số × số token × số lượt chạy qua model, chia cho thông lượng giả định của GPU;
+- báo số bước đã train nếu có checkpoint trên máy hoặc trên Hub.
+
+Các hằng số ghi ở đầu file và chưa đo trên T4 thật.
 
 `RunTracker` ghi cấu hình, chỉ số và đường dẫn adapter vào thư mục của lượt chạy.
 
@@ -93,7 +100,17 @@ Import không mở cổng mạng, không tạo thư mục.
 
 ### Notebook Colab (`notebooks/`)
 `notebooks/build.py` sinh các notebook (không kèm output, thư viện ghim phiên bản, mỗi ô có chú thích tiếng Việt). Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test chạy được đúng các lệnh đó bằng `--dry-run`:
-- `train_colab.ipynb`: model `smoke` trên GPU T4 → dữ liệu 2000 dòng → chấm trước → QLoRA fp16 (`configs/training/colab_smoke.json`), đẩy checkpoint lên Hub → chấm sau (`smoke-colab`) → bảng so sánh → đẩy adapter.
+- `train_colab.ipynb`, trên GPU T4:
+  1. chọn model `smoke` (Qwen2.5-0.5B) hoặc `light` (Qwen3-4B);
+  2. lấy dữ liệu 2000 dòng;
+  3. ước tính thời gian;
+  4. chấm trước;
+  5. QLoRA fp16 (`configs/training/colab_<model>.json`), đẩy checkpoint lên Hub; chạy lại thì train tiếp;
+  6. chấm sau (`<model>-colab`);
+  7. in bảng so sánh;
+  8. đẩy adapter.
+
+  Hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`.
 
 ### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
 `AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
@@ -105,7 +122,7 @@ Import không mở cổng mạng, không tạo thư mục.
 
 ## Kiểm thử
 - `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1, `tests/test_m8_…` trở đi là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
-- `tests/test_m10_colab.py` kiểm tra notebook hợp lệ (nbformat), khớp với `notebooks/build.py`, và chạy mọi lệnh của notebook bằng `--dry-run`; Hugging Face Hub và thư viện train đều là module giả.
+- `tests/test_m10_colab.py` kiểm tra notebook hợp lệ (nbformat), khớp với `notebooks/build.py`, và chạy mọi lệnh của notebook bằng `--dry-run`; Hugging Face Hub và thư viện train đều là module giả. `tests/test_m11_colab_light.py` chạy lại các lệnh đó với model `light`. Test này cũng kiểm tra cấu hình vừa T4, ước tính thời gian, và việc số phút ghi trong tài liệu khớp với ước tính.
 - `tests/test_consistency.py` giữ repo thống nhất: file mẫu dataset và preset cùng quy tắc (streaming, `limit` ≤ 1000, trạng thái giấy phép), cùng một thư mục `data/processed/hf_sft`, mọi lệnh con có trợ giúp, chữ cho người dùng bằng tiếng Việt.
 - `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
 - Lệnh kiểm tra trước khi đẩy: xem `CLAUDE.md`.

@@ -16,7 +16,7 @@ Quy tắc riêng tuần 2:
 | M8 | Gộp repo Agent, phần 1: đưa code runtime vào | **Xong** | 4/4 (100%) | `tests/test_m8_runtime.py` (14 test) |
 | M9 | Gộp repo Agent, phần 2: tool chạy lệnh an toàn | **Xong** | 5/5 (100%) | `tests/test_m9_terminal.py` (11 test) |
 | M10 | Notebook train trên Colab free (0.5B) | **Xong** | 5/5 (100%) | `tests/test_m10_colab.py` (16 test) |
-| M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | Chưa làm | 0/4 | — |
+| M11 | Colab cho Qwen3-4B + hướng dẫn iPhone | **Xong** | 4/4 (100%) | `tests/test_m11_colab_light.py` (11 test) |
 | M12 | Chất lượng dữ liệu | Chưa làm | 0/3 | — |
 | M13 | Agent chạy model thật trên Colab | Chưa làm | 0/3 | — |
 | M14 | Tổng kết tuần 2 | Chưa làm | 0/4 | — |
@@ -74,10 +74,30 @@ Quy tắc riêng tuần 2:
 Chưa kiểm chứng: notebook **chưa chạy trên Colab thật** (môi trường phát triển không có GPU); thời gian 20–40 phút ghi trong notebook là ước đoán.
 
 ## M11: Colab cho Qwen3-4B + hướng dẫn iPhone
-- [ ] 1. `configs/training/colab_light.json`: QLoRA 4-bit, fp16, batch 1, `max_length` vừa T4.
-- [ ] 2. Notebook thêm lựa chọn model light, in ước tính thời gian, tự train tiếp khi Colab ngắt.
-- [ ] 3. `docs/TRAIN_COLAB.md`: từng bước trên iPhone (mở link, chọn T4, thêm `HF_TOKEN` vào Secrets, Run all, kết quả nằm đâu, lỗi hay gặp).
-- [ ] 4. Test dry-run với cấu hình mới xanh.
+- [x] 1. `configs/training/colab_light.json`: model `light` (Qwen3-4B), QLoRA 4bit, fp16, batch 1 (tích lũy 16 bước), `save_steps` 10.
+  - `max_length` là 2048: VRAM ước tính 3,8 GB trên 15 GB của T4, và 2048 đúng bằng độ dài mà `vram.py` giả định.
+  - Đo trên 2000 dòng thật của 3 preset: cắt ở 2048 thì 16 dòng bị cắt; cắt ở 1024 thì tới 308 dòng.
+  - Thêm mục `light-colab` (adapter vừa train, `max_new_tokens` 512 để Qwen3 có chỗ cho phần `<think>`).
+
+  Bằng chứng: `LightConfigTests`.
+- [x] 2. Notebook có ô **Bước 1: chọn model**: form Colab `MODEL = "smoke"  # @param ["smoke", "light"]`. Mọi lệnh sau đó dùng `colab_{MODEL}.json`, `{MODEL}-colab` và repo `huyen-{MODEL}-qlora` riêng cho từng model.
+  - **Ước tính thời gian:** ô **Bước 6** chạy lệnh mới `python -m local_ai.training.estimate` (`local_ai/training/estimate.py`). Lệnh in số bước, số phút train, số phút chấm, VRAM so với T4, và số bước đã train nếu có checkpoint trên máy hoặc trên Hub.
+  - Ước tính theo 2000 dòng: `smoke` khoảng 21 phút, `light` khoảng 109 phút, chưa tính cài đặt. Đây là ước lượng thô, chưa đo trên T4 thật.
+  - **Tự train tiếp khi Colab ngắt:** lệnh train đẩy checkpoint lên Hub, chạy lại thì tải `last-checkpoint` về (từ M10); ô ước tính báo "Đã train N/125 bước".
+
+  Bằng chứng: `NotebookChoiceTests`, `EstimateTests`.
+- [x] 3. `docs/TRAIN_COLAB.md` hướng dẫn trên iPhone:
+  - chuẩn bị token Write, tắt tự khóa màn hình;
+  - mở link (bật "Yêu cầu trang web cho máy tính" trong Safari);
+  - chọn T4, thêm `HF_TOKEN` vào Secrets (bật Notebook access);
+  - chọn model, Run all (các hộp thoại sẽ gặp);
+  - kết quả nằm đâu, khi Colab ngắt thì làm gì;
+  - bảng lỗi hay gặp.
+
+  README và notebook có link tới tài liệu này. Bằng chứng: `GuideTests` (kiểm tra đủ các bước, và số phút trong tài liệu và README khớp với ước tính).
+- [x] 4. `test_light_notebook_commands_run_with_dry_run` chạy mọi lệnh của notebook với `MODEL = "light"` bằng `--dry-run`. Test M10 được sửa theo cấu trúc notebook mới (thêm 2 ô, đánh số lại, thay biến `{MODEL}`, `{MAX_NEW_TOKENS}`); không bỏ kiểm tra nào. 171 test chạy qua; compileall và secret-scan sạch.
+
+Chưa kiểm chứng: notebook **chưa chạy trên Colab thật**; thời gian và VRAM là ước lượng.
 
 ## M12: Chất lượng dữ liệu
 - [ ] 1. Bộ lọc: ngôn ngữ (ưu tiên tiếng Việt), độ dài, lặp từ/câu, gần trùng (MinHash tự viết, không thêm thư viện nặng).

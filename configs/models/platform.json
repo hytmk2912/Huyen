@@ -112,6 +112,18 @@
       "max_new_tokens": 256,
       "capabilities": ["chat", "evaluation"],
       "offline": false
+    },
+    {
+      "name": "light-colab",
+      "source": "Qwen/Qwen3-4B",
+      "kind": "text",
+      "params_b": 4.02,
+      "adapter_path": ".runs/colab_light/adapter",
+      "dtype": "float16",
+      "device_map": "auto",
+      "max_new_tokens": 512,
+      "capabilities": ["chat", "reasoning"],
+      "offline": false
     }
   ]
 }

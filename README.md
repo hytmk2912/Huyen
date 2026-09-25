@@ -10,7 +10,7 @@ Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ, 27,7
 
 Kế hoạch tuần 1 và bằng chứng từng mốc: `TASKS.md`. Tiến độ, việc dở và lỗi còn tồn: `memory.md`.
 
-Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn ở mục "Train trên Colab miễn phí").
+Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`).
 
 ## Trạng thái sau tuần 1
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
@@ -23,13 +23,13 @@ Train thử model nhỏ trên Colab miễn phí, không cần máy có GPU: [![O
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); quét khóa bí mật (`secrets.py`).
-- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`).
+- `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`); ước tính thời gian train trên Colab (`estimate.py`).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent.
 - `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
-- `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc.
+- `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc. `docs/TRAIN_COLAB.md`: train trên Colab bằng iPhone.
 - `notebooks/`: notebook Colab, sinh từ `notebooks/build.py` (lưu không kèm output).
 - `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent, nhật ký tuần 1).
 
@@ -276,28 +276,47 @@ Số VRAM lấy từ `python -m local_ai.models.vram` (batch 1, khoảng 2048 to
 ## Train trên Colab miễn phí
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb)
 
-Notebook `notebooks/train_colab.ipynb` train model `smoke` (Qwen2.5-0.5B) trên GPU T4 miễn phí của Colab. Các ô chạy lần lượt:
+Notebook `notebooks/train_colab.ipynb` train trên GPU T4 miễn phí của Colab. **Hướng dẫn từng bước trên iPhone: `docs/TRAIN_COLAB.md`.**
+
+Ô đầu tiên chọn model:
+
+| Model | Cấu hình train | Chấm sau khi train | Thời gian ước tính (train + 2 lần chấm) |
+| --- | --- | --- | --- |
+| `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 21 phút |
+| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 3,8 GB | `light-colab` | khoảng 109 phút |
+
+Các ô sau chạy lần lượt:
 1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
 2. tải repo, cài thư viện đã ghim phiên bản (không cài lại torch);
 3. đọc `HF_TOKEN` từ Colab Secrets;
 4. lấy 2000 dòng từ 3 preset;
-5. chấm model gốc;
-6. train QLoRA (4bit, fp16) bằng `configs/training/colab_smoke.json`;
-7. chấm lại model sau khi train (mục `smoke-colab` trong danh sách model);
-8. in bảng so sánh trước/sau;
-9. đẩy adapter lên repo Hugging Face riêng tư.
+5. in ước tính thời gian, và số bước đã train nếu Colab từng ngắt;
+6. chấm model gốc;
+7. train QLoRA;
+8. chấm lại model sau khi train;
+9. in bảng so sánh trước/sau;
+10. đẩy adapter lên repo Hugging Face riêng tư.
 
 **Cần chuẩn bị:** token Hugging Face quyền Write, lưu trong Colab Secrets (biểu tượng chìa khóa) với tên `HF_TOKEN`, bật Notebook access. Token không nằm trong notebook hay repo.
 
-**Colab ngắt giữa chừng:** mở lại notebook và chạy Run all. Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước. Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_smoke/_hub/last-checkpoint` rồi train tiếp.
+**Colab ngắt giữa chừng:** mở lại notebook, giữ nguyên model đã chọn và chạy Run all.
+- Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước (`light`: 10, `smoke`: 25).
+- Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_<model>/_hub/last-checkpoint` rồi train tiếp.
 
-Nút Colab mở notebook ở nhánh `main`, nên chỉ dùng được sau khi gộp PR tuần 2. **Notebook chưa chạy thử trên Colab thật.** Test `tests/test_m10_colab.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run`, ví dụ:
+**Ước tính thời gian** (`python -m local_ai.training.estimate`) không tải model, chỉ dựa vào cấu hình và `sft.jsonl`:
+- số token mỗi dòng, kể cả phần đệm khi batch lớn hơn 1;
+- thông lượng giả định của T4.
+
+Đây là ước lượng thô, chưa đo trên T4 thật; cách tính ghi ở đầu `local_ai/training/estimate.py`.
+
+Nút Colab mở notebook ở nhánh `main`, nên chỉ dùng được sau khi gộp PR tuần 2. **Notebook chưa chạy thử trên Colab thật.** Test `tests/test_m10_colab.py` và `tests/test_m11_colab_light.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run` với cả 2 model, ví dụ:
 
 ```bash
 python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft --dry-run
-python -m local_ai.training.finetune --config configs/training/colab_smoke.json --push-to-hub --hub-model-id ten-ban/huyen-smoke-qlora --dry-run
-python -m local_ai.evaluation --model smoke-colab --max-new-tokens 256 --dry-run
-python -m local_ai.evaluation.compare .runs/eval/truoc/report.json .runs/eval/sau/report.json --dry-run
+python -m local_ai.training.estimate --config configs/training/colab_light.json --max-new-tokens 512 --dry-run
+python -m local_ai.training.finetune --config configs/training/colab_light.json --push-to-hub --hub-model-id ten-ban/huyen-light-qlora --dry-run
+python -m local_ai.evaluation --model light-colab --max-new-tokens 512 --dry-run
+python -m local_ai.evaluation.compare .runs/eval/light/truoc/report.json .runs/eval/light/sau/report.json --dry-run
 ```
 
 Muốn sửa notebook thì sửa nội dung ô trong `notebooks/build.py`, rồi chạy `python notebooks/build.py`; test báo lỗi nếu file `.ipynb` không khớp.

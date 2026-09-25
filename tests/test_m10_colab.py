@@ -30,7 +30,8 @@ PLATFORM = ROOT / "configs" / "models" / "platform.json"
 COLAB_CONFIG = ROOT / "configs" / "training" / "colab_smoke.json"
 COLAB_LINK = "https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb"
 HUB_REPO = "nguoi-dung/huyen-smoke-qlora"
-STEPS = ["gioi-thieu", "buoc-1-gpu", "buoc-2-cai-dat", "buoc-3-token", "buoc-4-du-lieu", "buoc-5-cham-truoc", "buoc-6-train", "buoc-7-cham-sau", "buoc-8-so-sanh", "buoc-9-day-adapter", "ket-qua"]
+# M11 thêm ô chọn model (buoc-1-chon-model) và ô ước tính thời gian (buoc-6-uoc-tinh).
+STEPS = ["gioi-thieu", "buoc-1-chon-model", "buoc-2-gpu", "buoc-3-cai-dat", "buoc-4-token", "buoc-5-du-lieu", "buoc-6-uoc-tinh", "buoc-7-cham-truoc", "buoc-8-train", "buoc-9-cham-sau", "buoc-10-so-sanh", "buoc-11-day-adapter", "ket-qua"]
 VIETNAMESE = re.compile(r"[ăâđêôơưàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ]", re.I)
 
 
@@ -42,10 +43,32 @@ def code_cells(notebook: dict) -> dict[str, str]:
     return {cell["id"]: "".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"}
 
 
-def notebook_commands() -> list[list[str]]:
-    """Mọi lệnh `!python -m local_ai...` trong notebook, thay biến {HUB_REPO} bằng một tên repo mẫu."""
+def notebook_variables(model: str = "smoke") -> dict[str, str]:
+    """Biến mà các lệnh `!python` dùng: chạy ô chọn model (chỉ có Python thường) với MODEL đã chọn; HUB_REPO là tên repo mẫu."""
+    source = re.sub(r'^MODEL = "\w+"', f'MODEL = "{model}"', code_cells(load_notebook())["buoc-1-chon-model"], flags=re.M)
+    namespace: dict = {}
+    with contextlib.redirect_stdout(io.StringIO()): exec(source, namespace)
+    return {"MODEL": namespace["MODEL"], "MAX_NEW_TOKENS": str(namespace["MAX_NEW_TOKENS"]), "HUB_REPO": f"nguoi-dung/huyen-{model}-qlora"}
+
+
+def notebook_commands(model: str = "smoke") -> list[list[str]]:
+    """Mọi lệnh `!python -m local_ai...` trong notebook, thay các biến {TÊN} bằng giá trị ứng với model đã chọn."""
+    variables = notebook_variables(model)
     lines = [line.strip() for source in code_cells(load_notebook()).values() for line in source.splitlines()]
-    return [shlex.split(line[1:].replace("{HUB_REPO}", HUB_REPO)) for line in lines if line.startswith("!python -m local_ai")]
+    return [shlex.split(re.sub(r"\{(\w+)\}", lambda match: variables[match.group(1)], line[1:])) for line in lines if line.startswith("!python -m local_ai")]
+
+
+def run_notebook_commands(test: unittest.TestCase, model: str = "smoke") -> list[tuple[str, object]]:
+    """Chạy mọi lệnh của notebook với --dry-run (không mạng, không GPU); trả về (module, kết quả JSON hoặc chữ nếu lệnh in chữ)."""
+    environ = {**os.environ, "HF_HUB_OFFLINE": "1", "PYTHONPATH": str(ROOT)}
+    outputs = []
+    for command in notebook_commands(model):
+        with test.subTest(" ".join(command)):
+            result = subprocess.run([sys.executable, *command[1:], "--dry-run"], cwd=ROOT, env=environ, capture_output=True, text=True, timeout=120)
+            test.assertEqual(result.returncode, 0, result.stderr)
+            try: outputs.append((command[2], json.loads(result.stdout)))
+            except json.JSONDecodeError: outputs.append((command[2], result.stdout))
+    return outputs
 
 
 def fake_module(name, **attributes):
@@ -103,27 +126,20 @@ class NotebookTests(unittest.TestCase):
 
     def test_gpu_install_and_token_cells(self):
         cells = code_cells(load_notebook())
-        self.assertIn("torch.cuda.is_available()", cells["buoc-1-gpu"]); self.assertIn("T4", cells["buoc-1-gpu"])
-        install = next(line for line in cells["buoc-2-cai-dat"].splitlines() if "pip install" in line)
+        self.assertIn("torch.cuda.is_available()", cells["buoc-2-gpu"]); self.assertIn("T4", cells["buoc-2-gpu"])
+        install = next(line for line in cells["buoc-3-cai-dat"].splitlines() if "pip install" in line)
         packages = install.split("pip install", 1)[1].split()[1:]  # bỏ cờ -q
         self.assertTrue(packages and all(re.fullmatch(r"[a-z][a-z0-9_-]*==[0-9][0-9.]*", name) for name in packages), packages)
         self.assertNotIn("torch", [name.split("==")[0] for name in packages])  # Colab có sẵn torch hợp với GPU, không cài lại
-        self.assertIn('userdata.get("HF_TOKEN")', cells["buoc-3-token"])
+        self.assertIn('userdata.get("HF_TOKEN")', cells["buoc-4-token"])
         text = NOTEBOOK.read_text(encoding="utf-8")
         self.assertIsNone(SECRET.search(text))
         self.assertFalse([line for source in cells.values() for line in source.splitlines() if "print(" in line and "HF_TOKEN" in line])
 
     def test_notebook_commands_run_with_dry_run(self):
-        commands = notebook_commands()
-        self.assertEqual([command[2] for command in commands], ["local_ai.data", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub"])
-        environ = {**os.environ, "HF_HUB_OFFLINE": "1", "PYTHONPATH": str(ROOT)}
-        outputs = []
-        for command in commands:
-            with self.subTest(" ".join(command)):
-                result = subprocess.run([sys.executable, *command[1:], "--dry-run"], cwd=ROOT, env=environ, capture_output=True, text=True, timeout=120)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                outputs.append(json.loads(result.stdout))
-        data, before, train, after, compare, push = outputs
+        outputs = run_notebook_commands(self)  # model mặc định của notebook: smoke
+        self.assertEqual([module for module, _ in outputs], ["local_ai.data", "local_ai.training.estimate", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub"])
+        (_, data), _, (_, before), (_, train), (_, after), (_, compare), (_, push) = outputs
         self.assertEqual(sum(item["rows"] for item in data["presets"].values()), 2000)
         self.assertEqual(data["output"], "data/processed/hf_sft")
         self.assertEqual((before["model"]["name"], after["model"]["name"], after["model"]["max_new_tokens"]), ("smoke", "smoke-colab", 256))
