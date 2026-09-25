@@ -1,0 +1,33 @@
+{
+  "_note": "SỐ ĐO THẬT: light trên Colab T4 ngày 25/9/2026, lấy từ repo riêng tư Hytmk2912/huyen-light-qlora. measurements là nguyên file measurements.json (lần chạy tiếp từ bước 30 sau khi Colab ngắt); eval_before lấy các trường tóm tắt của eval/truoc/report.json (tính cả thời gian tải và nạp model); loss lấy từ last-checkpoint/trainer_state.json. Chưa có so_do/light.json và báo cáo chấm sau khi train.",
+  "measurements": {
+    "model": "light",
+    "source": "Qwen/Qwen3-4B",
+    "params_b": 4.02,
+    "gpu": "Tesla T4",
+    "quantization": "4bit",
+    "dtype": "float16",
+    "per_device_batch_size": 1,
+    "gradient_accumulation_steps": 16,
+    "max_length": 2048,
+    "gradient_checkpointing": true,
+    "start_step": 30,
+    "end_step": 125,
+    "train_seconds": 4000.1071,
+    "num_tokens": 856769.0,
+    "peak_vram_gb": 7.12,
+    "peak_reserved_gb": 8.17,
+    "measured_at": "2026-09-25T15:34:34.603837+00:00"
+  },
+  "eval_before": {
+    "status": "completed",
+    "model": "light",
+    "generated_at": "2026-09-25T12:31:39.492338+00:00",
+    "cases": 30,
+    "passed": 17,
+    "groups": {"code": {"cases": 8, "passed": 1}, "reasoning": {"cases": 14, "passed": 9}, "tool_use": {"cases": 8, "passed": 7}},
+    "duration_s": 1044.29,
+    "output_chars": 40400
+  },
+  "loss": {"first_step": 5, "first": 1.5050018310546875, "last_step": 125, "last": 0.9717856407165527}
+}
