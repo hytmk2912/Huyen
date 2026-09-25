@@ -8,7 +8,8 @@ Số đo lấy từ:
 Hằng số đề xuất được tính ngược từ số đo, cùng công thức với `estimate.py` và `vram.py`:
 - `train_tflops` = 2 × số tham số × số token đã train × số lượt chạy qua model ÷ số giây train;
 - `TRAINING_FACTOR` = VRAM đỉnh do torch đếm ÷ GB trọng số (torch không đếm phần CUDA context, nên không trừ CUDA_CONTEXT_GB);
-- `token_overhead_s` = số giây mỗi token khi chấm − thời gian đọc trọng số cho mỗi token.
+- `token_overhead_s` = số giây mỗi token khi chấm − thời gian đọc trọng số cho mỗi token. Báo cáo chấm cũ chưa có `load_s`
+  (như lần chạy `smoke` ngày 25/9) tính cả thời gian tải và nạp model vào `duration_s`, nên số này bị đánh dấu là không dùng được.
 
 Lệnh chỉ đề xuất, không tự sửa code: người sửa hằng số đọc bảng này rồi quyết định.
 """
@@ -63,15 +64,16 @@ def compare(config: FinetuneConfig, measurements: dict[str, Any], eval_reports: 
         note = f"đo với max_length {config.max_length}, batch {config.per_device_batch_size}" + ("" if weights >= MIN_WEIGHTS_GB else f"; trọng số chỉ {weights:.2f} GB nên KHÔNG dùng số này để sửa hệ số, hãy dùng số đo của model lớn hơn (ví dụ light)")
         proposals["TRAINING_FACTOR"] = {"current": TRAINING_FACTOR, "measured": vram["implied_training_factor"], "note": note, "reliable": weights >= MIN_WEIGHTS_GB}
 
-    evaluations, overheads = {}, []
+    evaluations, overheads, clean = {}, [], True
     for label, report in (eval_reports or {}).items():
         if not report or report.get("status") != "completed" or not report.get("duration_s") or not report.get("output_chars"): continue
         per_token = report["duration_s"] / (report["output_chars"] / CHARS_PER_TOKEN)
         evaluations[label] = {"model": report["model"], "passed": report["passed"], "cases": report["cases"], "measured_minutes": round(report["duration_s"] / 60, 1),
                               "estimated_max_minutes": plan["eval_minutes"], "seconds_per_token": round(per_token, 4), "estimated_seconds_per_token": round(seconds_per_generated_token(model.params_b, gpu), 4)}
-        overheads.append(per_token - 2 * model.params_b / gpu.memory_gbps)
+        overheads.append(per_token - 2 * model.params_b / gpu.memory_gbps); clean = clean and "load_s" in report
     if profile and overheads:
-        proposals["token_overhead_s"] = {"current": gpu.token_overhead_s, "measured": round(max(0.0, sum(overheads) / len(overheads)), 4)}
+        proposals["token_overhead_s"] = {"current": gpu.token_overhead_s, "measured": round(max(0.0, sum(overheads) / len(overheads)), 4), "reliable": clean}
+        if not clean: proposals["token_overhead_s"]["note"] = "báo cáo chấm cũ tính cả thời gian tải và nạp model, nên KHÔNG dùng số này để sửa hằng số"
 
     agent = None
     if agent_report and agent_report.get("status") == "completed":

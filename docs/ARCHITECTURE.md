@@ -79,13 +79,13 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 - phép tính ≈ 2 × số tham số × số token × số lượt chạy qua model, chia cho thông lượng giả định của GPU;
 - báo số bước đã train nếu có checkpoint trên máy hoặc trên Hub.
 
-Các hằng số ghi ở đầu file và chưa đo trên T4 thật.
+Các hằng số ghi ở đầu file. Mới có một lần đo thật trên T4 (`smoke`, 25/9): thông lượng train đã sửa theo lần đo đó; thời gian chấm và VRAM chưa sửa.
 
 Số đo thật (M15):
 - lệnh train ghi `measurements.json` trong `output_dir` (GPU, VRAM đỉnh, thời gian, bước bắt đầu/kết thúc, số token của lần chạy), trước khi lưu adapter, nên được đẩy lên Hub cùng adapter;
-- báo cáo eval ghi `duration_s` và `output_chars`; báo cáo agent ghi `duration_s`;
+- báo cáo eval ghi `duration_s` (không tính thời gian nạp model, ghi riêng ở `load_s`) và `output_chars`; báo cáo agent ghi `duration_s`;
 - `calibrate.py` (`python -m local_ai.training.calibrate`) đặt số đo cạnh ước tính và tính ngược hằng số đề xuất (`train_tflops`, `TRAINING_FACTOR`, `token_overhead_s`), không tự sửa code;
-- hệ số VRAM đo từ model nhỏ được đánh dấu là không dùng được.
+- hệ số VRAM đo từ model nhỏ, và tốc độ chấm từ báo cáo cũ không có `load_s`, được đánh dấu là không dùng được.
 
 `RunTracker` ghi cấu hình, chỉ số và đường dẫn adapter vào thư mục của lượt chạy.
 

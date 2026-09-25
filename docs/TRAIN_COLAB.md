@@ -7,18 +7,18 @@ Hướng dẫn chạy notebook `notebooks/train_colab.ipynb` trên GPU T4 miễn
 4. chấm lại, in bảng so sánh trước/sau;
 5. đẩy adapter lên repo Hugging Face riêng tư của bạn.
 
-**Lưu ý:** notebook **chưa chạy thử trên Colab thật**, vì môi trường phát triển của repo không có GPU. Nếu gặp lỗi không có trong mục "Lỗi hay gặp", hãy chụp màn hình ô báo lỗi đầu tiên và gửi lại.
+**Lưu ý:** notebook đã chạy xong trên Colab thật với `smoke` (ngày 25/9, sau khi sửa lỗi Bước 8). `light` **chưa chạy thử trên Colab thật**. Nếu gặp lỗi không có trong mục "Lỗi hay gặp", hãy chụp màn hình ô báo lỗi đầu tiên và gửi lại.
 
 Link notebook (dùng được sau khi PR tuần 2 được gộp vào `main`): <https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb>
 
 ## Chọn model và thời gian ước tính
 | Model | Train | Chấm mỗi lần (tối đa) | Tổng, chưa tính cài đặt và tải model |
 | --- | --- | --- | --- |
-| `smoke` (Qwen2.5-0.5B), nên chạy trước | khoảng 13 phút | khoảng 4 phút | khoảng 21 phút |
-| `light` (Qwen3-4B) | khoảng 75 phút | khoảng 17 phút | khoảng 109 phút |
+| `smoke` (Qwen2.5-0.5B), nên chạy trước | khoảng 15 phút | khoảng 4 phút | khoảng 23 phút |
+| `light` (Qwen3-4B) | khoảng 83 phút | khoảng 17 phút | khoảng 118 phút |
 
 - Cài thư viện và tải model thường mất thêm 5–10 phút.
-- Số trong bảng tính bằng `python -m local_ai.training.estimate` (2000 dòng, GPU T4). Đây là ước lượng thô, chưa đo trên T4 thật.
+- Số trong bảng tính bằng `python -m local_ai.training.estimate` (2000 dòng, GPU T4). Đây là ước lượng thô. Tốc độ train đã sửa theo lần chạy thật của `smoke` ngày 25/9: train 14,9 phút, mỗi lần chấm 2–3 phút (kể cả nạp model), VRAM 2,5 GB.
 - Khi chạy, Bước 6 của notebook in ước tính theo đúng dữ liệu vừa lấy.
 - `light` chạy lâu, nên Colab miễn phí có thể ngắt giữa chừng. Khi đó xem mục "Khi Colab ngắt giữa chừng": việc train tự chạy tiếp, không mất công.
 

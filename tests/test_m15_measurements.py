@@ -152,6 +152,63 @@ class FakeGpuTrainingTests(unittest.TestCase):
                          {"model": "light", "gpu": "Tesla T4", "start_step": 0, "end_step": 8, "train_seconds": 12.5, "num_tokens": 1800.0, "peak_vram_gb": 3.21, "peak_reserved_gb": 4.5, "quantization": "4bit", "max_length": 2048})
 
 
+class RealSmokeMeasurementTests(unittest.TestCase):
+    """Số đo THẬT đầu tiên: notebook train_colab với smoke trên Colab T4 ngày 25/9 (file so_do/smoke.json chép về fixtures)."""
+
+    def setUp(self):
+        self.real = fixture("that_smoke_t4_2026-09-25.json")
+
+    def test_t4_train_throughput_follows_real_measurement(self):
+        self.assertEqual((self.real["gpu"], self.real["measurements"]["end_step"]), ("Tesla T4", 125))
+        self.assertEqual(GPUS["T4"].train_tflops, round(self.real["train"]["effective_tflops"], 1))
+        result = calibrate.compare(config_without_data("smoke"), self.real["measurements"])  # tính lại từ số đo gốc, không lấy số đã làm tròn
+        self.assertAlmostEqual(result["proposals"]["train_tflops"]["measured"], GPUS["T4"].train_tflops, delta=0.1)
+        plan = estimate(config_without_data("smoke"), rows=2000)
+        self.assertLess(abs(plan["train_minutes"] - self.real["train"]["measured_minutes"]) / self.real["train"]["measured_minutes"], 0.05)
+        self.assertFalse(result["proposals"]["TRAINING_FACTOR"]["reliable"])  # chưa sửa vram.py theo smoke
+
+    def test_old_eval_reports_include_load_time_so_overhead_is_not_used(self):
+        report = {"status": "completed", "model": "smoke", "passed": 16, "cases": 30, "duration_s": 132.0, "output_chars": 10200}
+        old = calibrate.compare(config_without_data("smoke"), self.real["measurements"], {"before": report})
+        self.assertFalse(old["proposals"]["token_overhead_s"]["reliable"])
+        self.assertIn("tính cả thời gian tải và nạp model", calibrate.format_comparison(old))
+        new = calibrate.compare(config_without_data("smoke"), self.real["measurements"], {"before": {**report, "load_s": 20.0}})
+        self.assertTrue(new["proposals"]["token_overhead_s"]["reliable"]); self.assertNotIn("note", new["proposals"]["token_overhead_s"])
+        self.assertEqual(GPUS["T4"].token_overhead_s, self.real["proposals"]["token_overhead_s"]["current"])  # chưa sửa theo số đo lẫn thời gian nạp
+
+    def test_eval_loads_model_before_timing(self):
+        cases = [case for case in load_cases() if case.scoring != "python_tests"][:3]
+        clock = types.SimpleNamespace(now=0.0)
+        fake_time = types.SimpleNamespace(monotonic=lambda: clock.now)
+
+        class LazyModel:
+            name, model, loads = "nap-luoi", None, 0
+            def load(self): self.loads += 1; clock.now += 40.0; self.model = object()  # tải và nạp model mất 40 giây
+            def generate(self, messages):
+                if self.model is None: self.load()
+                clock.now += 2.0; return "trả lời"
+
+        from local_ai.evaluation import suite
+        with mock.patch.object(suite, "time", fake_time):
+            lazy = LazyModel(); report = run_eval(lazy, cases)
+        self.assertEqual((lazy.loads, report["load_s"], report["duration_s"]), (1, 40.0, 6.0))
+
+        class Broken(LazyModel):
+            def load(self): raise OSError("hết bộ nhớ GPU")
+        failed = run_eval(Broken(), cases)
+        self.assertEqual((failed["status"], failed["answered"]), ("error", 0)); self.assertIn("Model lỗi khi nạp", failed["error"])
+
+    def test_readme_has_real_measurement_table(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        table = readme.split("**Số đo thật trên Colab**", 1)[1].split("\n\n", 2)[1]
+        smoke = next(line for line in table.splitlines() if line.startswith("| Train |"))
+        self.assertIn(f"trong {self.real['train']['measured_minutes']:.1f} phút".replace(".", ","), smoke)
+        before, after = self.real["eval"]["before"], self.real["eval"]["after"]
+        for phrase in (f"{self.real['vram']['measured_gb']:.1f} GB".replace(".", ","), f"{before['passed']}/{before['cases']} → {after['passed']}/{after['cases']}"):
+            with self.subTest(phrase): self.assertIn(phrase, table)
+        self.assertIn("chưa chạy", table)  # light và agent chưa có số đo thật
+
+
 @unittest.skipIf(MISSING, f"thiếu thư viện: {', '.join(MISSING)}")
 class RealCpuTrainingTests(unittest.TestCase):
     """Train thật 2 bước rồi chạy tiếp 1 bước trên CPU với model tí hon (dùng lại cách tạo model của test M6)."""
