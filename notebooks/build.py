@@ -81,6 +81,9 @@ from local_ai.colab import run  # chạy lệnh: lệnh lỗi thì ô báo đỏ
 
 run("git pull --ff-only", "Bước 3 (cập nhật code)")
 run("pip install -q {PINNED}", "Bước 3 (cài thư viện)")
+# Colab cài sẵn torchao; bản đó không hợp với các thư viện đã ghim ở trên và làm lỗi khi train (chủ repo gặp khi chạy
+# smoke và light ngày 25/9, phải gỡ tay). Repo không dùng torchao nên gỡ đi; máy chưa có torchao thì lệnh này chỉ báo bỏ qua.
+run("pip uninstall -y -q torchao", "Bước 3 (gỡ torchao)")
 """),
         code("buoc-4-token", """
 # Bước 4: lấy HF_TOKEN từ Colab Secrets (biểu tượng chìa khóa 🔑). Token không bị in ra và không lưu vào notebook.

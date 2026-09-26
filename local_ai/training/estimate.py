@@ -1,7 +1,7 @@
 """Ước tính thời gian train và chấm eval trên GPU của Colab (mặc định T4), chỉ từ cấu hình và file dữ liệu: không tải model.
 
-Đây là ước lượng thô. Thông lượng train đã sửa theo 2 lần đo thật trên T4 (`smoke` và `light`, 25/9/2026); tốc độ chấm
-chưa đo được (xem `python -m local_ai.training.calibrate`). Cách tính:
+Đây là ước lượng thô. Thông lượng train (ở đây) và VRAM khi train QLoRA (`vram.py`) đã sửa theo 2 lần đo thật trên T4
+(`smoke` và `light`, 25/9/2026); tốc độ chấm chưa đo được (xem `python -m local_ai.training.calibrate`). Cách tính:
 - số bước = ceil(số dòng ÷ (per_device_batch_size × gradient_accumulation_steps)) × epochs, hoặc max_steps nếu lớn hơn 0;
 - số token mỗi dòng ≈ số ký tự ÷ CHARS_PER_TOKEN + TEMPLATE_TOKENS × số lượt hội thoại, không quá max_length.
   Hai hằng số này khớp với tokenizer Qwen3 trên 2000 dòng thật của 3 preset (đo ngày 25/9/2026: trung bình 491 token/dòng
@@ -123,7 +123,7 @@ def _number(value: float) -> str:
 
 
 def format_estimate(plan: dict[str, Any], resumed_from: str | None = None) -> str:
-    lines = [f"Ước tính cho model {plan['model']} ({plan['source']}, {_number(plan['params_b'])} tỷ tham số) trên GPU {plan['gpu']}. Đây là ước lượng thô; thông lượng train đo từ lần chạy thật trên T4 (smoke và light), VRAM và tốc độ chấm chưa sửa theo số đo.",
+    lines = [f"Ước tính cho model {plan['model']} ({plan['source']}, {_number(plan['params_b'])} tỷ tham số) trên GPU {plan['gpu']}. Đây là ước lượng thô; thông lượng train và VRAM đã sửa theo lần chạy thật trên T4 (smoke và light), tốc độ chấm chưa đo.",
              f"- Dữ liệu: {plan['rows']} dòng, trung bình khoảng {round(plan['tokens_per_row'])} token/dòng kể cả phần đệm (cắt ở {plan['max_length']} token; {'đếm từ sft.jsonl' if plan['data'] == 'sft.jsonl' else 'chưa có sft.jsonl nên dùng số đo mẫu'}).",
              f"- VRAM khi train: khoảng {_number(plan['vram_gb'])} GB / {_number(plan['gpu_memory_gb'])} GB của {plan['gpu']}." + ("" if plan["fits"] else " CẢNH BÁO: có thể thiếu bộ nhớ, hãy giảm max_length hoặc chọn model nhỏ hơn."),
              f"- Train: {plan['steps']} bước, khoảng {round(plan['train_minutes'])} phút."]

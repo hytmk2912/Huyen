@@ -4,11 +4,18 @@
 - trọng số = số tham số × số bit mỗi tham số ÷ 8. Nén 8bit/4bit tính thêm phần hằng số nén và các lớp
   giữ nguyên độ chính xác (embedding, lm_head, phần xử lý ảnh), nên lấy 8,5 và 4,5 bit thay vì 8 và 4;
 - train LoRA/QLoRA = trọng số × 1,25 (activation khi bật gradient checkpointing, tham số LoRA và trạng thái
-  optimizer, batch 1, độ dài khoảng 2048 token) + 1 GB cho CUDA context.
+  optimizer, batch 1, độ dài khoảng 2048 token) + 1 GB cho CUDA context;
+- model nén (QLoRA 4bit, 8bit) cộng thêm KBIT_OVERHEAD_GB × √(tỷ tham số). Khi train model nén, embedding bị đổi
+  sang float32 và phần logits trên bộ từ vựng (khoảng 152 nghìn token với Qwen) rất lớn so với trọng số 4bit; phần này
+  tăng chậm hơn số tham số nên tính theo căn bậc hai. Hằng số đo thật trên Colab T4 ngày 25/9/2026 (mốc M15):
+  `light` (Qwen3-4B) dùng 8,17 GB, công thức cũ chỉ ước tính 3,8 GB; `smoke` (0,5B) dùng 2,5 GB, công thức mới
+  ước tính 3,2 GB. Model 27B chưa đo: con số của nó là suy ra, cần đo lại khi làm M17.
+- train LoRA bf16 (không nén) chưa đo thật, vẫn dùng công thức cũ.
 """
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 from local_ai.config.settings import load_model_configs
@@ -19,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BITS_PER_PARAM = {"bf16": 16.0, "8bit": 8.5, "4bit": 4.5}
 TRAINING_FACTOR = 1.25
 CUDA_CONTEXT_GB = 1.0
+KBIT_OVERHEAD_GB = 2.67  # GB × √(tỷ tham số): (8,17 GB đo với light − 2,26 GB trọng số 4bit × 1,25) ÷ √4,02
 
 
 def weights_gb(params_b: float, precision: str) -> float:
@@ -26,9 +34,14 @@ def weights_gb(params_b: float, precision: str) -> float:
     return params_b * BITS_PER_PARAM[precision] / 8
 
 
+def kbit_overhead_gb(params_b: float, precision: str) -> float:
+    """Phần thêm khi train model nén 4bit/8bit (embedding float32, logits); model không nén thì bằng 0."""
+    return KBIT_OVERHEAD_GB * math.sqrt(params_b) if precision in ("4bit", "8bit") else 0.0
+
+
 def training_gb(params_b: float, precision: str) -> float:
     """GB khi train LoRA (precision bf16) hoặc QLoRA (precision 4bit)."""
-    return weights_gb(params_b, precision) * TRAINING_FACTOR + CUDA_CONTEXT_GB
+    return weights_gb(params_b, precision) * TRAINING_FACTOR + kbit_overhead_gb(params_b, precision) + CUDA_CONTEXT_GB
 
 
 def estimate(model: ModelConfig) -> dict[str, float | None]:
@@ -38,14 +51,14 @@ def estimate(model: ModelConfig) -> dict[str, float | None]:
 
 def format_table(models: list[ModelConfig]) -> str:
     def cell(value: float | None) -> str: return "?" if value is None else f"{value:.1f}"
-    lines = ["VRAM ước tính (GB) — chỉ là ước lượng từ params_b, chưa đo trên GPU thật.", "",
+    lines = ["VRAM ước tính (GB) — ước lượng từ params_b; phần QLoRA đã hiệu chỉnh theo số đo thật của model 4B trên T4.", "",
              "| Model | kind | Tham số (tỷ) | Trọng số bf16 | Trọng số 8bit | Trọng số 4bit | Train LoRA (bf16) | Train QLoRA (4bit) |",
              "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for model in models:
         values = estimate(model)
         lines.append(f"| {model.name} | {model.kind} | {'?' if model.params_b is None else f'{model.params_b:g}'} | " + " | ".join(cell(values[key]) for key in ("bf16", "8bit", "4bit", "lora_bf16", "qlora_4bit")) + " |")
     if any(model.params_b is None for model in models): lines += ["", "Dấu ? là model chưa khai báo params_b trong danh sách model."]
-    lines += ["", f"Cách tính: trọng số = tỷ tham số × bit/tham số ÷ 8 (bf16 = 16, 8bit = 8,5, 4bit = 4,5 bit); train = trọng số × {TRAINING_FACTOR} + {CUDA_CONTEXT_GB:.0f} GB (batch 1, khoảng 2048 token, bật gradient checkpointing). Suy luận cần thêm bộ nhớ cho KV cache, tăng theo độ dài ngữ cảnh."]
+    lines += ["", f"Cách tính: trọng số = tỷ tham số × bit/tham số ÷ 8 (bf16 = 16, 8bit = 8,5, 4bit = 4,5 bit); train = trọng số × {TRAINING_FACTOR:g} + {CUDA_CONTEXT_GB:.0f} GB (batch 1, khoảng 2048 token, bật gradient checkpointing); QLoRA cộng thêm {KBIT_OVERHEAD_GB:g} × √(tỷ tham số) GB cho embedding float32 và logits (đo trên Qwen3-4B; model 27B chưa đo). Suy luận cần thêm bộ nhớ cho KV cache, tăng theo độ dài ngữ cảnh."]
     return "\n".join(lines)
 
 

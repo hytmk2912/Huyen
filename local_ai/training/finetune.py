@@ -21,7 +21,7 @@ from typing import Any, Literal
 from local_ai.config.settings import find_model_config
 from local_ai.experiments.tracking import RunTracker, seed_everything
 from local_ai.models.adapters import QUANTIZATIONS, TORCH_DTYPES, ModelConfig, model_loader_class, quantization_config, resolve_torch_dtype
-from local_ai.training.hub import check_repo_id, download_last_checkpoint, downloaded_checkpoint
+from local_ai.training.hub import check_repo_id, download_file, download_last_checkpoint, downloaded_checkpoint
 from local_ai.training.plans import TrainingPlan
 
 FinetuneMethod = Literal["full", "lora"]
@@ -189,6 +189,18 @@ def trainable_to_float32(torch: Any, model: Any, cast: bool) -> str | None:
     return line
 
 
+def previous_measurements(config: FinetuneConfig) -> dict[str, Any] | None:
+    """Số đo của lần đã train trước: file trong output_dir, nếu không có thì file trên repo Hub (khi bật --push-to-hub)."""
+    local = Path(config.output_dir) / MEASUREMENTS
+    if local.is_file(): return json.loads(local.read_text(encoding="utf-8"))
+    if not (config.push_to_hub and config.hub_model_id): return None
+    try:
+        remote = download_file(config.hub_model_id, MEASUREMENTS)
+    except Exception:  # mất mạng hay lỗi quyền: không để việc giữ số đo cũ làm hỏng lượt train vừa xong
+        return None
+    return json.loads(remote.read_text(encoding="utf-8")) if remote else None
+
+
 def train(config: FinetuneConfig) -> dict[str, Any]:
     config.validate(); model_config = resolve_base_model(config); quantization = effective_quantization(config, model_config)
     missing = missing_requirements(config)
@@ -229,6 +241,10 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     if summary: print(summary, file=sys.stderr, flush=True)
     result = trainer.train(resume_from_checkpoint=resume)
     measurements = training_measurements(torch, config, model_config, trainer, result, checkpoint_step(resume))
+    if measurements["end_step"] is not None and measurements["end_step"] <= measurements["start_step"]:
+        # Checkpoint đã đủ bước nên lần này không train thêm bước nào (ví dụ chạy lại notebook chỉ để chấm): giữ số đo của
+        # lần đã train, không ghi đè bằng số đo 0 bước (ngày 25/9 light bị mất số đo train theo đúng cách này).
+        measurements = previous_measurements(config) or measurements
     # Ghi trước save_model: khi bật --push-to-hub, file này được đẩy lên repo cùng adapter.
     (Path(config.output_dir) / MEASUREMENTS).write_text(json.dumps(measurements, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     final = Path(config.output_dir) / ("adapter" if config.method == "lora" else "final")
