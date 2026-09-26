@@ -29,7 +29,7 @@ Test: `tests/test_m8_runtime.py`. Vì repo Agent không có test, đây là test
 - **`/v1/execute` qua HTTP của runtime gốc không đưa vào:** chạy lệnh từ xa qua mạng là rủi ro lớn nhất, mà agent đã gọi `TerminalTool` ngay trong tiến trình nên không cần.
 - Test: `tests/test_m9_terminal.py`.
 - **Giới hạn còn lại:**
-  - `git status`/`git log` tự tìm repo git ở thư mục cha, nên đọc được lịch sử của repo chứa thư mục làm việc;
+  - ~~`git status`/`git log` tự tìm repo git ở thư mục cha, nên đọc được lịch sử của repo chứa thư mục làm việc~~: đã sửa ngày 26/9 (chủ repo thử thật được `git log -p` in cả repo). Nay lệnh chạy với `GIT_CEILING_DIRECTORIES` là thư mục cha của thư mục làm việc và môi trường tối thiểu (không có HF_TOKEN hay khóa; HOME là thư mục tạm). Test: `tests/test_bao_mat_sandbox_terminal.py`;
   - mẫu tìm của `grep` có dấu `/` ở đầu bị coi là đường dẫn và bị từ chối (chặn thừa, nhưng an toàn).
 
 ## Phần bỏ

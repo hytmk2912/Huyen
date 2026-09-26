@@ -11,13 +11,15 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M15 | Số đo thật trên Colab | **Xong** | 4/4 (100%) | `tests/test_m15_measurements.py` (21 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (13 test, 2 test thêm ở lượt rà soát tuần 3) |
 | M17 | Model chính (ảnh + chữ): LoRA chỉ gắn vào phần ngôn ngữ | **Xong** | 4/4 (100%) | `tests/test_m17_multimodal_lora.py` (5 test) |
-| M19 | Chấm công bằng hơn | **Chưa làm** (chọn 26/9, làm trước M20) | 0/5 (0%) | — |
-| M20 | Dữ liệu giữ khả năng gọi công cụ | **Chưa làm** (chọn 26/9) | 0/3 (0%) | — |
-| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 3 **Xong**, 2 chưa làm | 3/5 mốc (60%) | `python -m local_ai.check`: 266 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
+| M19 | Chấm công bằng hơn | **Chưa làm** (chọn 26/9, làm trước M20) | 0/8 (0%) | — |
+| M20 | Dữ liệu giữ khả năng gọi công cụ | **Chưa làm** (chọn 26/9) | 0/4 (0%) | — |
+| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 3 **Xong**, 2 chưa làm | 3/5 mốc (60%) | `python -m local_ai.check`: 271 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
 Rà soát tuần 3 (26/9, chủ repo yêu cầu, không phải mốc): tài liệu khớp thực tế sau khi chạy thật trên Colab T4; tuần 1–2 của file này chép nguyên văn sang `archive/tasks-tuan-1-2.md`; `memory.md` tối đa 5.000 ký tự (nhật ký chi tiết ở `archive/memory-tuan-3.md`); lệnh mới `python -m local_ai.check` (test bị bỏ qua vì thiếu thư viện thì không xanh); hàm `run` của `local_ai/colab.py` đóng pipe và in nốt chữ còn trong decoder; ghi tiêu chí M19, M20. Bằng chứng: `tests/test_ra_soat_tuan_3.py`, `RunCleanupTests` trong `tests/test_m16_notebook_resilience.py`.
+
+Sửa 2 lỗi bảo mật (26/9, chủ repo yêu cầu và đã thử thật, không phải mốc): (1) TerminalTool đọc được repo cha qua git, vì thư mục làm việc của agent nằm trong repo và git tự tìm `.git` ở thư mục cha; nay lệnh chạy với `GIT_CEILING_DIRECTORIES` là thư mục cha của thư mục làm việc. (2) PythonSandbox để lộ `HF_TOKEN` (notebook đặt vào `os.environ`); nay sandbox và lệnh của TerminalTool chỉ nhận môi trường tối thiểu (PATH, ngôn ngữ/mã hóa, HOME tạm). Bằng chứng: `tests/test_bao_mat_sandbox_terminal.py` (5 test). Ghi thêm tiêu chí M19 (5–7) và M20 (3).
 
 Sửa lỗi Bước 8 trên T4 (25/9, chủ repo gặp khi chạy `smoke`): TRL đổi tham số LoRA sang bf16 nên train fp16 lỗi ở bước đầu; nay tham số được train được đổi về float32 trước khi train và dtype được in ra log. Bằng chứng: `tests/test_sua_loi_fp16_t4.py` (4 test).
 
@@ -66,13 +68,17 @@ Chủ repo chọn ngày 26/9; làm trước M20 (chủ repo gọi `/lam-moc`). M
 - [ ] 2. Bước 9 (chấm sau) đẩy báo cáo lên Hub ở `eval/sau` và luôn chấm lại (thêm tùy chọn `--no-reuse` cho lệnh eval).
 - [ ] 3. Câu tool_use trong bộ chấm tăng từ 8 lên ít nhất 16.
 - [ ] 4. TerminalTool từ chối lệnh thì kèm gợi ý cách khác (các lệnh được phép; chạy từng lệnh, không pipe hay redirect). Thêm 1 nhiệm vụ agent phải thử lại sau khi bị từ chối; test bằng `--scripted` hoặc server giả.
-- [ ] 5. `python -m local_ai.check` xanh.
+- [ ] 5. Chấm lặp lại được. Hiện `generate()` dùng cấu hình sinh chữ mặc định của Qwen (lấy mẫu ngẫu nhiên, không seed) nên chạy lại ra điểm khác. Model transformers mặc định greedy (`do_sample=False`); model qua server gửi `temperature` 0 và `seed` cố định. Cách sinh chữ và revision model nằm trong `eval_settings` và trong báo cáo. Test: chấm 2 lần bằng model tí hon ra cùng kết quả.
+- [ ] 6. Chấm nhiệm vụ agent so số theo giá trị. Hiện `answer_matches` chỉ kiểm tra chuỗi con nên "187" được tính đúng khi cần "87". Sửa để 187 hay 87,5 không khớp 87; 337500.0 vẫn khớp 337500.
+- [ ] 7. Ghim revision (mã commit) cho các model transformers trong `configs/models/platform.json`; mục `-lora`, `-colab` dùng cùng revision với model gốc. Không lấy được mã commit thì ghi vào "Việc dở", không đoán.
+- [ ] 8. `python -m local_ai.check` xanh.
 
 ## M20: Dữ liệu giữ khả năng gọi công cụ
 Chủ repo chọn ngày 26/9; làm sau M19. Mục tiêu: sau khi train, `light` tụt tool_use 7/8 → 3/8 vì dữ liệu train không có dòng gọi công cụ; dữ liệu train mới giữ được khả năng này và không gần trùng với bộ chấm.
 - [ ] 1. `hf-sft` có tùy chọn trộn khoảng 10% dòng gọi công cụ tự sinh: đúng dạng JSON mà câu tool_use của bộ chấm yêu cầu, có cả câu không cần công cụ; câu hỏi và số liệu khác bộ chấm; không dùng API trả phí. Notebook train bật tùy chọn này mặc định.
 - [ ] 2. Chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12; `manifest.json` ghi số dòng bị loại.
-- [ ] 3. `python -m local_ai.check` xanh.
+- [ ] 3. Chỉ tính loss trên câu trả lời: truyền `assistant_only_loss=True` vào `SFTConfig` (hiện TRL tính loss cả câu hỏi của người dùng). TRL 1.13 tự thay chat template có `{% generation %}` cho Qwen2.5, Qwen3, Qwen3.8; template không hỗ trợ thì báo lỗi tiếng Việt rõ ràng trước khi train, tắt được bằng cấu hình. Test train thật trên CPU với model tí hon dùng chat template Qwen: nhãn phần câu hỏi là -100.
+- [ ] 4. `python -m local_ai.check` xanh.
 
 ## M16: Notebook bền hơn
 Mục tiêu: Colab (chạy từ điện thoại) không chạy tiếp các ô sau khi một lệnh đã lỗi; chạy lại sau khi Colab ngắt thì không phải chấm lại model gốc.
