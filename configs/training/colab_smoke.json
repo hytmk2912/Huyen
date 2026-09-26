@@ -22,5 +22,6 @@
   "require_gpu": true,
   "push_to_hub": false,
   "hub_model_id": null,
-  "hub_private": true
+  "hub_private": true,
+  "assistant_only_loss": true
 }

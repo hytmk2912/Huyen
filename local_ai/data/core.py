@@ -208,20 +208,26 @@ def generate_synthetic(teacher: TeacherModel, prompts: list[str], parser: Callab
 
 
 def build_dataset(sources: list[str | Path], output_dir: str | Path, version: str, config: dict[str, Any], eval_sources: list[str | Path] | None = None, quality: Any = None) -> dict[str, Any]:
-    """Kiểm tra schema → loại trùng tuyệt đối → bộ lọc chất lượng (nếu truyền `quality`, kiểu QualityConfig) → chặn trùng eval → xuất file và manifest."""
+    """Kiểm tra schema → loại trùng tuyệt đối → bộ lọc chất lượng (nếu truyền `quality`, kiểu QualityConfig) → chặn trùng eval
+    (trùng hẳn thì báo lỗi; gần trùng thì loại, số dòng ghi ở `eval_near_duplicate` của manifest) → xuất file và manifest."""
     raw = [record for source in sources for record in load_records(source)]
     valid, rejected = validate_records(raw); unique, duplicates = deduplicate(valid)
     quality_report: dict[str, Any] = {"enabled": False}
     if quality is not None:
         from local_ai.data.quality import apply_quality_filters  # quality.py dùng hàm của file này, nên import ở đây để tránh vòng lặp import
         unique, filtered, quality_report = apply_quality_filters(unique, quality); rejected = rejected + filtered; quality_report = {"enabled": True, **quality_report}
-    overlap = find_eval_overlap(unique, [record for source in (eval_sources or []) for record in load_records(source)])
+    eval_records = [record for source in (eval_sources or []) for record in load_records(source)]
+    overlap = find_eval_overlap(unique, eval_records)
     if overlap: raise ValueError(f"Dữ liệu train trùng với dữ liệu eval (overlap): {', '.join(f'{identifier} (trùng {reason})' for identifier, reason in sorted(overlap))}")
+    # Gần trùng với bộ chấm (M20): loại bằng MinHash của M12, dùng ngưỡng near_duplicate của cấu hình chất lượng (tắt lọc chất lượng thì dùng mặc định).
+    from local_ai.data.quality import NearDuplicateFilter, remove_eval_near_duplicates
+    unique, near_eval, eval_near_report = remove_eval_near_duplicates(unique, eval_records, quality.near_duplicate if quality is not None else NearDuplicateFilter())
+    rejected = rejected + near_eval
     for record in unique: record["quality_score"] = quality_score(record)
     if config.get("mix_weights"): unique = mix_records(unique, config["mix_weights"], config.get("seed", 0))
     output = Path(output_dir); write_jsonl(output / "train.jsonl", unique); write_jsonl(output / "rejected.jsonl", rejected + duplicates)
     for kind in config.get("formats", ["sft"]): write_jsonl(output / f"{kind}.jsonl", prepare_format(unique, kind))
     checksum = hashlib.sha256((output / "train.jsonl").read_bytes()).hexdigest()
-    manifest = {"version": version, "generated_at": datetime.now(timezone.utc).isoformat(), "source_manifest": [str(path) for path in sources], "configuration": config, "checksum": checksum, "statistics": statistics(unique, len(duplicates), len(rejected)), "quality": quality_report, "eval_sources": [str(path) for path in (eval_sources or [])]}
+    manifest = {"version": version, "generated_at": datetime.now(timezone.utc).isoformat(), "source_manifest": [str(path) for path in sources], "configuration": config, "checksum": checksum, "statistics": statistics(unique, len(duplicates), len(rejected)), "quality": quality_report, "eval_sources": [str(path) for path in (eval_sources or [])], "eval_near_duplicate": eval_near_report}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return manifest

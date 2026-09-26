@@ -1,7 +1,7 @@
 # Train trên Colab bằng iPhone
 
 Hướng dẫn chạy notebook `notebooks/train_colab.ipynb` trên GPU T4 miễn phí của Google Colab, chỉ cần iPhone (Safari). Notebook sẽ:
-1. lấy 2000 dòng dữ liệu;
+1. lấy 2000 dòng dữ liệu (có 200 dòng gọi công cụ tự sinh, để model không quên cách gọi công cụ);
 2. chấm model gốc;
 3. train QLoRA;
 4. chấm lại, in bảng so sánh trước/sau;

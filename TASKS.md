@@ -12,8 +12,8 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (13 test, 2 test thêm ở lượt rà soát tuần 3) |
 | M17 | Model chính (ảnh + chữ): LoRA chỉ gắn vào phần ngôn ngữ | **Xong** | 4/4 (100%) | `tests/test_m17_multimodal_lora.py` (5 test) |
 | M19 | Chấm công bằng hơn | **Xong** | 8/8 (100%) | `tests/test_m19_cham_cong_bang.py` (23 test) |
-| M20 | Dữ liệu giữ khả năng gọi công cụ | **Chưa làm** (chọn 26/9) | 0/4 (0%) | — |
-| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 4 **Xong**, 1 chưa làm | 4/5 mốc (80%) | `python -m local_ai.check`: 294 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
+| M20 | Dữ liệu giữ khả năng gọi công cụ | **Xong** | 4/4 (100%) | `tests/test_m20_du_lieu_goi_cong_cu.py` (15 test) |
+| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 5 **Xong** | 5/5 mốc (100%) | `python -m local_ai.check`: 309 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
@@ -89,10 +89,16 @@ Chủ repo chọn ngày 26/9; làm trước M20 (chủ repo gọi `/lam-moc`). M
 
 ## M20: Dữ liệu giữ khả năng gọi công cụ
 Chủ repo chọn ngày 26/9; làm sau M19. Mục tiêu: sau khi train, `light` tụt tool_use 7/8 → 3/8 vì dữ liệu train không có dòng gọi công cụ; dữ liệu train mới giữ được khả năng này và không gần trùng với bộ chấm.
-- [ ] 1. `hf-sft` có tùy chọn trộn khoảng 10% dòng gọi công cụ tự sinh: đúng dạng JSON mà câu tool_use của bộ chấm yêu cầu, có cả câu không cần công cụ; câu hỏi và số liệu khác bộ chấm; không dùng API trả phí. Notebook train bật tùy chọn này mặc định.
-- [ ] 2. Chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12; `manifest.json` ghi số dòng bị loại.
-- [ ] 3. Chỉ tính loss trên câu trả lời: truyền `assistant_only_loss=True` vào `SFTConfig` (hiện TRL tính loss cả câu hỏi của người dùng). TRL 1.13 tự thay chat template có `{% generation %}` cho Qwen2.5, Qwen3, Qwen3.8; template không hỗ trợ thì báo lỗi tiếng Việt rõ ràng trước khi train, tắt được bằng cấu hình. Test train thật trên CPU với model tí hon dùng chat template Qwen: nhãn phần câu hỏi là -100.
-- [ ] 4. `python -m local_ai.check` xanh.
+- [x] 1. `hf-sft` có tùy chọn trộn khoảng 10% dòng gọi công cụ tự sinh: đúng dạng JSON mà câu tool_use của bộ chấm yêu cầu, có cả câu không cần công cụ; câu hỏi và số liệu khác bộ chấm; không dùng API trả phí. Notebook train bật tùy chọn này mặc định.
+
+  Đã làm: `--tool-calls TỈ_LỆ` (mới `local_ai/data/tool_calls.py`, mẫu câu có seed, chỉ thư viện chuẩn); có `--total` thì nằm trong tổng (notebook Bước 5: 2000 = 1800 dòng preset + 200 dòng gọi công cụ). Chia đều tiếng Việt / tiếng Anh × calculator, read_file, search, không cần công cụ. Lời dẫn khác bộ chấm; không dùng số, tên file, chủ đề của câu tool_use trong bộ chấm; Jaccard lớn nhất với câu chấm 0,3. Bằng chứng: `ToolCallDataTests` (5 test). Test M10, M11 kiểm tra notebook lấy 2000 dòng sửa thành 1800 dòng preset + 200 dòng gọi công cụ (vẫn đủ 2000).
+- [x] 2. Chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12; `manifest.json` ghi số dòng bị loại.
+
+  Đã làm: `build_dataset` loại dòng gần trùng với `eval_sources` (MinHash + LSH của M12, rồi Jaccard thật, ngưỡng 0,8; so câu hỏi và cả hội thoại; chạy cả khi `--no-quality`); `manifest.json` có mục `eval_near_duplicate` (số dòng bị loại, ví dụ); `rejected.jsonl` ghi id câu chấm. Trùng hẳn vẫn báo lỗi như trước. Bằng chứng: `EvalNearDuplicateTests` (4 test).
+- [x] 3. Chỉ tính loss trên câu trả lời: truyền `assistant_only_loss=True` vào `SFTConfig` (hiện TRL tính loss cả câu hỏi của người dùng). TRL 1.13 tự thay chat template có `{% generation %}` cho Qwen2.5, Qwen3, Qwen3.8; template không hỗ trợ thì báo lỗi tiếng Việt rõ ràng trước khi train, tắt được bằng cấu hình. Test train thật trên CPU với model tí hon dùng chat template Qwen: nhãn phần câu hỏi là -100.
+
+  Đã làm: khóa `assistant_only_loss` trong cấu hình train (4 file trong `configs/training/` đặt `true`; cấu hình không có khóa thì `false` như cũ); `check_assistant_only_loss` kiểm tra template trước khi nạp model. Chat template thật của `smoke`, `light`, model chính ở revision đã ghim trùng template TRL biết (kiểm tra 26/9 bằng file `tokenizer_config.json` nhỏ, mã băm trong `tests/fixtures/chat_templates/ghim_2026-09-26.json`). Bằng chứng: `AssistantOnlyLossConfigTests` (2 test), `AssistantOnlyLossTrainingTests` (4 test: train thật trên CPU với template Qwen2.5, Qwen3, Qwen3.8, phần câu hỏi có nhãn -100; tắt thì học cả câu hỏi như cũ; template tự viết báo lỗi tiếng Việt trước khi nạp model).
+- [x] 4. `python -m local_ai.check` xanh: 309 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
 
 ## M16: Notebook bền hơn
 Mục tiêu: Colab (chạy từ điện thoại) không chạy tiếp các ô sau khi một lệnh đã lỗi; chạy lại sau khi Colab ngắt thì không phải chấm lại model gốc.

@@ -8,7 +8,7 @@ Mọi bước đều điều khiển bằng file cấu hình JSON trong `configs
 Luồng chính:
 
 ```
-preset / dataset Hugging Face ──► local_ai.data (kiểm tra, loại trùng, lọc chất lượng, chặn trùng với eval) ──► sft.jsonl
+preset / dataset Hugging Face (+ dòng gọi công cụ tự sinh) ──► local_ai.data (kiểm tra, loại trùng, lọc chất lượng, chặn trùng và gần trùng với eval) ──► sft.jsonl
 sft.jsonl ──► local_ai.training.finetune (full | LoRA | QLoRA) ──► adapter (.runs/<tên>/adapter)
 model gốc + adapter_path ──► local_ai.evaluation (38 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
 ```
@@ -37,10 +37,12 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 - `hub.py`:
   - đọc dataset Hugging Face; đọc kiểu streaming với `limit` để không tải cả dataset;
   - ánh xạ cột sang schema của repo. Hội thoại nhiều lượt được giữ nguyên, hiểu cả dạng `role/content` lẫn ShareGPT `from/value`;
-  - trộn nhiều preset theo tỉ lệ.
+  - trộn nhiều preset theo tỉ lệ; `--tool-calls 0.1` trộn thêm khoảng 10% dòng gọi công cụ tự sinh (M20).
+- `tool_calls.py` (M20): sinh dòng gọi công cụ từ mẫu câu có seed (calculator, read_file, search, và câu không cần công cụ); câu trả lời là JSON `{"tool": ..., "arguments": ...}` đúng dạng câu tool_use của bộ chấm; lời dẫn, số, tên file, chủ đề khác bộ chấm. Chỉ dùng thư viện chuẩn.
 - `core.py`:
   - kiểm tra schema và loại trùng theo nội dung;
-  - chặn trùng với eval (`find_eval_overlap`) theo id, theo nội dung và theo câu hỏi đã chuẩn hóa;
+  - chặn trùng với eval (`find_eval_overlap`) theo id, theo nội dung và theo câu hỏi đã chuẩn hóa (trùng thì báo lỗi);
+  - loại dòng gần trùng với eval (`remove_eval_near_duplicates` trong `quality.py`, M20): MinHash + LSH rồi Jaccard thật, so câu hỏi và cả hội thoại; số dòng bị loại ghi ở mục `eval_near_duplicate` của `manifest.json`;
   - xuất `sft.jsonl`: `reasoning` được đưa vào khối `<think>`, `context` đặt trước câu hỏi.
 - `quality.py`: bộ lọc chất lượng, cấu hình ở `configs/datasets/quality.json`. `hf-sft` bật mặc định, `build` bật bằng `--quality`.
   - Các bộ lọc: ngôn ngữ (ưu tiên tiếng Việt: nhận theo chữ có dấu, loại tiếng Việt không dấu và chữ không phải Latin), độ dài, lặp từ/câu (xét từng lượt, bỏ qua code và lệnh LaTeX), gần trùng (MinHash tự viết kiểu một hoán vị, LSH theo dải, so lại bằng Jaccard thật).
@@ -68,6 +70,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 `finetune.py` là khung SFT dùng transformers, trl và peft:
 - chạy `full`, `lora`, hoặc QLoRA (`lora` cùng `quantization: "4bit"`);
 - model `kind: "multimodal"` chỉ gắn LoRA vào phần ngôn ngữ: `exclude_modules` (hằng `VISION_MODULES`) loại trừ phần xử lý ảnh; `--dry-run` in phạm vi LoRA ở mục `lora` (M17);
+- `assistant_only_loss` (M20, các cấu hình trong `configs/training/` bật): chỉ tính loss trên câu trả lời. Trước khi nạp model, `check_assistant_only_loss` kiểm tra chat template có `{% generation %}` hoặc TRL thay được (Qwen2.5, Qwen3, Qwen3.8...); không thì báo lỗi tiếng Việt;
 - chạy tiếp từ `checkpoint-N` mới nhất;
 - `--push-to-hub --hub-model-id <tên>/<repo>`: Trainer đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư (`hub_strategy` checkpoint). Máy mới (ví dụ Colab vừa bị ngắt) không có `checkpoint-N` thì tải `last-checkpoint` về `output_dir/_hub/` rồi train tiếp. Thư mục bắt đầu bằng `_` nên Trainer không đẩy ngược nó lên Hub;
 - thiếu GPU hoặc thư viện thì trả `"status": "skipped"`;

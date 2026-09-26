@@ -142,7 +142,7 @@ class NotebookTests(unittest.TestCase):
         outputs = run_notebook_commands(self)  # model mặc định của notebook: smoke
         self.assertEqual([module for module, _ in outputs], ["local_ai.data", "local_ai.training.estimate", "local_ai.evaluation", "local_ai.training.finetune", "local_ai.evaluation", "local_ai.evaluation.compare", "local_ai.training.hub", "local_ai.training.calibrate"])
         (_, data), _, (_, before), (_, train), (_, after), (_, compare), (_, push), _ = outputs
-        self.assertEqual(sum(item["rows"] for item in data["presets"].values()), 2000)
+        self.assertEqual(sum(item["rows"] for item in data["presets"].values()) + data["tool_calls"]["rows"], 2000)  # M20: 1800 dòng preset + 200 dòng gọi công cụ tự sinh
         self.assertEqual(data["output"], "data/processed/hf_sft")
         self.assertEqual((before["model"]["name"], after["model"]["name"], after["model"]["max_new_tokens"]), ("smoke", "smoke-colab", 256))
         self.assertEqual((train["qlora"], train["base_model"]["dtype"], train["hub"]["hub_model_id"], train["hub"]["hub_strategy"], train["hub"]["private"]), (True, "float16", HUB_REPO, "checkpoint", True))

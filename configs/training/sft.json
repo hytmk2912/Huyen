@@ -1,5 +1,5 @@
 {
-  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. quantization (tùy chọn): 4bit | 8bit | none, ghi đè kiểu nén của model gốc; lora + 4bit là QLoRA (xem qlora_primary.json). resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể.",
+  "_comment": "Cấu hình huấn luyện SFT. base_model là tên một model trong models_config. method: full | lora. quantization (tùy chọn): 4bit | 8bit | none, ghi đè kiểu nén của model gốc; lora + 4bit là QLoRA (xem qlora_primary.json). resume: true (chạy tiếp từ checkpoint-N mới nhất trong output_dir), false, hoặc đường dẫn checkpoint cụ thể. assistant_only_loss: true (M20) chỉ tính loss trên câu trả lời (TRL che phần câu hỏi); chat template không hỗ trợ thì báo lỗi trước khi nạp model, đặt false để tắt.",
   "base_model": "smoke",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",
@@ -17,5 +17,6 @@
   "save_total_limit": 3,
   "logging_steps": 10,
   "resume": true,
-  "require_gpu": true
+  "require_gpu": true,
+  "assistant_only_loss": true
 }
