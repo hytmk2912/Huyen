@@ -215,6 +215,59 @@ class NearDuplicateFilter:
         return duplicates
 
 
+def eval_conversation(record: dict[str, Any]) -> tuple[str, str]:
+    """(câu hỏi, câu trả lời) của một câu eval: dạng bộ chấm (`prompt` + `reference`/`expected`) hoặc dạng dữ liệu (`input`/`messages`)."""
+    if record.get("messages"): return conversation(record)
+    question = record.get("prompt") or record.get("input") or ""
+    answer = record.get("reference") or record.get("expected_output") or record.get("expected") or ""
+    return str(question), str(answer)
+
+
+EVAL_PARTS = ("câu hỏi", "cả hội thoại")
+
+
+def find_eval_near_duplicates(records: list[dict[str, Any]], eval_records: list[dict[str, Any]], config: NearDuplicateFilter) -> dict[int, tuple[str, float, str]]:
+    """Bản ghi train gần trùng với một câu eval (M20): vị trí -> (id câu eval, Jaccard, phần so).
+
+    Dùng MinHash + LSH của M12 để tìm ứng viên, rồi so kỹ bằng Jaccard thật trên cụm từ, với cùng ngưỡng. So 2 phần:
+    câu hỏi (các lượt user với `prompt` của câu eval) và cả hội thoại (câu hỏi + câu trả lời với `prompt` + đáp án mẫu),
+    để bắt cả dòng train chép lại câu hỏi eval nhưng trả lời dài khác đi."""
+    if not eval_records: return {}
+    if config.permutations % config.bands: raise ValueError("near_duplicate.permutations phải chia hết cho near_duplicate.bands")
+    rows, minhash = config.permutations // config.bands, MinHash(config.permutations, config.seed)
+    def parts(question: str, answer: str) -> dict[str, set[str]]:
+        return {"câu hỏi": shingles(question, config.shingle_words), "cả hội thoại": shingles(f"{question}\n{answer}", config.shingle_words)}
+    def keys(items: set[str]) -> list[tuple[int, tuple[int, ...]]]:
+        signature = minhash.signature(items)
+        return [(band, signature[band * rows:(band + 1) * rows]) for band in range(config.bands)]
+    eval_sets, buckets = [], {}
+    for position, record in enumerate(eval_records):
+        eval_sets.append(parts(*eval_conversation(record)))
+        for part, items in eval_sets[-1].items():
+            if items:
+                for key in keys(items): buckets.setdefault((part, key), []).append(position)
+    found: dict[int, tuple[str, float, str]] = {}
+    for position, record in enumerate(records):
+        for part, items in parts(*conversation(record)).items():
+            if not items: continue
+            candidates = sorted({other for key in keys(items) for other in buckets.get((part, key), [])})
+            similarity, other = max(((jaccard(items, eval_sets[other][part]), other) for other in candidates), default=(0.0, None))
+            if other is not None and similarity >= config.threshold:
+                found[position] = (str(eval_records[other].get("id")), round(similarity, 3), part); break
+    return found
+
+
+def remove_eval_near_duplicates(records: list[dict[str, Any]], eval_records: list[dict[str, Any]], config: NearDuplicateFilter) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Loại bản ghi train gần trùng với bộ chấm; trả về (giữ lại, bị loại kèm lý do, mục `eval_near_duplicate` của manifest)."""
+    found = find_eval_near_duplicates(records, eval_records, config)
+    rejected = [{**records[index], "validation_status": "rejected", "verification": {**records[index].get("verification", {}), "quality_filter": "eval_near_duplicate",
+                 "quality_reason": f"gần trùng với câu eval {eval_id} ({part}, Jaccard {similarity})", "eval_near_duplicate_of": eval_id}}
+                for index, (eval_id, similarity, part) in sorted(found.items())]
+    report = {"removed": len(found), "eval_records": len(eval_records), "threshold": config.threshold, "shingle_words": config.shingle_words, "parts": list(EVAL_PARTS),
+              "examples": [{"id": records[index]["id"], "eval_id": eval_id, "part": part, "jaccard": similarity} for index, (eval_id, similarity, part) in sorted(found.items())[:10]]}
+    return [record for index, record in enumerate(records) if index not in found], rejected, report
+
+
 @dataclass(frozen=True)
 class QualityConfig:
     language: LanguageFilter = field(default_factory=LanguageFilter)

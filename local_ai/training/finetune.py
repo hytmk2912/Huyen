@@ -65,6 +65,10 @@ class FinetuneConfig:
     push_to_hub: bool = False  # đẩy checkpoint lên Hugging Face Hub trong lúc train (hub_strategy "checkpoint") để chạy lại thì train tiếp
     hub_model_id: str | None = None  # repo nhận checkpoint, dạng tên-người-dùng/tên-repo; token đọc từ biến môi trường HF_TOKEN
     hub_private: bool = True
+    # Chỉ tính loss trên câu trả lời (M20): TRL che phần câu hỏi của người dùng (nhãn -100). Mọi cấu hình trong configs/training bật;
+    # mặc định ở đây là false để cấu hình cũ không có khóa này vẫn chạy như trước. Chat template phải có {% generation %}
+    # hoặc được TRL thay bằng bản có (Qwen2.5, Qwen3, Qwen3.5, Qwen3.8...); không thì báo lỗi trước khi nạp model.
+    assistant_only_loss: bool = False
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "FinetuneConfig":
@@ -75,6 +79,7 @@ class FinetuneConfig:
         if self.method not in ("full", "lora"): raise ValueError(f"Không hỗ trợ method finetune: {self.method}; hãy dùng 'full' hoặc 'lora'")
         if self.quantization not in (None, "none", *QUANTIZATIONS): raise ValueError(f"quantization phải là 4bit, 8bit hoặc none, không phải '{self.quantization}'")
         if self.dtype is not None and self.dtype not in TORCH_DTYPES: raise ValueError(f"dtype phải là một trong {', '.join(TORCH_DTYPES)}, không phải '{self.dtype}'")
+        if not isinstance(self.assistant_only_loss, bool): raise ValueError("assistant_only_loss phải là true hoặc false")
         if self.push_to_hub: check_repo_id(self.hub_model_id)
         TrainingPlan("sft", self.dataset_path, self.base_model, self.seed, self.output_dir).validate()
 
@@ -138,10 +143,36 @@ def lora_scope(config: FinetuneConfig, model: ModelConfig) -> dict[str, Any] | N
             "note": "chỉ phần ngôn ngữ; không gắn vào phần xử lý ảnh" if exclude else "mọi lớp Linear (trừ lm_head)"}
 
 
+ASSISTANT_ONLY_HINT = ('Muốn train tiếp mà tính loss cả câu hỏi (như trước M20) thì đặt "assistant_only_loss": false trong cấu hình train '
+                       '(configs/training/<tên>.json), hoặc sửa chat template cho có {% generation %} ... {% endgeneration %} quanh câu trả lời.')
+
+
+def check_assistant_only_loss(tokenizer: Any, model: ModelConfig) -> str:
+    """Kiểm tra trước khi nạp model: chỉ tính loss trên câu trả lời được không. TRL cần chat template có dấu `{% generation %}`
+    (bao quanh câu trả lời), hoặc tự thay bằng bản có dấu nếu nhận ra template (Qwen2.5, Qwen3, Qwen3.5, Qwen3.8, Llama 3, Gemma...).
+    Không được thì báo lỗi tiếng Việt ngay, thay vì để TRL báo lỗi tiếng Anh sau khi đã nạp model. Trả về một dòng log."""
+    import trl  # lấy qua module trl đang dùng (như SFTTrainer trong train), không import thẳng module con
+    utilities = getattr(trl, "chat_template_utils", None)
+    get_training_chat_template, has_generation_markers = getattr(utilities, "get_training_chat_template", None), getattr(utilities, "has_generation_markers", None)
+    if get_training_chat_template is None or has_generation_markers is None:  # trl cũ chưa có các hàm này (hoặc trl giả trong test): để SFTTrainer tự kiểm tra
+        return "Chỉ tính loss trên câu trả lời (assistant_only_loss): để TRL tự kiểm tra chat template."
+    template = getattr(tokenizer, "chat_template", None)
+    if not isinstance(template, str) or not template.strip():
+        raise ValueError(f"Tokenizer của model '{model.name}' ({model.source}) không có chat template, nên không chỉ tính loss trên câu trả lời được. {ASSISTANT_ONLY_HINT}")
+    if has_generation_markers(template): return "Chỉ tính loss trên câu trả lời: chat template đã có {% generation %}."
+    try:
+        get_training_chat_template(tokenizer)
+    except ValueError:
+        raise ValueError(f"Chat template của model '{model.name}' ({model.source}) chưa được TRL hỗ trợ để chỉ tính loss trên câu trả lời: "
+                         f"template không có {{% generation %}} và TRL không có bản thay thế (TRL hỗ trợ Qwen2.5, Qwen3, Qwen3.5, Qwen3.8, Llama 3, Gemma...). {ASSISTANT_ONLY_HINT}") from None
+    return "Chỉ tính loss trên câu trả lời: TRL thay chat template bằng bản có {% generation %} khi train."
+
+
 def describe(config: FinetuneConfig) -> dict[str, Any]:
     model = resolve_base_model(config); quantization = effective_quantization(config, model)
     hub = {"push_to_hub": config.push_to_hub, "hub_model_id": config.hub_model_id, "private": config.hub_private, "hub_strategy": "checkpoint", "resume_from_hub": config.push_to_hub and config.resume is True} if config.push_to_hub else {"push_to_hub": False}
-    return {"method": config.method, "quantization": quantization, "qlora": config.method == "lora" and quantization is not None, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "kind": model.kind, "params_b": model.params_b, "dtype": config.dtype or model.dtype}, "hub": hub, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "resume_from": resume_target(config), "lora": lora_scope(config, model), "config": asdict(config)}
+    return {"method": config.method, "quantization": quantization, "qlora": config.method == "lora" and quantization is not None, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "kind": model.kind, "params_b": model.params_b, "dtype": config.dtype or model.dtype}, "hub": hub, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "resume_from": resume_target(config), "lora": lora_scope(config, model),
+            "assistant_only_loss": config.assistant_only_loss, "config": asdict(config)}
 
 
 def hub_arguments(config: FinetuneConfig) -> dict[str, Any]:
@@ -234,6 +265,7 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     # sft.jsonl chỉ có chữ, nên kể cả model multimodal cũng dùng tokenizer (không cần phần xử lý ảnh).
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.tokenizer_source or model_config.source, revision=model_config.tokenizer_revision or model_config.revision, local_files_only=model_config.offline)
     if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
+    if config.assistant_only_loss: print(check_assistant_only_loss(tokenizer, model_config), file=sys.stderr, flush=True)  # trước khi nạp model: báo lỗi sớm
     model_kwargs = {"revision": model_config.revision, "dtype": dtype, "device_map": model_config.device_map, "local_files_only": model_config.offline}
     if quantization: model_kwargs["quantization_config"] = quantization_config(transformers, quantization, dtype)
     model = model_loader_class(transformers, model_config.kind).from_pretrained(model_config.source, **model_kwargs)
@@ -247,7 +279,7 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
         peft_config = LoraConfig(r=config.lora.r, lora_alpha=config.lora.alpha, lora_dropout=config.lora.dropout, target_modules=config.lora.target_modules,
                                  exclude_modules=lora_exclude_modules(model_config), task_type="CAUSAL_LM")
     dataset = load_dataset("json", data_files=config.dataset_path, split="train").select_columns(["messages"])
-    args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, max_steps=config.max_steps, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[], **hub_arguments(config))
+    args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, max_steps=config.max_steps, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[], assistant_only_loss=config.assistant_only_loss, **hub_arguments(config))
     tracker = RunTracker(config.output_dir, describe(config))
     trainer = SFTTrainer(model=model, args=args, train_dataset=dataset, processing_class=tokenizer, peft_config=peft_config)
     resume = resume_target(config)

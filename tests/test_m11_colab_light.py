@@ -69,7 +69,7 @@ class NotebookChoiceTests(unittest.TestCase):
     def test_light_notebook_commands_run_with_dry_run(self):
         outputs = m10.run_notebook_commands(self, "light")
         (_, data), (_, estimate), (_, before), (_, train), (_, after), (_, compare), (_, push), _ = outputs  # ô cuối là số đo thật (M15)
-        self.assertEqual(sum(item["rows"] for item in data["presets"].values()), 2000)
+        self.assertEqual(sum(item["rows"] for item in data["presets"].values()) + data["tool_calls"]["rows"], 2000)  # M20: 1800 dòng preset + 200 dòng gọi công cụ tự sinh
         self.assertIn("model light", estimate); self.assertRegex(estimate, r"Train: \d+ bước, khoảng \d+ phút"); self.assertNotIn("CẢNH BÁO", estimate)
         self.assertEqual((before["model"]["name"], after["model"]["name"], before["model"]["max_new_tokens"], after["model"]["max_new_tokens"]), ("light", "light-colab", 512, 512))
         self.assertEqual((train["base_model"]["name"], train["qlora"], train["base_model"]["dtype"], train["config"]["per_device_batch_size"]), ("light", True, "float16", 1))

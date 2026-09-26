@@ -19,8 +19,8 @@ Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
 
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
 | --- | --- | --- |
-| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json` | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng. Notebook Colab lấy 2000 dòng thật mỗi lần chạy |
-| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ (LoRA chỉ gắn phần ngôn ngữ, M17); GPU không bf16 thì dùng fp16. Đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian và VRAM trên T4 theo số đo thật | **Chạy thật trên Colab T4** (25–26/9): QLoRA `smoke` và `light`, mỗi model 125 bước; `light` có một lần Colab ngắt và train tiếp được. LoRA chạy thật trên CPU với model tí hon (cả model ảnh + chữ Qwen3.5 tí hon). **Chưa chạy trên Colab thật:** model chính 27B (cần GPU 40–48 GB) |
+| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json`. **M20:** trộn khoảng 10% dòng gọi công cụ tự sinh (`--tool-calls 0.1`); chặn cả dòng gần trùng với bộ chấm | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng. Notebook Colab lấy 2000 dòng thật mỗi lần chạy |
+| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ (LoRA chỉ gắn phần ngôn ngữ, M17); chỉ tính loss trên câu trả lời (M20); GPU không bf16 thì dùng fp16. Đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian và VRAM trên T4 theo số đo thật | **Chạy thật trên Colab T4** (25–26/9): QLoRA `smoke` và `light`, mỗi model 125 bước; `light` có một lần Colab ngắt và train tiếp được. LoRA chạy thật trên CPU với model tí hon (cả model ảnh + chữ Qwen3.5 tí hon). **Chưa chạy trên Colab thật:** model chính 27B (cần GPU 40–48 GB) |
 | Eval | 38 câu Việt + Anh (16 câu tool_use từ M19), 4 cách chấm, chấm greedy lặp lại được, báo cáo JSON + Markdown; bảng so sánh trước/sau khi train | **Chạy thật trên Colab T4**: `smoke` 16 → 14/30; `light` 17 → 19/30 nhưng tool_use 7/8 → 3/8 (sửa ở M19, M20) |
 | Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả |
 | Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 6 nhiệm vụ mẫu với calculator và TerminalTool (M19 thêm nhiệm vụ phải thử lại sau khi TerminalTool từ chối lệnh; lỗi từ chối kèm gợi ý lệnh được phép) | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút (trước khi có nhiệm vụ thứ 6). Test bằng model giả và server OpenAI giả (6/6 nhiệm vụ) |
@@ -161,6 +161,7 @@ Kết quả đọc giấy phép và nguồn gốc của 3 dataset (ngày 25/9) n
 python -m local_ai.data list-presets                                          # xem các preset
 python -m local_ai.data hf-sft --config configs/datasets/presets/code.json    # một preset
 python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_sft
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --tool-calls 0.1 --output data/processed/hf_sft   # như notebook: 1800 dòng preset + 200 dòng gọi công cụ
 ```
 
 Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả chung vào một `sft.jsonl`, mặc định ở `data/processed/hf_sft/`, đúng chỗ các cấu hình train đọc:
@@ -168,6 +169,21 @@ Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả c
 - Nếu không ghi `--total`, lệnh lấy tổng số dòng lớn nhất sao cho không preset nào vượt `limit` của nó.
 - `--limit 20` thì mỗi preset chỉ đọc tối đa 20 dòng, hợp để chạy thử.
 - Tỉ lệ tính trên số dòng đọc vào. Dòng bị loại (trùng, sai dạng, không qua bộ lọc chất lượng) làm tỉ lệ cuối lệch nhẹ; số dòng thật của từng nguồn ghi trong `manifest.json`.
+
+### Dòng gọi công cụ tự sinh (M20)
+`--tool-calls 0.1` trộn thêm dòng gọi công cụ, chiếm khoảng 10% dữ liệu (có `--total` thì nằm trong tổng: 2000 dòng = 1800 dòng preset + 200 dòng gọi công cụ). Lý do: sau khi train bằng dữ liệu không có dòng nào gọi công cụ, `light` tụt tool_use 7/8 → 3/8 (đo 26/9).
+- Dòng được sinh từ mẫu câu trong `local_ai/data/tool_calls.py`, có seed nên chạy lại ra đúng các dòng cũ; không gọi model hay API nào.
+- Câu hỏi liệt kê 3 công cụ `calculator(expression)`, `read_file(path)`, `search(query)`; câu trả lời là JSON đúng dạng câu tool_use của bộ chấm: `{"tool": <tên hoặc null>, "arguments": {...}}`.
+- Chia đều tiếng Việt / tiếng Anh và 4 loại: tính toán, đọc file, tìm kiếm, và câu không cần công cụ (`"tool": null`).
+- Để không học thuộc bộ chấm: lời dẫn viết khác bộ chấm, thứ tự công cụ thay đổi; số, tên file, chủ đề tìm kiếm khác bộ chấm (số có trong câu tool_use của bộ chấm thì không dùng). Đo 26/9: độ giống (Jaccard) lớn nhất với câu chấm là 0,3.
+- `manifest.json` ghi số dòng tự sinh ở `configuration.tool_calls`.
+
+### Chặn gần trùng với bộ chấm (M20)
+Ngoài chặn trùng hẳn (cùng id, cùng nội dung hoặc cùng câu hỏi thì báo lỗi), dòng train **gần trùng** với câu trong `eval_sources` (bộ chấm `data/eval/eval_v1.jsonl`) bị loại:
+- dùng MinHash và LSH của bộ lọc `near_duplicate`, rồi so lại bằng Jaccard thật trên cụm 3 từ, cùng ngưỡng 0,8;
+- so 2 phần: câu hỏi với câu hỏi, và cả hội thoại (câu hỏi + đáp án mẫu), để bắt cả dòng chép câu hỏi chấm nhưng trả lời dài khác đi;
+- chạy cả khi tắt bộ lọc chất lượng (`--no-quality`);
+- dòng bị loại nằm trong `rejected.jsonl` (`quality_filter: "eval_near_duplicate"`, kèm id câu chấm); `manifest.json` ghi số dòng bị loại và vài ví dụ ở mục `eval_near_duplicate`.
 
 ### Bộ lọc chất lượng
 `hf-sft` lọc dữ liệu theo `configs/datasets/quality.json` (tắt bằng `--no-quality`; lệnh `build` bật bằng `--quality`). Các bộ lọc chạy sau bước kiểm tra schema và loại trùng tuyệt đối, theo thứ tự:
@@ -220,7 +236,8 @@ python -m local_ai.training.finetune --config configs/training/qlora_primary.jso
 
 Các khóa hữu ích khác trong cấu hình huấn luyện:
 - `max_steps`: dừng sau đúng số bước này, ví dụ `2` để chạy thử;
-- `require_gpu: false`: cho phép chạy trên CPU.
+- `require_gpu: false`: cho phép chạy trên CPU;
+- `assistant_only_loss` (M20; mọi cấu hình trong `configs/training/` đặt `true`): chỉ tính loss trên câu trả lời, phần câu hỏi của người dùng có nhãn -100 (trước M20, TRL tính loss cả câu hỏi). TRL cần chat template có `{% generation %}`, hoặc tự thay bằng bản có dấu này cho Qwen2.5, Qwen3, Qwen3.5, Qwen3.8, Llama 3, Gemma... Chat template của `smoke`, `light` và model chính ở revision đã ghim đều thuộc loại TRL tự thay được (kiểm tra 26/9, mã băm trong `tests/fixtures/chat_templates/`). Template không hỗ trợ thì lệnh báo lỗi tiếng Việt trước khi nạp model; muốn train tiếp như cũ thì đặt `"assistant_only_loss": false`. Cấu hình không có khóa này thì mặc định `false`.
 
 Để chấm model sau khi train, thêm một mục vào danh sách model, trỏ `adapter_path` tới thư mục adapter vừa lưu. Ví dụ `{"name": "smoke-lora", "source": "Qwen/Qwen2.5-0.5B-Instruct", "adapter_path": ".runs/sft/adapter", ...}`. Sau đó chạy `python -m local_ai.evaluation --model smoke-lora`. `max_new_tokens` (mặc định 512) giới hạn độ dài câu trả lời.
 
@@ -332,7 +349,7 @@ Các ô sau chạy lần lượt:
 1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
 2. tải repo, cài thư viện đã ghim phiên bản (không cài lại torch);
 3. đọc `HF_TOKEN` từ Colab Secrets;
-4. lấy 2000 dòng từ 3 preset;
+4. lấy 2000 dòng: 1800 dòng từ 3 preset và 200 dòng (10%) gọi công cụ tự sinh (M20);
 5. in ước tính thời gian, và số bước đã train nếu Colab từng ngắt;
 6. chấm model gốc;
 7. train QLoRA;
@@ -384,7 +401,7 @@ Hệ số VRAM trong `so_do/light.json` (2,07) không dùng được: lần ch�
 - Cách 3: train nhẹ tay hơn để model ít quên: learning rate 2e-4 → 1e-4, hoặc LoRA `r` 16 → 8.
 - Cách 4: tăng số câu tool_use trong bộ chấm (đề xuất M19), để biết thay đổi nào là thật, không phải ngẫu nhiên.
 
-Chủ repo đã chọn làm (26/9): cách 1 ở M20 (dữ liệu); cách 2 và 4 ở M19 (chấm công bằng hơn). Cách 3 chưa chọn.
+Chủ repo đã chọn làm (26/9): cách 1 ở M20 (dữ liệu, xong 26/9: `--tool-calls 0.1`, notebook bật; thêm chỉ tính loss trên câu trả lời); cách 2 và 4 ở M19 (chấm công bằng hơn, xong 26/9). Cách 3 chưa chọn. Điểm mới cần chạy lại notebook trên Colab mới có.
 
 Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy nghĩ" trong khối `<think>` hết 512 token trước khi kịp viết code. Đây là giới hạn của bộ chấm, không phải lỗi train.
 
@@ -464,7 +481,7 @@ Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU v�
    - chấm lặp lại được: model transformers sinh chữ greedy, model qua server `temperature` 0 và `seed` cố định; cách sinh chữ và revision model ghi trong cài đặt chấm và báo cáo;
    - nhiệm vụ agent so số theo giá trị (187 hay 87,5 không còn khớp 87);
    - ghim revision (mã commit) cho các model transformers trong `configs/models/platform.json`.
-6. **M20 – Dữ liệu giữ khả năng gọi công cụ** (chủ repo chọn 26/9, làm sau M19; tiêu chí trong `TASKS.md`):
+6. **M20 – Dữ liệu giữ khả năng gọi công cụ** (xong 26/9; tiêu chí và bằng chứng trong `TASKS.md`):
    - `hf-sft` trộn khoảng 10% dòng gọi công cụ tự sinh, đúng dạng JSON bộ chấm yêu cầu, có cả câu không cần công cụ, khác câu và số liệu của bộ chấm; notebook train bật mặc định (đo 26/9: tool_use của `light` tụt 7/8 → 3/8 sau khi train);
    - chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12, `manifest.json` ghi số dòng bị loại;
    - chỉ tính loss trên câu trả lời (`assistant_only_loss=True`), báo lỗi rõ ràng nếu chat template không hỗ trợ;

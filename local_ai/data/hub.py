@@ -96,12 +96,25 @@ def quality_config(quality: Any = True) -> Any:
     return quality or None
 
 
-def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None, loader: RowLoader | None = None, quality: Any = True) -> dict[str, Any]:
-    """Tải -> chuyển đổi -> kiểm tra/loại trùng/lọc chất lượng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json."""
+def tool_call_mix(rows: int, share: float, seed: int) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Dòng gọi công cụ tự sinh (M20) thêm vào `rows` dòng lấy từ Hugging Face, để chúng chiếm khoảng `share` của dữ liệu."""
+    if not share: return [], None
+    from local_ai.data.tool_calls import tool_call_records, tool_call_rows
+    tool_call_rows(rows, share)  # kiểm tra tỉ lệ hợp lệ
+    count = round(rows * share / (1 - share))
+    return tool_call_records(count, seed), {"share": share, "rows": count, "generator": "local_ai/data/tool_calls.py"}
+
+
+def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None, loader: RowLoader | None = None, quality: Any = True, tool_calls: float = 0.0) -> dict[str, Any]:
+    """Tải -> chuyển đổi -> kiểm tra/loại trùng/lọc chất lượng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json.
+    `tool_calls` (ví dụ 0.1): trộn thêm dòng gọi công cụ tự sinh, chiếm khoảng tỉ lệ đó của dữ liệu."""
     spec = config["hf_dataset"]; validate_spec(spec)
     version = config.get("dataset_version", "hf-v1"); output = Path(output_dir or config.get("output_dir", DEFAULT_SFT_DIR))
-    raw = output / "raw.jsonl"; write_jsonl(raw, map_rows(load_hf_rows(spec, loader), spec, version))
+    records = map_rows(load_hf_rows(spec, loader), spec, version)
+    synthetic, tool_info = tool_call_mix(len(records), tool_calls, config.get("seed", 0))
+    raw = output / "raw.jsonl"; write_jsonl(raw, records + synthetic)
     build_config = {"seed": config.get("seed", 0), "formats": config.get("formats", ["sft"]), "hf_dataset": {key: value for key, value in spec.items() if key != "token"}}
+    if tool_info: build_config["tool_calls"] = tool_info
     return build_dataset([raw], output, version, build_config, config.get("eval_sources", []), quality_config(quality))
 
 
@@ -145,18 +158,38 @@ def mix_counts(weights: dict[str, float], limits: dict[str, int], total: int | N
     return counts
 
 
+def mix_plan(weights: dict[str, float], limits: dict[str, int], total: int | None = None, tool_calls: float = 0.0) -> tuple[dict[str, int], int]:
+    """(số dòng đọc từ mỗi preset, số dòng gọi công cụ tự sinh). Có `total` thì dòng tự sinh nằm trong `total`
+    (ví dụ 2000 dòng, tool_calls 0.1: 1800 dòng từ preset + 200 dòng gọi công cụ)."""
+    if total is not None and tool_calls:
+        from local_ai.data.tool_calls import tool_call_rows
+        hf_total, synthetic = tool_call_rows(total, tool_calls)
+        return mix_counts(weights, limits, hf_total), synthetic
+    counts = mix_counts(weights, limits, total)
+    if not tool_calls: return counts, 0
+    from local_ai.data.tool_calls import tool_call_rows
+    tool_call_rows(sum(counts.values()), tool_calls)  # kiểm tra tỉ lệ hợp lệ
+    return counts, round(sum(counts.values()) * tool_calls / (1 - tool_calls))
+
+
 def prepare_hf_mix(weights: dict[str, float], output_dir: str | Path, loader: RowLoader | None = None, total: int | None = None, limit: int | None = None,
-                   version: str = "hf-mix-v1", seed: int = 17, directory: str | Path = PRESET_DIR, quality: Any = True) -> dict[str, Any]:
+                   version: str = "hf-mix-v1", seed: int = 17, directory: str | Path = PRESET_DIR, quality: Any = True, tool_calls: float = 0.0) -> dict[str, Any]:
     """Trộn nhiều preset theo tỉ lệ thành một sft.jsonl. `limit` (nếu có) ghi đè số dòng tối đa của mọi preset.
+    `tool_calls` (ví dụ 0.1, M20): khoảng 10% số dòng là dòng gọi công cụ tự sinh (local_ai/data/tool_calls.py).
     Bộ lọc chất lượng chạy sau khi trộn, nên sft.jsonl có thể ít dòng hơn tổng số dòng đọc vào; số dòng bị loại ghi trong manifest.json."""
     presets = {name: load_preset(name, directory) for name in weights}
     for config in presets.values(): validate_spec(config["hf_dataset"])
     limits = {name: limit or config["hf_dataset"].get("limit") or 1000 for name, config in presets.items()}
-    counts = mix_counts(weights, limits, total); records = []
+    counts, synthetic = mix_plan(weights, limits, total, tool_calls); records = []
     for name, config in presets.items():
         spec = {**config["hf_dataset"], "limit": counts[name]}
         records += map_rows(load_hf_rows(spec, loader), spec, version)
+    if synthetic:
+        from local_ai.data.tool_calls import tool_call_records
+        records += tool_call_records(synthetic, seed)
     output = Path(output_dir); raw = output / "raw.jsonl"; write_jsonl(raw, records)
     eval_sources = sorted({source for config in presets.values() for source in config.get("eval_sources", [])})
     mix = {name: {"weight": round(weights[name], 4), "rows": counts[name], "dataset": presets[name]["hf_dataset"]["name"], "revision": presets[name]["hf_dataset"].get("revision", "main")} for name in presets}
-    return build_dataset([raw], output, version, {"seed": seed, "formats": ["sft"], "mix": mix}, eval_sources, quality_config(quality))
+    build_config = {"seed": seed, "formats": ["sft"], "mix": mix}
+    if synthetic: build_config["tool_calls"] = {"share": tool_calls, "rows": synthetic, "generator": "local_ai/data/tool_calls.py"}
+    return build_dataset([raw], output, version, build_config, eval_sources, quality_config(quality))

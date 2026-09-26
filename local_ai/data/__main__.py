@@ -33,6 +33,7 @@ def main() -> None:
     hf.add_argument("--limit", type=int, help="Số dòng tối đa đọc từ mỗi dataset"); hf.add_argument("--total", type=int, help="Tổng số dòng đọc khi trộn preset, chia theo tỉ lệ")
     hf.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch (preset, số dòng mỗi preset, thư mục đầu ra), không tải dữ liệu")
     hf.add_argument("--no-quality", action="store_true", help="Tắt bộ lọc chất lượng (mặc định bật theo configs/datasets/quality.json)")
+    hf.add_argument("--tool-calls", type=float, default=0.0, metavar="TỈ_LỆ", help="Trộn thêm dòng gọi công cụ tự sinh (JSON đúng dạng câu tool_use của bộ chấm, có cả câu không cần công cụ), chiếm khoảng TỈ_LỆ của dữ liệu, ví dụ 0.1 là 10%%; với --total thì nằm trong tổng số dòng. Mặc định 0: không trộn")
     commands.add_parser("list-presets", help="Liệt kê các preset dataset trong configs/datasets/presets/")
     commands.add_parser("secret-scan", help="Quét repo tìm khóa/mật khẩu bị lộ")
     args = parser.parse_args()
@@ -42,29 +43,33 @@ def main() -> None:
             print(f"{item['name']}: {item['dataset']}@{item['revision'][:8]} | domain {item['domain']} | ngôn ngữ {item['language']} | tối đa {item['limit']} dòng | giấy phép {item['license']} ({item['license_status']})\n    {item['description']}")
         return
     if args.command == "hf-sft" and args.dry_run:
-        from local_ai.data.hub import DEFAULT_SFT_DIR, load_preset, mix_counts, parse_mix, validate_spec
+        from local_ai.data.hub import DEFAULT_SFT_DIR, load_preset, mix_plan, parse_mix, validate_spec
         if args.preset:
             weights = parse_mix(args.preset); presets = {name: load_preset(name) for name in weights}
             for preset in presets.values(): validate_spec(preset["hf_dataset"])
-            counts = mix_counts(weights, {name: args.limit or preset["hf_dataset"].get("limit") or 1000 for name, preset in presets.items()}, args.total)
+            counts, synthetic = mix_plan(weights, {name: args.limit or preset["hf_dataset"].get("limit") or 1000 for name, preset in presets.items()}, args.total, args.tool_calls)
             plan = {"presets": {name: {"dataset": presets[name]["hf_dataset"]["name"], "revision": presets[name]["hf_dataset"].get("revision"), "weight": round(weights[name], 4), "rows": counts[name]} for name in presets}, "output": args.output or DEFAULT_SFT_DIR}
+            if args.tool_calls: plan["tool_calls"] = {"share": args.tool_calls, "rows": synthetic}
         else:
             config = json.loads(Path(args.config).read_text(encoding="utf-8")); spec = config["hf_dataset"]
             if args.dataset: spec["name"] = args.dataset
             validate_spec(spec); plan = {"dataset": spec["name"], "limit": args.limit or spec.get("limit"), "streaming": spec.get("streaming"), "output": args.output or config.get("output_dir", DEFAULT_SFT_DIR)}
+            if args.tool_calls:
+                from local_ai.data.tool_calls import tool_call_rows
+                tool_call_rows(plan["limit"] or 0, args.tool_calls); plan["tool_calls"] = {"share": args.tool_calls, "rows": round((plan["limit"] or 0) * args.tool_calls / (1 - args.tool_calls))}
         from local_ai.data.quality import DEFAULT_QUALITY, QualityConfig
         if not args.no_quality: QualityConfig.from_file()  # cấu hình lọc sai thì báo ngay, trước khi tải dữ liệu
         plan["quality"] = "tắt" if args.no_quality else str(DEFAULT_QUALITY.relative_to(DEFAULT_QUALITY.parents[2]))
         print(json.dumps({"status": "dry-run", **plan}, ensure_ascii=False, indent=2)); return
     if args.command == "hf-sft" and args.preset:
         from local_ai.data.hub import DEFAULT_SFT_DIR, parse_mix, prepare_hf_mix
-        print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or DEFAULT_SFT_DIR, total=args.total, limit=args.limit, quality=not args.no_quality), indent=2, ensure_ascii=False)); _exit_after_stream(); return
+        print(json.dumps(prepare_hf_mix(parse_mix(args.preset), args.output or DEFAULT_SFT_DIR, total=args.total, limit=args.limit, quality=not args.no_quality, tool_calls=args.tool_calls), indent=2, ensure_ascii=False)); _exit_after_stream(); return
     if args.command == "hf-sft":
         from local_ai.data.hub import prepare_hf_sft
         config = json.loads(Path(args.config).read_text(encoding="utf-8"))
         if args.dataset: config["hf_dataset"]["name"] = args.dataset
         if args.limit: config["hf_dataset"]["limit"] = args.limit
-        print(json.dumps(prepare_hf_sft(config, args.output, quality=not args.no_quality), indent=2, ensure_ascii=False)); _exit_after_stream(); return
+        print(json.dumps(prepare_hf_sft(config, args.output, quality=not args.no_quality, tool_calls=args.tool_calls), indent=2, ensure_ascii=False)); _exit_after_stream(); return
     if args.command == "secret-scan":
         findings = scan_secrets(Path(".")); print(json.dumps({"findings": findings}, indent=2));
         if findings: raise SystemExit("Phát hiện có thể lộ thông tin bí mật. Hãy đổi các khóa bị lộ và xóa chúng khỏi repo trước khi tiếp tục.")

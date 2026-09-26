@@ -102,10 +102,11 @@ HUB_REPO = f"{HF_USER}/huyen-{MODEL}-qlora"  # repo riêng tư nhận checkpoint
 print("Tài khoản Hugging Face:", HF_USER, "| repo:", HUB_REPO)
 """),
         code("buoc-5-du-lieu", """
-# Bước 5: lấy 2000 dòng dữ liệu từ 3 preset (code 40%, lập luận 30%, tiếng Việt 30%).
+# Bước 5: lấy 2000 dòng dữ liệu: 1800 dòng từ 3 preset (code 40%, lập luận 30%, tiếng Việt 30%) và 200 dòng (10%) gọi công cụ tự sinh
+# (--tool-calls 0.1: trả JSON {"tool": ..., "arguments": ...} như câu tool_use của bộ chấm, có cả câu không cần công cụ), để model không quên cách gọi công cụ.
 # Đọc kiểu streaming nên không tải cả dataset. Kết quả nằm ở data/processed/hf_sft/sft.jsonl.
-# Bộ lọc chất lượng (ngôn ngữ, độ dài, lặp, gần trùng) bỏ các dòng kém, nên có thể còn ít hơn 2000 dòng; số dòng bị bỏ ghi trong manifest.json.
-run("python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft", "Bước 5 (lấy dữ liệu)")
+# Bộ lọc chất lượng (ngôn ngữ, độ dài, lặp, gần trùng) và bộ chặn gần trùng với bộ chấm bỏ các dòng không đạt, nên có thể còn ít hơn 2000 dòng; số dòng bị bỏ ghi trong manifest.json.
+run("python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --tool-calls 0.1 --output data/processed/hf_sft", "Bước 5 (lấy dữ liệu)")
 """),
         code("buoc-6-uoc-tinh", """
 # Bước 6: ước tính thời gian train và chấm trên T4 (ước lượng thô, chưa đo trên T4 thật).

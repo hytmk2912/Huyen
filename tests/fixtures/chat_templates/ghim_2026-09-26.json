@@ -1,0 +1,8 @@
+{
+  "_comment": "Mã băm SHA-256 của chat template thật ở đúng revision đã ghim trong configs/models/platform.json (M19). Lấy ngày 26/9/2026 từ file nhỏ tokenizer_config.json hoặc chat_template.jinja trên Hugging Face (không tải trọng số). trl_template: tên template cùng nội dung trong trl.chat_template_utils của TRL 1.13, nên TRL tự thay bằng bản có {% generation %} khi assistant_only_loss bật (M20).",
+  "models": {
+    "smoke": {"source": "Qwen/Qwen2.5-0.5B-Instruct", "revision": "7ae557604adf67be50417f59c2c2f167def9a775", "file": "tokenizer_config.json", "sha256": "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f", "trl_template": "qwen2_5_chat_template"},
+    "light": {"source": "Qwen/Qwen3-4B", "revision": "1cfa9a7208912126459214e8b04321603b3df60c", "file": "tokenizer_config.json", "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8", "trl_template": "qwen3_chat_template"},
+    "primary": {"source": "huihui-ai/Huihui-Qwen3.8-27B-abliterated", "revision": "739e3c5b89849f6c238ce1e5b70008612ae42cdd", "file": "chat_template.jinja", "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041", "trl_template": "qwen3_8_chat_template"}
+  }
+}
