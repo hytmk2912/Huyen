@@ -7,7 +7,7 @@ Hướng dẫn chạy notebook `notebooks/train_colab.ipynb` trên GPU T4 miễn
 4. chấm lại, in bảng so sánh trước/sau;
 5. đẩy adapter lên repo Hugging Face riêng tư của bạn.
 
-**Lưu ý:** notebook đã chạy hết trên Colab thật với cả `smoke` và `light` (25–26/9; `light` có một lần Colab ngắt và chạy tiếp được). Notebook `agent_colab` chưa chạy thử trên Colab thật. Nếu gặp lỗi không có trong mục "Lỗi hay gặp", hãy chụp màn hình ô báo lỗi đầu tiên và gửi lại.
+**Lưu ý:** notebook đã chạy hết trên Colab thật với cả `smoke` và `light` (25–26/9; `light` có một lần Colab ngắt và chạy tiếp được). Notebook `agent_colab` cũng đã chạy thật (26/9: 4/5 nhiệm vụ đạt). Chỉ có model chính 27B là chưa chạy thử trên Colab thật (cần GPU 40–48 GB, Colab miễn phí không đủ). Nếu gặp lỗi không có trong mục "Lỗi hay gặp", hãy chụp màn hình ô báo lỗi đầu tiên và gửi lại.
 
 Link notebook (dùng được sau khi PR tuần 2 được gộp vào `main`): <https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb>
 

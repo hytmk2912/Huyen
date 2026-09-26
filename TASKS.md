@@ -8,7 +8,7 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 
 | Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
 | --- | --- | --- | --- | --- |
-| M15 | Số đo thật trên Colab | **Đang làm** (đủ số đo `smoke` và `light`, đã sửa ước tính; chờ số đo agent) | 3/4 (75%) | `tests/test_m15_measurements.py` (19 test) |
+| M15 | Số đo thật trên Colab | **Xong** | 4/4 (100%) | `tests/test_m15_measurements.py` (21 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (11 test) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
@@ -31,7 +31,7 @@ Mục tiêu: sửa các hằng số ước tính (`local_ai/training/estimate.py
   - GPU chưa có hồ sơ (ví dụ CPU, L4) thì chỉ ghi số đo, không đề xuất.
 
   Bằng chứng: `CalibrateTests`, dùng SỐ ĐO MẪU trong `tests/fixtures/measurements/`, không phải số đo thật.
-- [ ] 3. Có số đo thật từ chủ repo (smoke, light, agent): sửa hằng số trong `estimate.py` và `vram.py`; README có bảng số đo thật. **Đạt một phần:**
+- [x] 3. Có số đo thật từ chủ repo (smoke, light, agent): sửa hằng số trong `estimate.py` và `vram.py`; README có bảng số đo thật. **Đạt (26/9):**
   - [x] `smoke` (Colab T4, 25/9, sau khi sửa lỗi Bước 8): train 125 bước trong 14,9 phút (ước tính 13,3), VRAM 2,5 GB (ước tính 1,3), chấm 2,2 và 2,6 phút, điểm 16/30 → 14/30. File `so_do/smoke.json` chép vào `tests/fixtures/measurements/that_smoke_t4_2026-09-25.json`.
   - Đã sửa: `GPUS["T4"].train_tflops` 6 → 5,4 (đo 5,36); thời gian trong README và `docs/TRAIN_COLAB.md` tính lại (`smoke` 23 phút, `light` 118 phút). README có bảng số đo thật (cột `light` và agent ghi "chưa chạy").
   - Chưa sửa: `TRAINING_FACTOR` (số đo model nhỏ không dùng được, chờ `light`); `token_overhead_s` (thời gian chấm lần này tính cả thời gian tải và nạp model). Đã sửa cách đo: lệnh eval nạp model trước khi bấm giờ và ghi `load_s` riêng; `calibrate` đánh dấu số đo từ báo cáo cũ là không dùng được.
@@ -39,10 +39,10 @@ Mục tiêu: sửa các hằng số ước tính (`local_ai/training/estimate.py
     - Đã sửa: `train_tflops` 5,4 → 5,2 (smoke 5,36, light 5,17): ước tính của cả 2 model lệch dưới 5%; thời gian trong tài liệu tính lại (`light` 121 phút). README điền cột `light`.
     - VRAM (chủ repo đồng ý ngày 26/9, "tùy chỉnh sao cho hợp"): không nhân hệ số 3,61 cho mọi model (27B sẽ thành 57 GB, quá cao), mà cộng thêm phần cho model nén `KBIT_OVERHEAD_GB` × √(tỷ tham số) = 2,67 × √(tỷ tham số) GB (embedding float32, logits), đo trên `light`. Ước tính: `light` 9,2 GB (đo 8,2 + CUDA context), `smoke` 3,2 GB (đo 2,5), 27B 34,6 GB (trước 20,5; chưa đo, cần đo ở M17). `calibrate` đề xuất `KBIT_OVERHEAD_GB` cho model nén. Test M2 `test_numbers_for_27b` sửa theo (27B QLoRA trên 24 GB, không quá 48 GB).
     - `token_overhead_s` giữ nguyên, có số đo làm căn cứ: ước tính chấm tối đa của `light` 17,2 phút khớp đo thật 17,4 phút; lần chấm sau (câu trả lời ngắn) cho 0,12 giây/token vì chi phí cố định mỗi câu, không đại diện.
-  - [ ] agent: chờ chủ repo chạy `agent_colab` (26/9: chủ repo chưa chạy).
+  - [x] agent (Colab T4, 26/9, Ollama + `qwen3:4b`): 4/5 nhiệm vụ đạt (80%) trong 11,1 phút. Không đạt `tong-cot-csv`: model chạy `awk ... 'NR > 1 ...'`, TerminalTool từ chối đúng quy tắc (ký tự `>`), model không thử lại bằng `cat` mà trả lời 30 thay vì 87. Kết quả chép từ ảnh chụp vào `tests/fixtures/measurements/that_agent_t4_2026-09-26.json`; README điền cột Agent.
 
-  Bằng chứng: `RealSmokeMeasurementTests` (4 test: hằng số T4 nằm giữa 2 số đo thật, ước tính `smoke` lệch dưới 5%, eval nạp model trước khi bấm giờ, README có bảng số đo); `RealLightMeasurementTests` (4 test: lần chạy tiếp chỉ đếm bước và token của nó, ước tính train và chấm lệch dưới 5%, công thức VRAM QLoRA theo `light`, README có cột `light` và đề xuất giữ tool_use); `ZeroStepRerunTests` (2 test: lần chạy 0 bước không ghi đè số đo, `calibrate` bỏ qua VRAM của nó). Gỡ torchao ở Bước 3: `tests/test_sua_loi_colab.py`.
-- [x] 4. Test xanh, kể cả chạy lệnh mới của notebook bằng `--dry-run`. Test M10/M11 được sửa theo notebook mới (thêm ô Bước 12; không bỏ kiểm tra nào); test M14 đọc đúng phần tuần 2 khi tuần 3 được thêm lên đầu `TASKS.md`. 215 test chạy qua; compileall và secret-scan sạch.
+  Bằng chứng: `RealSmokeMeasurementTests` (4 test: hằng số T4 nằm giữa 2 số đo thật, ước tính `smoke` lệch dưới 5%, eval nạp model trước khi bấm giờ, README có bảng số đo); `RealLightMeasurementTests` (4 test: lần chạy tiếp chỉ đếm bước và token của nó, ước tính train và chấm lệch dưới 5%, công thức VRAM QLoRA theo `light`, README có cột `light` và đề xuất giữ tool_use); `ZeroStepRerunTests` (2 test: lần chạy 0 bước không ghi đè số đo, `calibrate` bỏ qua VRAM của nó); `RealAgentMeasurementTests` (2 test: kết quả khớp bộ nhiệm vụ, bảng `calibrate` và README có dòng agent, bảng số đo không còn ô "chưa chạy"). Gỡ torchao ở Bước 3: `tests/test_sua_loi_colab.py`.
+- [x] 4. Test xanh, kể cả chạy lệnh mới của notebook bằng `--dry-run`. Test M10/M11 được sửa theo notebook mới (thêm ô Bước 12; không bỏ kiểm tra nào); test M14 đọc đúng phần tuần 2 khi tuần 3 được thêm lên đầu `TASKS.md`. 215 test chạy qua; compileall và secret-scan sạch. Khi xong mốc (26/9): 249 test chạy qua; compileall và secret-scan sạch.
 
 ## M16: Notebook bền hơn
 Mục tiêu: Colab (chạy từ điện thoại) không chạy tiếp các ô sau khi một lệnh đã lỗi; chạy lại sau khi Colab ngắt thì không phải chấm lại model gốc.

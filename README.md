@@ -343,14 +343,14 @@ Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất ch
 
 **Số đo thật trên Colab** (GPU Tesla T4, file `so_do/<model>.json` trong repo riêng tư; bản chép của `smoke` ở `tests/fixtures/measurements/that_smoke_t4_2026-09-25.json`):
 
-| Mục | `smoke` (25/9/2026) | `light` (25/9/2026) | Agent (`qwen3:4b`) |
+| Mục | `smoke` (25/9/2026) | `light` (25/9/2026) | Agent (`qwen3:4b`, 26/9/2026) |
 | --- | --- | --- | --- |
 | Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | Colab ngắt sau bước 30, chạy tiếp được: 95 bước sau trong 66,7 phút (khoảng 42 giây/bước; ước tính cũ 56,9); 5,17 TFLOPS; 856.769 token. Lần chạy lại 26/9 không train thêm bước nào | — |
 | VRAM khi train | 2,5 GB (ước tính cũ 1,3 GB, công thức mới 3,2 GB) | 8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB) | — |
 | Loss | 1,48 (bước 5) → 1,27 (bước 125) | 1,51 (bước 5) → 0,97 (bước 125) | — |
 | Chấm 30 câu (tối đa 256 token/câu với `smoke`, 512 với `light`) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | trước: 17,4 phút, tính cả nạp model (ước tính tối đa 17,2); sau: 2,5 phút (câu trả lời ngắn hơn hẳn, không còn phần suy nghĩ `<think>`) | — |
 | Điểm eval trước → sau | 16/30 → 14/30 | 17/30 → 19/30; riêng tool_use 7/8 → 3/8 | — |
-| Nhiệm vụ agent | — | — | chưa chạy |
+| Nhiệm vụ agent | — | — | 4/5 (80%) trong 11,1 phút; không đạt: `tong-cot-csv` |
 
 Đã sửa theo số đo này:
 - thông lượng train của T4 trong `estimate.py`: 6 → 5,2 TFLOPS;
@@ -424,19 +424,21 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 
 Để model thật biết gọi công cụ nào, agent gửi kèm trong prompt danh sách công cụ, cách truyền tham số và các kết quả trước đó.
 
-**Chưa chạy với Ollama thật** (môi trường phát triển không tải model). Test `tests/test_m13_agent_colab.py` gồm:
+**Đã chạy với Ollama thật trên Colab T4 (26/9/2026): 4/5 nhiệm vụ đạt (80%) trong 11,1 phút.** Nhiệm vụ không đạt là `tong-cot-csv`: model chạy `awk -F, 'NR > 1 {print $2}' du_lieu.csv`, TerminalTool từ chối đúng quy tắc vì lệnh có ký tự điều khiển shell (`>`). Sau đó model không thử lại bằng `cat` mà gọi calculator với một giá trị (30), nên trả lời 30 thay vì 87. Kết quả chép vào `tests/fixtures/measurements/that_agent_t4_2026-09-26.json`.
+
+Test `tests/test_m13_agent_colab.py` (chạy không cần Ollama) gồm:
 - kiểm tra notebook hợp lệ và chạy lệnh của nó bằng `--dry-run`;
 - chạy 5 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
-1. **M15 – Số đo thật trên Colab** (đang làm: đã có số đo thật của `smoke`, chờ `light` và agent). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
+1. **M15 – Số đo thật trên Colab** (xong 26/9: đủ số đo `smoke`, `light` và agent; bảng số đo ở mục "Train trên Colab miễn phí"). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
 2. **M16 – Notebook bền hơn** (xong):
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.)
 4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
-5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train; chấm Qwen3 công bằng khi bật/tắt chế độ suy nghĩ (xem "Vì sao tool_use tụt" ở trên).
+5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train; chấm Qwen3 công bằng khi bật/tắt chế độ suy nghĩ (xem "Vì sao tool_use tụt" ở trên); nhiệm vụ agent khi lệnh bị TerminalTool từ chối (đo 26/9: model không thử lại bằng lệnh khác).
 6. **M20 – Dữ liệu:**
    - chặn gần trùng giữa dữ liệu train và eval bằng MinHash của M12 (hiện chỉ chặn trùng chính xác và trùng câu hỏi);
    - thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép;

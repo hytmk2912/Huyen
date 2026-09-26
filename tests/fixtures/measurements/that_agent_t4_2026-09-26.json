@@ -1,0 +1,19 @@
+{
+  "_note": "SỐ ĐO THẬT: notebook agent_colab trên Colab T4 ngày 26/9/2026 (Ollama + qwen3:4b, mục ollama-colab), chép từ ảnh chụp Bước 7 của chủ repo. Báo cáo JSON không được đẩy lên Hugging Face nên không có duration_s chính xác tới giây.",
+  "status": "completed",
+  "model": "ollama-colab",
+  "source": "qwen3:4b",
+  "gpu": "Tesla T4",
+  "passed": 4,
+  "total": 5,
+  "success_rate": 0.8,
+  "duration_s": 666.0,
+  "tasks": [
+    {"id": "tinh-bieu-thuc", "passed": true, "tools_called": ["calculator"], "answer": "549"},
+    {"id": "tinh-tien-giam-gia", "passed": true, "tools_called": ["calculator"]},
+    {"id": "liet-ke-file", "passed": true, "tools_called": ["terminal"], "answer": "bao_cao.md du_lieu.csv ghi_chu.txt"},
+    {"id": "doc-ghi-chu", "passed": true, "tools_called": ["terminal"], "answer": "DH-4827"},
+    {"id": "tong-cot-csv", "passed": false, "tools_called": ["calculator"], "answer": "30", "expected": "87",
+     "reason": "model chạy awk -F, 'NR > 1 {print $2}' du_lieu.csv; TerminalTool từ chối vì có ký tự điều khiển shell (>). Model không thử lại bằng cat mà gọi calculator với một giá trị (30) rồi trả lời 30."}
+  ]
+}

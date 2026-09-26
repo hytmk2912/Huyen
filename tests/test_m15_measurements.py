@@ -213,7 +213,6 @@ class RealSmokeMeasurementTests(unittest.TestCase):
         before, after = self.real["eval"]["before"], self.real["eval"]["after"]
         for phrase in (f"{self.real['vram']['measured_gb']:.1f} GB".replace(".", ","), f"{before['passed']}/{before['cases']} → {after['passed']}/{after['cases']}"):
             with self.subTest(phrase): self.assertIn(phrase, table)
-        self.assertIn("chưa chạy", table)  # light và agent chưa có số đo thật
 
 
 class RealLightMeasurementTests(unittest.TestCase):
@@ -260,6 +259,31 @@ class RealLightMeasurementTests(unittest.TestCase):
         for phrase in ("`light` (25/9/2026)", "66,7 phút", "8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB)", score, f"sau: {after['measured_minutes']:.1f} phút".replace(".", ",")):
             with self.subTest(phrase): self.assertIn(phrase, table)
         self.assertIn("Vì sao tool_use tụt sau khi train", readme)  # có đề xuất cách giữ khả năng dùng công cụ
+
+
+class RealAgentMeasurementTests(unittest.TestCase):
+    """Số đo THẬT của agent_colab (Ollama + qwen3:4b trên Colab T4, 26/9), chép từ ảnh chụp Bước 7 của chủ repo."""
+
+    def setUp(self):
+        self.real = fixture("that_agent_t4_2026-09-26.json")
+
+    def test_agent_result_matches_task_set(self):
+        tasks = {task.id: task for task in load_tasks()}
+        self.assertEqual([item["id"] for item in self.real["tasks"]], list(tasks))
+        self.assertEqual((self.real["passed"], self.real["total"]), (sum(item["passed"] for item in self.real["tasks"]), len(tasks)))
+        failed = [item for item in self.real["tasks"] if not item["passed"]]
+        self.assertEqual([item["id"] for item in failed], ["tong-cot-csv"])
+        self.assertIn(failed[0]["expected"], tasks["tong-cot-csv"].expected)
+        self.assertNotIn(failed[0]["expected"], failed[0]["answer"])
+
+    def test_calibrate_table_and_readme_show_agent(self):
+        result = calibrate.compare(config_without_data("light"), fixture("that_light_t4_2026-09-25.json")["measurements"], agent_report=self.real)
+        self.assertEqual(result["agent"], {"passed": 4, "total": 5, "success_rate": 0.8, "measured_minutes": 11.1})
+        self.assertIn("| Agent: nhiệm vụ đạt | | 4/5 (11,1 phút) |", calibrate.format_comparison(result))
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        table = readme.split("**Số đo thật trên Colab**", 1)[1].split("\n\n", 2)[1]
+        self.assertIn("| Nhiệm vụ agent | — | — | 4/5 (80%) trong 11,1 phút; không đạt: `tong-cot-csv` |", table)
+        self.assertNotIn("chưa chạy", table)  # đủ số đo của cả smoke, light và agent
 
 
 class ZeroStepRerunTests(unittest.TestCase):
