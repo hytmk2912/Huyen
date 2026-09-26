@@ -10,6 +10,7 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | --- | --- | --- | --- | --- |
 | M15 | Số đo thật trên Colab | **Xong** | 4/4 (100%) | `tests/test_m15_measurements.py` (21 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (11 test) |
+| M17 | Model chính (ảnh + chữ): LoRA chỉ gắn vào phần ngôn ngữ | **Xong** | 4/4 (100%) | `tests/test_m17_multimodal_lora.py` (5 test) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
@@ -43,6 +44,16 @@ Mục tiêu: sửa các hằng số ước tính (`local_ai/training/estimate.py
 
   Bằng chứng: `RealSmokeMeasurementTests` (4 test: hằng số T4 nằm giữa 2 số đo thật, ước tính `smoke` lệch dưới 5%, eval nạp model trước khi bấm giờ, README có bảng số đo); `RealLightMeasurementTests` (4 test: lần chạy tiếp chỉ đếm bước và token của nó, ước tính train và chấm lệch dưới 5%, công thức VRAM QLoRA theo `light`, README có cột `light` và đề xuất giữ tool_use); `ZeroStepRerunTests` (2 test: lần chạy 0 bước không ghi đè số đo, `calibrate` bỏ qua VRAM của nó); `RealAgentMeasurementTests` (2 test: kết quả khớp bộ nhiệm vụ, bảng `calibrate` và README có dòng agent, bảng số đo không còn ô "chưa chạy"). Gỡ torchao ở Bước 3: `tests/test_sua_loi_colab.py`.
 - [x] 4. Test xanh, kể cả chạy lệnh mới của notebook bằng `--dry-run`. Test M10/M11 được sửa theo notebook mới (thêm ô Bước 12; không bỏ kiểm tra nào); test M14 đọc đúng phần tuần 2 khi tuần 3 được thêm lên đầu `TASKS.md`. 215 test chạy qua; compileall và secret-scan sạch. Khi xong mốc (26/9): 249 test chạy qua; compileall và secret-scan sạch.
+
+## M17: Model chính (ảnh + chữ): LoRA chỉ gắn vào phần ngôn ngữ
+Chủ repo chọn ngày 26/9. Mục tiêu: model chính (`huihui-ai/Huihui-Qwen3.8-27B-abliterated`, kiến trúc Qwen3.5 ảnh + chữ) được train bằng dữ liệu chỉ có chữ, nên LoRA chỉ gắn vào phần ngôn ngữ, không gắn vào phần xử lý ảnh (vision encoder, merger/projector). Hiện `target_modules: "all-linear"` gắn LoRA vào cả phần xử lý ảnh. Việc đổi `torch_dtype` sang `dtype` đã làm ở lượt rà soát M1–M16. Train thật model 27B cần GPU 40–48 GB nên không thuộc mốc này.
+- [x] 1. Model `kind: "multimodal"`: LoRA loại trừ phần xử lý ảnh (`exclude_modules` của PEFT); model chữ giữ nguyên. `--dry-run` của lệnh train in ra phạm vi LoRA (gắn vào đâu, loại trừ gì).
+  Bằng chứng: `LoraScopeTests` (3 test: chỉ model multimodal loại trừ, biểu thức `VISION_MODULES` khớp phần xử lý ảnh của Qwen3.5, LLaVA, Gemma 3 và không khớp phần ngôn ngữ, `--dry-run` in mục `lora`).
+- [x] 2. Chứng minh trên model tí hon cùng kiến trúc với model chính (Qwen3.5 ảnh + chữ, khởi tạo ngẫu nhiên, không tải gì): không có LoRA nào trong phần xử lý ảnh; mọi lớp Linear của phần ngôn ngữ (attention thường, linear attention, MLP) đều có LoRA; `lm_head` không có.
+  Bằng chứng: `TinyQwen35Tests.test_all_linear_touches_vision_and_exclusion_fixes_it`. Test cũng cho thấy lỗi cũ: chỉ dùng `all-linear` thì LoRA gắn vào 10 lớp Linear của phần xử lý ảnh.
+- [x] 3. Train thật 2 bước trên CPU bằng lệnh train của repo với model tí hon đó và dữ liệu chữ: xong, lưu adapter; `adapter_config.json` ghi phần loại trừ; nạp lại adapter vào model gốc được và không có LoRA trong phần xử lý ảnh.
+  Bằng chứng: `TinyQwen35Tests.test_real_cpu_training_keeps_vision_without_lora` (nạp bằng `AutoModelForMultimodalLM`, đúng lớp `Qwen3_5ForConditionalGeneration` của model chính; chạy khoảng 2 giây).
+- [x] 4. README (mục train trên GPU, lộ trình), `docs/ARCHITECTURE.md` cập nhật. 254 test chạy qua; compileall và secret-scan sạch.
 
 ## M16: Notebook bền hơn
 Mục tiêu: Colab (chạy từ điện thoại) không chạy tiếp các ô sau khi một lệnh đã lỗi; chạy lại sau khi Colab ngắt thì không phải chấm lại model gốc.

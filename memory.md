@@ -12,16 +12,18 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào được chọn thì mới có tiêu chí trong `TASKS.md`.
 - [x] M15 Số đo thật trên Colab (xong 26/9)
 - [x] M16 Notebook bền hơn (xong 25/9)
-- M17 Model chính: LoRA chỉ phần ngôn ngữ (phần `dtype` đã làm khi rà soát 25/9) · M18 Agent dùng model đã train (GGUF) · M19 Mở rộng eval · M20 Dữ liệu: gần trùng train/eval, thêm preset tiếng Việt · M21 Tổng kết tuần 3 (chưa chọn)
+- [x] M17 Model chính: LoRA chỉ phần ngôn ngữ (xong 26/9)
+- M18 Agent dùng model đã train (GGUF) · M19 Mở rộng eval · M20 Dữ liệu: gần trùng train/eval, thêm preset tiếng Việt · M21 Tổng kết tuần 3 (chưa chọn)
 
 ## Mốc đang làm
-- Không có mốc dở. M15 xong 26/9 (4/4); mốc kế tiếp: mốc chủ repo chọn trong M17–M21.
+- Không có mốc dở. M17 xong 26/9 (4/4); mốc kế tiếp: mốc chủ repo chọn trong M18–M21. Train thật model 27B (GPU 40–48 GB) vẫn chờ chủ repo.
+- Chủ repo cho phép (26/9): kiểm tra xanh thì **tự gộp PR**, không nhắc hay hỏi xác nhận (đã ghi vào skill `lam-moc`).
 - Tóm tắt M15 (chi tiết trong `TASKS.md`): số đo thật trên T4 của `smoke`, `light`, agent chép ở `tests/fixtures/measurements/that_*.json` (số đo train của `light` trên Hub đã bị lần chạy 0 bước ghi đè). Đã sửa `train_tflops` T4 = 5,2; VRAM QLoRA thêm `KBIT_OVERHEAD_GB` × √(tỷ tham số) (27B ước tính 34,6 GB, chưa đo); `token_overhead_s` giữ nguyên có căn cứ. Agent 4/5 (80%), 11,1 phút.
 
 ## Việc chủ repo tự làm (rà soát M1–M16 ngày 25/9)
 1. ~~Tạo token Hugging Face, chạy `train_colab` (`smoke`, `light`) và `agent_colab`~~ (xong 25–26/9).
 2. Chọn mốc tiếp theo trong M17–M21; chọn cách giữ tool_use khi train (README, hợp M19/M20); có tắt chế độ suy nghĩ khi chấm Qwen3 không.
-3. Model chính 27B: ước tính khoảng 35 GB khi train QLoRA, cần GPU 40–48 GB (Colab free không đủ; đo ở M17).
+3. Model chính 27B: ước tính khoảng 35 GB khi train QLoRA, cần GPU 40–48 GB (Colab free không đủ). Muốn train thật thì thuê GPU rồi báo; LoRA đã chỉ gắn phần ngôn ngữ (M17).
 4. Đổi mật khẩu rsync (user `huyen`) đã lộ trong lịch sử commit `e6bc723` (file `cpu_hub.sh`, `gpu_8h.sh`, đã xóa nhưng lịch sử vẫn công khai). Không chép mật khẩu vào đâu cả.
 5. Quyết định PR #4: đề nghị đóng (xung đột khoảng 65 file, xóa agent; phần sửa dữ liệu đã có trong `main`).
 6. Xóa nhánh `codex/build-autonomous-ai-system-architecture` (đã gộp hết vào `main`; Claude không có quyền xóa nhánh).
@@ -30,7 +32,7 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 9. Đọc `docs/GIAY_PHEP_DATASET.md`, chấp nhận hoặc bỏ preset (`vietnamese` chỉ dùng cá nhân, không thương mại).
 
 ## Việc dở
-- Nhánh làm việc tuần 3: `claude/nhiem-vu-tuan-jixv6i` (nhánh phiên được giao; dựng lại từ `main` tại `c7f4cc7` sau khi gộp PR #13).
+- Nhánh làm việc tuần 3: `claude/nhiem-vu-tuan-jixv6i` (nhánh phiên được giao; dựng lại từ `main` tại `9ac9d5e` sau khi gộp PR #14).
 - Agent thật (26/9): khi TerminalTool từ chối lệnh (ví dụ awk có `>`), `qwen3:4b` không thử lại bằng lệnh khác mà đoán. Có thể thêm gợi ý lệnh được phép vào thông báo từ chối; hợp M18/M19, hỏi chủ repo trước.
 - Chấm Qwen3 (`light`): model "suy nghĩ" trong `<think>` hết 512 token trước khi viết code, nên code chỉ đạt 1/8 (lỗi NameError). Cách sửa có thể: tắt chế độ suy nghĩ khi chấm (`enable_thinking=False`) hoặc tăng `max_new_tokens`. Việc ngoài M15 (hợp với M19), hỏi chủ repo trước.
 - Giữ tool_use khi train (`light` 7/8 → 3/8 sau train): đề xuất 4 cách trong README ("Vì sao tool_use tụt"); nên làm trước: trộn khoảng 10% dữ liệu gọi công cụ tự sinh (hợp M20). Chờ chủ repo chọn mốc.
@@ -39,7 +41,7 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 ## Lỗi còn tồn
 | Lỗi | Nơi |
 | --- | --- |
-| Chưa chạy thật trên GPU hay model thật: QLoRA, model ảnh + chữ, 2 notebook Colab, agent với Ollama + qwen3:4b. `target_modules: "all-linear"` có thể gắn LoRA vào phần xử lý ảnh. | `adapters.py`, `finetune.py`, `notebooks/` |
+| Model chính 27B (ảnh + chữ) chưa train thật trên GPU (cần 40–48 GB); QLoRA 4bit với model ảnh + chữ chưa chạy trên GPU. | `finetune.py`, `configs/training/qlora_primary.json` |
 
 ## Nhật ký tuần 3
 | Ngày | Lượt | Kết quả |
@@ -54,3 +56,4 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 | 26/9 | M15 (dở, lượt 3) | Chủ repo: gộp PR #12 (đã gộp), đồng ý sửa công thức VRAM. Không nhân hệ số 3,61 cho mọi model (27B thành 57 GB, quá cao); thêm `KBIT_OVERHEAD_GB` × √(tỷ tham số) cho model nén (embedding float32, logits), đo trên `light`: light 9,2 GB, smoke 3,2 GB, 27B 34,6 GB. `calibrate` đề xuất hằng số mới cho model nén. Sửa test M2 (27B QLoRA trên 24 GB, không quá 48) và các test M15 liên quan; cập nhật README, cấu hình, ARCHITECTURE. 244 test qua. Tiếp theo: chờ chấm sau của `light` và agent. |
 | 26/9 | M15 (dở, lượt 4) | Chủ repo chạy xong `smoke` và `light` (Bước 10, 12). `light`: 17 → 19/30, tool_use 7/8 → 3/8, chấm sau chỉ 2,5 phút vì bỏ `<think>`. Hệ số VRAM 2,07 của `light` là từ lần chạy 0 bước (chỉ nạp model), không dùng; sửa lệnh train để không ghi đè số đo khi 0 bước, `calibrate` bỏ qua VRAM 0 bước. `token_overhead_s` giữ nguyên (ước tính 17,2 khớp đo 17,4). Gỡ torchao ở Bước 3. Viết đề xuất giữ tool_use (README, M19/M20). Gộp vào PR #13. 247 test qua. Còn chờ: agent. |
 | 26/9 | M15 (xong) | Chủ repo chạy `agent_colab` trên T4: 4/5 (80%) trong 11,1 phút; không đạt `tong-cot-csv` (awk có `>` bị TerminalTool từ chối, model không thử lại bằng `cat`, trả lời 30 thay vì 87). Điền cột Agent trong README, lưu kết quả vào fixture, thêm `RealAgentMeasurementTests`. Tiêu chí 3 đạt, M15 xong 4/4. 249 test qua, compileall và secret-scan sạch. Tiếp theo: mốc chủ repo chọn (M17–M21). |
+| 26/9 | M17 | Chủ repo chọn M17 và cho phép tự gộp PR (ghi vào skill `lam-moc`). Model chính là Qwen3.5 ảnh + chữ (`model.visual`, `model.language_model`); `all-linear` gắn LoRA cả vào 10 lớp của phần xử lý ảnh (model tí hon). Sửa: model multimodal thêm `exclude_modules` = `VISION_MODULES`; `--dry-run` in mục `lora`. Train thật 2 bước trên CPU với Qwen3.5 tí hon: adapter chỉ có LoRA ở phần ngôn ngữ, nạp lại được. 254 test qua. Tiếp theo: mốc chủ repo chọn. |

@@ -288,7 +288,13 @@ python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset
 | --- | --- | --- | ---: | --- |
 | 1. smoke | `smoke` (Qwen2.5-0.5B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json` | 2,2 GB | GPU bất kỳ từ 4 GB (T4 tự dùng fp16) |
 | 2. light | `light` (Qwen3-4B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json --base-model light --output-dir .runs/sft_light` | 11,0 GB | T4 16 GB, RTX 3060 12 GB; thêm `--quantization 4bit` (QLoRA) thì còn 9,2 GB |
-| 3. primary | `primary` (27,78 tỷ), QLoRA 4bit | `python -m local_ai.training.finetune --config configs/training/qlora_primary.json` | 34,6 GB | 40–48 GB (A100 40 GB, L40S hoặc RTX A6000 48 GB); suy ra từ số đo model 4B, cần đo lại khi làm M17. LoRA bf16 không nén cần khoảng 70,5 GB (A100 80 GB) |
+| 3. primary | `primary` (27,78 tỷ), QLoRA 4bit | `python -m local_ai.training.finetune --config configs/training/qlora_primary.json` | 34,6 GB | 40–48 GB (A100 40 GB, L40S hoặc RTX A6000 48 GB); suy ra từ số đo model 4B, cần đo lại khi train thật trên GPU đó. LoRA bf16 không nén cần khoảng 70,5 GB (A100 80 GB) |
+
+**Model chính là model ảnh + chữ (M17).** `primary` có kiến trúc Qwen3.5 (`Qwen3_5ForConditionalGeneration`): phần xử lý ảnh nằm ở `model.visual` (các khối vision và merger), phần ngôn ngữ ở `model.language_model`. Dữ liệu train chỉ có chữ, nên với model `kind: "multimodal"` lệnh train chỉ gắn LoRA vào phần ngôn ngữ: `target_modules: "all-linear"` kèm `exclude_modules` loại trừ phần xử lý ảnh (khớp tên `visual`, `vision_tower`, `multi_modal_projector`...). Trước M17, `all-linear` gắn LoRA vào cả phần xử lý ảnh. Kiểm tra trước khi train:
+```bash
+python -m local_ai.training.finetune --config configs/training/qlora_primary.json --dry-run   # mục "lora" ghi phạm vi gắn LoRA
+```
+Đã chạy thật trên CPU với model Qwen3.5 ảnh + chữ tí hon (`tests/test_m17_multimodal_lora.py`): LoRA có ở mọi lớp Linear của phần ngôn ngữ (attention thường, linear attention, MLP), không có ở phần xử lý ảnh hay `lm_head`. Model 27B thật chưa train (cần GPU 40–48 GB).
 
 Chấm sau mỗi bước: `smoke-lora`, `light-lora`, `primary-qlora` trong `configs/models/platform.json` đã trỏ sẵn `adapter_path` tới thư mục adapter của từng bước. So với model gốc bằng cùng một bộ eval:
 ```bash
@@ -436,7 +442,7 @@ Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việ
 2. **M16 – Notebook bền hơn** (xong):
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
-3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.)
+3. **M17 – Model chính (ảnh + chữ)** (xong 26/9): chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.) Train thật model 27B trên GPU 40–48 GB vẫn chờ chủ repo.
 4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
 5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train; chấm Qwen3 công bằng khi bật/tắt chế độ suy nghĩ (xem "Vì sao tool_use tụt" ở trên); nhiệm vụ agent khi lệnh bị TerminalTool từ chối (đo 26/9: model không thử lại bằng lệnh khác).
 6. **M20 – Dữ liệu:**

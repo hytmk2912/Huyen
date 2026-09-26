@@ -25,6 +25,10 @@ from local_ai.training.hub import check_repo_id, download_file, download_last_ch
 from local_ai.training.plans import TrainingPlan
 
 FinetuneMethod = Literal["full", "lora"]
+# Phần xử lý ảnh của model multimodal, theo tên module trong transformers: "visual" (Qwen2-VL, Qwen3.5, gồm cả merger),
+# "vision_tower", "vision_model", "multi_modal_projector" (LLaVA, Gemma 3...). Dữ liệu train chỉ có chữ nên không gắn LoRA
+# vào đây (mốc M17); PEFT so khớp cả tên module với biểu thức này (re.fullmatch).
+VISION_MODULES = r".*\b(visual|vision_tower|vision_model|vision_encoder|image_encoder|multi_modal_projector|mm_projector)\b.*"
 
 
 @dataclass(frozen=True)
@@ -121,10 +125,23 @@ def resume_target(config: FinetuneConfig) -> str | None:
     return str(checkpoint) if checkpoint else None
 
 
+def lora_exclude_modules(model: ModelConfig) -> str | None:
+    """Module không gắn LoRA: phần xử lý ảnh nếu model là multimodal; model chữ thì không loại trừ gì."""
+    return VISION_MODULES if model.kind == "multimodal" else None
+
+
+def lora_scope(config: FinetuneConfig, model: ModelConfig) -> dict[str, Any] | None:
+    """Phạm vi gắn LoRA, in ra ở --dry-run để kiểm tra trước khi train."""
+    if config.method != "lora": return None
+    exclude = lora_exclude_modules(model)
+    return {"target_modules": config.lora.target_modules, "exclude_modules": exclude,
+            "note": "chỉ phần ngôn ngữ; không gắn vào phần xử lý ảnh" if exclude else "mọi lớp Linear (trừ lm_head)"}
+
+
 def describe(config: FinetuneConfig) -> dict[str, Any]:
     model = resolve_base_model(config); quantization = effective_quantization(config, model)
     hub = {"push_to_hub": config.push_to_hub, "hub_model_id": config.hub_model_id, "private": config.hub_private, "hub_strategy": "checkpoint", "resume_from_hub": config.push_to_hub and config.resume is True} if config.push_to_hub else {"push_to_hub": False}
-    return {"method": config.method, "quantization": quantization, "qlora": config.method == "lora" and quantization is not None, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "kind": model.kind, "params_b": model.params_b, "dtype": config.dtype or model.dtype}, "hub": hub, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "resume_from": resume_target(config), "config": asdict(config)}
+    return {"method": config.method, "quantization": quantization, "qlora": config.method == "lora" and quantization is not None, "base_model": {"name": model.name, "source": model.source, "revision": model.revision, "kind": model.kind, "params_b": model.params_b, "dtype": config.dtype or model.dtype}, "hub": hub, "dataset_path": config.dataset_path, "output_dir": config.output_dir, "gradient_checkpointing": config.gradient_checkpointing, "resume_from": resume_target(config), "lora": lora_scope(config, model), "config": asdict(config)}
 
 
 def hub_arguments(config: FinetuneConfig) -> dict[str, Any]:
@@ -227,7 +244,8 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     peft_config = None
     if config.method == "lora":
         from peft import LoraConfig
-        peft_config = LoraConfig(r=config.lora.r, lora_alpha=config.lora.alpha, lora_dropout=config.lora.dropout, target_modules=config.lora.target_modules, task_type="CAUSAL_LM")
+        peft_config = LoraConfig(r=config.lora.r, lora_alpha=config.lora.alpha, lora_dropout=config.lora.dropout, target_modules=config.lora.target_modules,
+                                 exclude_modules=lora_exclude_modules(model_config), task_type="CAUSAL_LM")
     dataset = load_dataset("json", data_files=config.dataset_path, split="train").select_columns(["messages"])
     args = SFTConfig(output_dir=config.output_dir, seed=config.seed, num_train_epochs=config.epochs, max_steps=config.max_steps, learning_rate=config.learning_rate, per_device_train_batch_size=config.per_device_batch_size, gradient_accumulation_steps=config.gradient_accumulation_steps, max_length=config.max_length, gradient_checkpointing=config.gradient_checkpointing, gradient_checkpointing_kwargs={"use_reentrant": False}, save_strategy="steps", save_steps=config.save_steps, save_total_limit=config.save_total_limit, logging_steps=config.logging_steps, bf16=dtype == torch.bfloat16, fp16=dtype == torch.float16, report_to=[], **hub_arguments(config))
     tracker = RunTracker(config.output_dir, describe(config))

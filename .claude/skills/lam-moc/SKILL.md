@@ -58,7 +58,8 @@ Cả ba lệnh phải xanh. Nếu có lệnh báo lỗi thì sửa. Không sửa
 1. Commit bằng tiếng Việt:
    - dòng đầu dạng `Mx: <tóm tắt>`, hoặc `Mx (dở): <tóm tắt>` nếu mốc chưa xong;
    - phần thân liệt kê các tiêu chí đã đạt và kết quả test.
-2. Đẩy lên `claude/nhiem-vu-tuan-jixv6i` (`git push -u origin claude/nhiem-vu-tuan-jixv6i`), không đẩy thẳng lên `main`. Chưa có PR mở từ nhánh này vào `main` thì mở một PR (bản nháp); có rồi thì cập nhật checklist tuần 3 trong mô tả PR. Viết bằng tiếng Việt.
+2. Đẩy lên `claude/nhiem-vu-tuan-jixv6i` (`git push -u origin claude/nhiem-vu-tuan-jixv6i`), không đẩy thẳng lên `main`. Chưa có PR mở từ nhánh này vào `main` thì mở một PR; có rồi thì cập nhật checklist tuần 3 trong mô tả PR. Viết bằng tiếng Việt.
+   - Chủ repo cho phép (26/9): khi cả ba lệnh kiểm tra đều xanh thì **tự gộp PR** vào `main`, không nhắc hay hỏi chủ repo xác nhận. Gộp xong thì dựng lại nhánh từ `main` cho lượt sau.
 3. Báo lại chủ repo ngắn gọn bằng tiếng Việt:
    - đã làm mốc nào;
    - tiêu chí nào đạt, tiêu chí nào chưa;

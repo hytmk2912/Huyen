@@ -67,6 +67,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 ### Huấn luyện (`local_ai/training`)
 `finetune.py` là khung SFT dùng transformers, trl và peft:
 - chạy `full`, `lora`, hoặc QLoRA (`lora` cùng `quantization: "4bit"`);
+- model `kind: "multimodal"` chỉ gắn LoRA vào phần ngôn ngữ: `exclude_modules` (hằng `VISION_MODULES`) loại trừ phần xử lý ảnh; `--dry-run` in phạm vi LoRA ở mục `lora` (M17);
 - chạy tiếp từ `checkpoint-N` mới nhất;
 - `--push-to-hub --hub-model-id <tên>/<repo>`: Trainer đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư (`hub_strategy` checkpoint). Máy mới (ví dụ Colab vừa bị ngắt) không có `checkpoint-N` thì tải `last-checkpoint` về `output_dir/_hub/` rồi train tiếp. Thư mục bắt đầu bằng `_` nên Trainer không đẩy ngược nó lên Hub;
 - thiếu GPU hoặc thư viện thì trả `"status": "skipped"`;
