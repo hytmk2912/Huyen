@@ -21,9 +21,9 @@ Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
 | --- | --- | --- |
 | Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json` | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng. Notebook Colab lấy 2000 dòng thật mỗi lần chạy |
 | Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ (LoRA chỉ gắn phần ngôn ngữ, M17); GPU không bf16 thì dùng fp16. Đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian và VRAM trên T4 theo số đo thật | **Chạy thật trên Colab T4** (25–26/9): QLoRA `smoke` và `light`, mỗi model 125 bước; `light` có một lần Colab ngắt và train tiếp được. LoRA chạy thật trên CPU với model tí hon (cả model ảnh + chữ Qwen3.5 tí hon). **Chưa chạy trên Colab thật:** model chính 27B (cần GPU 40–48 GB) |
-| Eval | 30 câu Việt + Anh, 4 cách chấm, báo cáo JSON + Markdown; bảng so sánh trước/sau khi train | **Chạy thật trên Colab T4**: `smoke` 16 → 14/30; `light` 17 → 19/30 nhưng tool_use 7/8 → 3/8 (sửa ở M19, M20) |
+| Eval | 38 câu Việt + Anh (16 câu tool_use từ M19), 4 cách chấm, chấm greedy lặp lại được, báo cáo JSON + Markdown; bảng so sánh trước/sau khi train | **Chạy thật trên Colab T4**: `smoke` 16 → 14/30; `light` 17 → 19/30 nhưng tool_use 7/8 → 3/8 (sửa ở M19, M20) |
 | Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả |
-| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 5 nhiệm vụ mẫu với calculator và TerminalTool | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút. Test bằng model giả và server OpenAI giả (5/5 nhiệm vụ) |
+| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 6 nhiệm vụ mẫu với calculator và TerminalTool (M19 thêm nhiệm vụ phải thử lại sau khi TerminalTool từ chối lệnh; lỗi từ chối kèm gợi ý lệnh được phép) | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút (trước khi có nhiệm vụ thứ 6). Test bằng model giả và server OpenAI giả (6/6 nhiệm vụ) |
 | Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm; trên Colab, TerminalTool chạy thật với agent |
 | Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
 
@@ -32,7 +32,7 @@ Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
 - `local_ai/training`: khung fine-tune SFT (`finetune.py`: full, LoRA hoặc QLoRA); đẩy checkpoint và adapter lên Hugging Face Hub (`hub.py`); ước tính thời gian train trên Colab (`estimate.py`); so số đo thật với ước tính (`calibrate.py`).
 - `local_ai/models`: cấu hình model, adapter chạy model Hugging Face (chữ hoặc ảnh + chữ, nén 4bit/8bit), adapter gọi server local kiểu OpenAI (`openai_compatible.py`), router chọn model theo khả năng, ước tính VRAM (`vram.py`).
 - `local_ai/evaluation`: bộ eval (`suite.py`) với 4 cách chấm, lệnh `python -m local_ai.evaluation`; câu hỏi nằm trong `data/eval/eval_v1.jsonl`; so sánh 2 báo cáo (`compare.py`).
-- `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent; 5 nhiệm vụ mẫu cho agent (`agents/tasks.py`).
+- `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent; 6 nhiệm vụ mẫu cho agent (`agents/tasks.py`).
 - `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
 - `local_ai/colab.py`: hàm `run` cho notebook Colab. Lệnh chạy không qua shell; lệnh lỗi thì ô báo đỏ và Run all dừng.
 - `local_ai/check.py`: lệnh kiểm tra chung `python -m local_ai.check` (test, compileall, secret-scan).
@@ -232,7 +232,7 @@ Test `tests/test_m6_cpu_pipeline.py` tự tạo tokenizer (BPE, có `chat_templa
 2. LoRA 2 bước trên CPU;
 3. lưu adapter;
 4. nạp lại model gốc cùng adapter;
-5. chạy eval 30 câu.
+5. chạy eval 38 câu.
 
 Test chạy với `HF_HUB_OFFLINE=1`. Trên máy 4 CPU, test mất khoảng 6 giây. Máy thiếu torch, transformers, trl, peft hoặc datasets thì test tự bỏ qua.
 
@@ -243,9 +243,9 @@ python -m unittest tests.test_m6_cpu_pipeline -v
 ```
 
 ## Bước 3: đánh giá (eval)
-Bộ câu hỏi `data/eval/eval_v1.jsonl` có 30 câu:
-- chia theo ngôn ngữ: 15 câu tiếng Việt, 15 câu tiếng Anh;
-- chia theo nhóm: 8 câu `code`, 14 câu `reasoning`, 8 câu `tool_use` (trả JSON gọi công cụ).
+Bộ câu hỏi `data/eval/eval_v1.jsonl` có 38 câu:
+- chia theo ngôn ngữ: 19 câu tiếng Việt, 19 câu tiếng Anh;
+- chia theo nhóm: 8 câu `code`, 14 câu `reasoning`, 16 câu `tool_use` (trả JSON gọi công cụ; M19 thêm 8 câu để mỗi câu không còn nặng 12,5% của nhóm).
 
 Mỗi câu ghi `language`, `group` và cách chấm `scoring`:
 
@@ -259,7 +259,7 @@ Mỗi câu ghi `language`, `group` và cách chấm `scoring`:
 Trước khi chấm, khối `<think>...</think>` trong câu trả lời được bỏ đi. Mỗi câu có `reference` là một câu trả lời đúng mẫu; test kiểm tra mọi `reference` đều đạt.
 
 ```bash
-python -m local_ai.evaluation --scripted                  # chạy thử bằng đáp án mẫu (không cần model), kết quả 30/30
+python -m local_ai.evaluation --scripted                  # chạy thử bằng đáp án mẫu (không cần model), kết quả 38/38
 python -m local_ai.evaluation --model ollama              # chấm một model trong configs/models/platform.json
 python -m local_ai.evaluation --scripted --train-data data/processed/hf_sft/sft.jsonl   # kiểm tra dữ liệu train không chứa câu eval
 ```
@@ -268,7 +268,9 @@ Báo cáo ghi vào `.runs/eval/<model>-<thời điểm>/`, hoặc thư mục ghi
 - `report.json`: kết quả từng câu;
 - `report.md`: tỉ lệ đạt theo nhóm và theo ngôn ngữ, cùng danh sách câu không đạt kèm lý do.
 
-Với `--hub-repo <tên>/<repo> --hub-path <thư mục>`, chấm xong thì báo cáo được đẩy lên repo Hugging Face riêng tư. Lần chạy sau, nếu repo đã có báo cáo cùng cài đặt (model, `max_new_tokens`, mã băm bộ câu hỏi) thì báo cáo được dùng lại, không nạp model.
+Chấm lặp lại được (M19): model transformers sinh chữ greedy (`do_sample=False`, ghi đè cấu hình lấy mẫu mặc định của Qwen); model qua server nhận `temperature` 0 và `seed` cố định. Muốn lấy mẫu thì đặt `temperature` (lớn hơn 0) và `seed` cho model trong `configs/models/platform.json`. `--no-thinking` tắt chế độ suy nghĩ `<think>` của Qwen3 (truyền `enable_thinking=False` vào chat template), để model không dùng hết số token cho phần suy nghĩ. Cài đặt chấm (model, nguồn, revision, `max_new_tokens`, cách sinh chữ, mã băm bộ câu hỏi) ghi vào `report.json` (khóa `settings`) và một dòng "Cài đặt" trong `report.md`.
+
+Với `--hub-repo <tên>/<repo> --hub-path <thư mục>`, chấm xong thì báo cáo được đẩy lên repo Hugging Face riêng tư. Lần chạy sau, nếu repo đã có báo cáo cùng cài đặt như trên thì báo cáo được dùng lại, không nạp model. `--no-reuse` luôn chấm lại (vẫn đẩy báo cáo mới lên); notebook dùng cho bước chấm sau khi train (`eval/sau`), vì adapter có thể đã đổi.
 
 So sánh 2 lần chấm (ví dụ trước và sau khi train): `python -m local_ai.evaluation.compare <trước>/report.json <sau>/report.json`. Lệnh in bảng tỉ lệ đạt theo nhóm và theo ngôn ngữ, mức thay đổi (điểm %), cùng các câu mới đạt và mới trượt. `--max-new-tokens` ghi đè độ dài câu trả lời tối đa để chấm nhanh hơn; `--dry-run` chỉ in kế hoạch, không nạp model.
 
@@ -323,8 +325,8 @@ Notebook `notebooks/train_colab.ipynb` train trên GPU T4 miễn phí của Cola
 
 | Model | Cấu hình train | Chấm sau khi train | Thời gian ước tính (train + 2 lần chấm) |
 | --- | --- | --- | --- |
-| `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 23 phút |
-| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 9,2 GB (đo thật 8,2 GB) | `light-colab` | khoảng 121 phút |
+| `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 25 phút |
+| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 9,2 GB (đo thật 8,2 GB) | `light-colab` | khoảng 130 phút |
 
 Các ô sau chạy lần lượt:
 1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
@@ -344,7 +346,7 @@ Các ô sau chạy lần lượt:
 **Colab ngắt giữa chừng:** mở lại notebook, giữ nguyên model đã chọn và chạy Run all.
 - Cờ `--push-to-hub` của lệnh train đẩy checkpoint mới nhất vào thư mục `last-checkpoint` của repo riêng tư sau mỗi `save_steps` bước (`light`: 10, `smoke`: 25).
 - Lần chạy sau, lệnh train tự tải checkpoint đó về `.runs/colab_<model>/_hub/last-checkpoint` rồi train tiếp.
-- Bước chấm trước khi train (`--hub-repo ... --hub-path eval/truoc`) cũng không phải chạy lại. Lần đầu chấm xong, báo cáo được đẩy lên repo riêng tư, kèm cài đặt (model, `max_new_tokens`, mã băm bộ câu hỏi). Lần sau, nếu cài đặt giống thì báo cáo được tải về dùng luôn.
+- Bước chấm trước khi train (`--hub-repo ... --hub-path eval/truoc`) cũng không phải chạy lại. Lần đầu chấm xong, báo cáo được đẩy lên repo riêng tư, kèm cài đặt (model, revision, `max_new_tokens`, cách sinh chữ, mã băm bộ câu hỏi). Lần sau, nếu cài đặt giống thì báo cáo được tải về dùng luôn. Từ M19, bước chấm sau khi train (Bước 9) cũng đẩy báo cáo lên (`eval/sau`) nhưng luôn chấm lại; cả hai bước chấm đều tắt phần suy nghĩ (`--no-thinking`).
 
 **Lệnh lỗi thì dừng (M16).** Mọi lệnh trong notebook chạy qua `run(...)` của `local_ai/colab.py`, thay cho `!python`. Khi mã thoát khác 0, ô báo đỏ "Bước N lỗi (mã thoát ...)" và Run all dừng ngay, không chạy tiếp các ô sau như trước.
 
@@ -386,7 +388,7 @@ Chủ repo đã chọn làm (26/9): cách 1 ở M20 (dữ liệu); cách 2 và 4
 
 Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy nghĩ" trong khối `<think>` hết 512 token trước khi kịp viết code. Đây là giới hạn của bộ chấm, không phải lỗi train.
 
-Điểm sau khi train của `smoke` giảm 2 câu (16 → 14 trên 30). Với 30 câu, chênh 2 câu có thể chỉ là ngẫu nhiên. Báo cáo chấm sau khi train không được đẩy lên Hugging Face, nên chưa xem được câu nào sai thêm.
+Điểm sau khi train của `smoke` giảm 2 câu (16 → 14 trên 30). Với 30 câu, chênh 2 câu có thể chỉ là ngẫu nhiên. Lần chạy đó báo cáo chấm sau khi train chưa được đẩy lên Hugging Face, nên chưa xem được câu nào sai thêm (từ M19 đã đẩy lên `eval/sau`).
 
 **Ước tính thời gian** (`python -m local_ai.training.estimate`) không tải model, chỉ dựa vào cấu hình và `sft.jsonl`:
 - số token mỗi dòng, kể cả phần đệm khi batch lớn hơn 1;
@@ -413,7 +415,7 @@ Muốn sửa notebook thì sửa nội dung ô trong `notebooks/build.py`, rồi
 Notebook `notebooks/agent_colab.ipynb` chạy theo các bước:
 1. cài Ollama bản đã ghim (0.34.4);
 2. tải model `qwen3:4b` (khoảng 2,5 GB);
-3. cho agent của repo làm 5 nhiệm vụ mẫu, gọi model qua adapter kiểu OpenAI (mục `ollama-colab` trong danh sách model).
+3. cho agent của repo làm 6 nhiệm vụ mẫu, gọi model qua adapter kiểu OpenAI (mục `ollama-colab` trong danh sách model).
 
 Notebook không cần token và không cần cài gói pip nào.
 
@@ -428,11 +430,12 @@ Các nhiệm vụ nằm trong `data/eval/agent_tasks_v1.jsonl`, dùng 2 công c�
 | Liệt kê file trong thư mục làm việc | terminal (`ls`) |
 | Đọc mã số đơn hàng trong `ghi_chu.txt` | terminal (`cat`) |
 | Tính tổng cột `so_luong` của `du_lieu.csv` | terminal, rồi calculator |
+| Đếm dòng dữ liệu của `du_lieu.csv`: phải chạy `wc -l` trước (bị từ chối vì không có trong allowlist), rồi thử lại bằng lệnh được phép (M19) | terminal, có một lệnh bị từ chối rồi một lệnh chạy được |
 
-Một nhiệm vụ chỉ tính là đạt khi câu trả lời đúng **và** agent đã thật sự gọi mọi công cụ cần dùng, để không tính trường hợp model đoán mò. Lệnh in trace từng nhiệm vụ (kế hoạch, công cụ đã gọi, kết quả) và tỉ lệ thành công ở cuối:
+Một nhiệm vụ chỉ tính là đạt khi câu trả lời đúng **và** agent đã thật sự gọi mọi công cụ cần dùng, để không tính trường hợp model đoán mò. Đáp án là số thì so theo giá trị (M19): "187" hay "87,5" không khớp 87, còn "337500.0" hay "337.500" vẫn khớp 337500. Khi TerminalTool từ chối lệnh, thông báo lỗi kèm gợi ý: các lệnh được phép, chạy từng lệnh một, không dùng pipe hay redirect. Lệnh in trace từng nhiệm vụ (kế hoạch, công cụ đã gọi, kết quả) và tỉ lệ thành công ở cuối:
 
 ```bash
-python -m local_ai.agents.tasks --scripted                   # dùng câu trả lời mẫu, không cần model: 5/5
+python -m local_ai.agents.tasks --scripted                   # dùng câu trả lời mẫu, không cần model: 6/6
 python -m local_ai.agents.tasks --model ollama-colab --dry-run
 python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/report.json   # cần Ollama đang chạy
 ```
@@ -443,7 +446,7 @@ python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/
 
 Test `tests/test_m13_agent_colab.py` (chạy không cần Ollama) gồm:
 - kiểm tra notebook hợp lệ và chạy lệnh của nó bằng `--dry-run`;
-- chạy 5 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
+- chạy 6 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU và thử Ollama (notebook Colab train và agent); tuần 3 đã chạy thật trên Colab T4 (M15). Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
@@ -452,8 +455,8 @@ Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU v�
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ)** (xong 26/9): chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.) Train thật model 27B trên GPU 40–48 GB vẫn chờ chủ repo.
-4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
-5. **M19 – Chấm công bằng hơn** (chủ repo chọn 26/9, làm trước; tiêu chí trong `TASKS.md`):
+4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 6 nhiệm vụ mẫu với model vừa train, so với model gốc.
+5. **M19 – Chấm công bằng hơn** (xong 26/9; tiêu chí và bằng chứng trong `TASKS.md`):
    - tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False`), ghi vào cài đặt chấm để không dùng lại nhầm báo cáo cũ; chấm trước và sau dùng cùng cài đặt;
    - chấm sau khi train (Bước 9) đẩy báo cáo lên Hub ở `eval/sau`, luôn chấm lại (`--no-reuse`);
    - câu tool_use trong bộ chấm tăng từ 8 lên ít nhất 16;

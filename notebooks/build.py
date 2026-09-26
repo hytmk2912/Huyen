@@ -113,10 +113,11 @@ run("python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --p
 run(f"python -m local_ai.training.estimate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --hub-model-id {HUB_REPO}", "Bước 6 (ước tính)")
 """),
         code("buoc-7-cham-truoc", """
-# Bước 7: chấm model gốc (chưa train) trên bộ 30 câu eval, để lát nữa so sánh.
-# --train-data kiểm tra dữ liệu train không chứa câu hỏi của bộ eval. Chấm xong, báo cáo được lưu vào repo riêng tư:
+# Bước 7: chấm model gốc (chưa train) trên bộ 38 câu eval, để lát nữa so sánh.
+# --train-data kiểm tra dữ liệu train không chứa câu hỏi của bộ eval. --no-thinking tắt phần suy nghĩ <think> của Qwen3
+# (Bước 9 dùng đúng cài đặt này). Chấm luôn greedy nên chạy lại ra cùng kết quả. Chấm xong, báo cáo được lưu vào repo riêng tư:
 # Colab ngắt rồi chạy lại thì dùng lại báo cáo đó (cùng model, cùng cài đặt), không phải chấm lại.
-run(f"python -m local_ai.evaluation --model {MODEL} --max-new-tokens {MAX_NEW_TOKENS} --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/truoc --hub-repo {HUB_REPO} --hub-path eval/truoc", "Bước 7 (chấm trước)")
+run(f"python -m local_ai.evaluation --model {MODEL} --max-new-tokens {MAX_NEW_TOKENS} --no-thinking --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/truoc --hub-repo {HUB_REPO} --hub-path eval/truoc", "Bước 7 (chấm trước)")
 """),
         code("buoc-8-train", """
 # Bước 8: train QLoRA (nén 4bit, fp16 vì T4 không có bf16). Checkpoint được đẩy lên repo riêng tư HUB_REPO sau mỗi vài chục bước.
@@ -126,7 +127,8 @@ run(f"python -m local_ai.training.finetune --config configs/training/colab_{MODE
 """),
         code("buoc-9-cham-sau", """
 # Bước 9: chấm lại model sau khi train (model gốc + adapter vừa train: mục smoke-colab hoặc light-colab trong configs/models/platform.json).
-run(f"python -m local_ai.evaluation --model {MODEL}-colab --max-new-tokens {MAX_NEW_TOKENS} --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/sau", "Bước 9 (chấm sau)")
+# Cùng cài đặt với Bước 7 (--no-thinking). Luôn chấm lại (--no-reuse) vì adapter có thể đã đổi; báo cáo được lưu vào repo riêng tư ở eval/sau.
+run(f"python -m local_ai.evaluation --model {MODEL}-colab --max-new-tokens {MAX_NEW_TOKENS} --no-thinking --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/sau --hub-repo {HUB_REPO} --hub-path eval/sau --no-reuse", "Bước 9 (chấm sau)")
 """),
         code("buoc-10-so-sanh", """
 # Bước 10: in bảng so sánh điểm trước và sau khi train (theo nhóm câu và theo ngôn ngữ).
@@ -164,7 +166,7 @@ def agent_colab() -> dict:
         markdown("gioi-thieu", f"""
 # Agent chạy model thật trên Colab (Ollama + {OLLAMA_MODEL})
 
-Notebook này cài Ollama, tải model `{OLLAMA_MODEL}` (khoảng 2,5 GB), rồi cho agent của repo làm 5 nhiệm vụ mẫu bằng 2 công cụ:
+Notebook này cài Ollama, tải model `{OLLAMA_MODEL}` (khoảng 2,5 GB), rồi cho agent của repo làm 6 nhiệm vụ mẫu bằng 2 công cụ:
 - **calculator**: tính biểu thức số học;
 - **terminal** (TerminalTool): chạy lệnh trong danh sách cho phép như `ls`, `cat`, chỉ trong thư mục làm việc riêng của từng nhiệm vụ.
 
@@ -172,7 +174,7 @@ Agent gọi model qua adapter kiểu OpenAI của repo (`http://localhost:11434/
 
 **Không cần token Hugging Face.** Nên chọn GPU T4 (menu Runtime → Change runtime type); chạy trên CPU cũng được nhưng rất chậm.
 
-**Cách chạy:** menu Runtime → Run all. Thời gian ước tính: cài đặt và tải model khoảng 5 phút, 5 nhiệm vụ khoảng 5–15 phút (qwen3 suy nghĩ trước khi trả lời). Con số này chưa đo trên Colab thật.
+**Cách chạy:** menu Runtime → Run all. Thời gian ước tính: cài đặt và tải model khoảng 5 phút, 6 nhiệm vụ khoảng 5–15 phút (qwen3 suy nghĩ trước khi trả lời). Con số này chưa đo trên Colab thật.
 """),
         code("buoc-1-gpu", """
 # Bước 1: kiểm tra GPU. Ollama chạy được trên CPU nhưng chậm hơn nhiều.
@@ -237,11 +239,11 @@ else:
 run("ollama pull {OLLAMA_MODEL}", "Bước 5 (tải model)")
 """),
         code("buoc-6-kiem-tra", """
-# Bước 6: kiểm tra cấu hình, chưa gọi model: 5 nhiệm vụ, công cụ mỗi nhiệm vụ cần, địa chỉ máy chủ Ollama.
+# Bước 6: kiểm tra cấu hình, chưa gọi model: 6 nhiệm vụ, công cụ mỗi nhiệm vụ cần, địa chỉ máy chủ Ollama.
 run("python -m local_ai.agents.tasks --model ollama-colab --dry-run", "Bước 6 (kiểm tra cấu hình)")
 """),
         code("buoc-7-chay-agent", """
-# Bước 7: cho agent làm 5 nhiệm vụ mẫu. Mỗi nhiệm vụ in trace (kế hoạch, công cụ đã gọi, kết quả); dòng cuối là tỉ lệ thành công.
+# Bước 7: cho agent làm 6 nhiệm vụ mẫu. Mỗi nhiệm vụ in trace (kế hoạch, công cụ đã gọi, kết quả); dòng cuối là tỉ lệ thành công.
 # TerminalTool chỉ được bật trong thư mục làm việc riêng của từng nhiệm vụ (.runs/agent_tasks/<nhiệm vụ>/workspace).
 run("python -m local_ai.agents.tasks --model ollama-colab --output .runs/agent_tasks/report.json", "Bước 7 (chạy agent)")
 """),

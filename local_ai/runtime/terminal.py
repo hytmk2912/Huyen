@@ -88,8 +88,22 @@ class TerminalTool:
         self._lock = threading.Lock()
 
     def check(self, command: str | Sequence[str]) -> list[str]:
-        """Trả về argv đã kiểm tra, hoặc ném CommandRejected kèm lý do bằng tiếng Việt."""
+        """Trả về argv đã kiểm tra, hoặc ném CommandRejected kèm lý do bằng tiếng Việt và gợi ý cách khác (M19),
+        để agent biết thử lại bằng lệnh được phép thay vì bỏ cuộc."""
         if not self.enabled: raise CommandRejected("TerminalTool đang tắt; muốn bật phải đặt enabled: true trong cấu hình (configs/tools/terminal.json) hoặc tạo công cụ với enabled=True")
+        try:
+            return self._check(command)
+        except CommandRejected as error:
+            raise CommandRejected(f"{error}. {self.hint(list_allowed='allowlist' not in str(error))}") from None
+
+    def hint(self, list_allowed: bool = True) -> str:
+        """Gợi ý kèm lỗi từ chối: các lệnh được phép, chạy từng lệnh một. Phần tiếng Anh dành cho model (câu lệnh gửi model giữ tiếng Anh)."""
+        allowed = ", ".join(sorted(self.config.allowed_commands))
+        return (f"Gợi ý: {f'chỉ dùng các lệnh {allowed}; ' if list_allowed else ''}chạy từng lệnh một, không dùng pipe (|), redirect (> <), ; hay &&; ví dụ đọc file: cat <tên file>. "
+                f"(Hint: allowed commands are {allowed}. Run one command at a time, without pipes, redirects, ; or &&. "
+                "Try another allowed command, for example cat <file> to read a file, then count or compute from its output yourself.)")
+
+    def _check(self, command: str | Sequence[str]) -> list[str]:
         parts = [command] if isinstance(command, str) else list(command)
         if not parts or not all(isinstance(part, str) for part in parts): raise CommandRejected("Lệnh phải là một chuỗi hoặc list các chuỗi, không được rỗng")
         for part in parts:

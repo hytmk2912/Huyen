@@ -93,7 +93,8 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(answer, "chào bạn")
         request = server.requests[0]
         self.assertEqual(request["path"], "/v1/chat/completions")
-        self.assertEqual(request["body"], {"model": "qwen-test", "messages": [{"role": "system", "content": "Trả lời ngắn."}, {"role": "user", "content": "xin chào"}], "stream": False})
+        self.assertEqual(request["body"], {"model": "qwen-test", "messages": [{"role": "system", "content": "Trả lời ngắn."}, {"role": "user", "content": "xin chào"}], "stream": False,
+                                           "temperature": 0.0, "seed": 0})  # M19: temperature 0 và seed cố định để chấm lặp lại được
         self.assertNotIn("Authorization", request["headers"])
 
     def test_api_key_is_read_only_from_environment(self):

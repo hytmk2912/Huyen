@@ -137,12 +137,26 @@ def check_train_overlap(cases: list[EvalCase], train_paths: list[str | Path]) ->
     return find_eval_overlap([record for path in train_paths for record in load_records(path)], eval_records)
 
 
+def describe_settings(settings: dict[str, Any]) -> str:
+    """Một dòng mô tả cài đặt chấm cho report.md: model, revision, số token tối đa, cách sinh chữ, bộ câu hỏi."""
+    parts = [f"model `{settings.get('model')}`"]
+    if settings.get("source"): parts.append(f"nguồn `{settings['source']}`" + (f" (revision `{settings['revision']}`)" if settings.get("revision") else ""))
+    if settings.get("max_new_tokens"): parts.append(f"tối đa {settings['max_new_tokens']} token mỗi câu")
+    generation = settings.get("generation")
+    if generation:
+        parts.append("sinh chữ greedy (do_sample=False)" if not generation.get("do_sample") else f"lấy mẫu temperature {generation.get('temperature')}, seed {generation.get('seed')}")
+        parts.append({False: "tắt suy nghĩ (enable_thinking=False)", True: "bật suy nghĩ (enable_thinking=True)"}.get(generation.get("enable_thinking"), "suy nghĩ theo mặc định của chat template"))
+    if settings.get("cases_sha256"): parts.append(f"bộ câu hỏi `{settings['cases_sha256'][:12]}`")
+    return ", ".join(parts)
+
+
 def markdown_report(report: dict[str, Any]) -> str:
     if report["status"] != "completed": return f"# Báo cáo eval: {report['model']}\n\nTrạng thái: **{report['status']}**\n\n{report.get('error', '')}\n"
     def table(title: str, buckets: dict[str, dict[str, Any]]) -> list[str]:
         return [f"## Theo {title}", "", f"| {title.capitalize()} | Số câu | Đạt | Tỉ lệ |", "| --- | ---: | ---: | ---: |",
                 *(f"| {name} | {bucket['cases']} | {bucket['passed']} | {bucket['accuracy']:.0%} |" for name, bucket in buckets.items()), ""]
-    lines = [f"# Báo cáo eval: {report['model']}", "", f"Thời điểm: {report['generated_at']}", "", f"**Tổng: {report['passed']}/{report['cases']} câu đạt ({report['accuracy']:.0%})**", "",
+    lines = [f"# Báo cáo eval: {report['model']}", "", f"Thời điểm: {report['generated_at']}", "", *([f"Cài đặt: {describe_settings(report['settings'])}", ""] if report.get("settings") else []),
+             f"**Tổng: {report['passed']}/{report['cases']} câu đạt ({report['accuracy']:.0%})**", "",
              *table("nhóm", report["groups"]), *table("ngôn ngữ", report["languages"]), "## Câu không đạt", ""]
     lines += [f"- `{item['id']}` ({item['group']}, {item['language']}, {item['scoring']}): {item['reason']}" for item in report["failures"]] or ["Không có."]
     return "\n".join(lines) + "\n"

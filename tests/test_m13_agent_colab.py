@@ -115,13 +115,13 @@ class NotebookTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 plan = json.loads(result.stdout)
                 self.assertEqual((plan["model"]["name"], plan["model"]["base_url"], plan["model"]["source"]), ("ollama-colab", "http://localhost:11434/v1", "qwen3:4b"))
-                self.assertEqual(len(plan["tasks"]), 5)
+                self.assertEqual(len(plan["tasks"]), len(load_tasks()))  # M19 thêm nhiệm vụ thử lại: 6
 
 
 class TaskTests(unittest.TestCase):
     def test_five_tasks_use_both_tools_and_are_solvable(self):
         tasks = load_tasks()
-        self.assertEqual(len(tasks), 5)
+        self.assertEqual(len(tasks), 6)  # M19 thêm nhiệm vụ thu-lai-khi-bi-tu-choi
         self.assertEqual({tool for task in tasks for tool in task.tools}, {"calculator", "terminal"})
         self.assertTrue(any(set(task.tools) == {"calculator", "terminal"} for task in tasks))
         files = {path.name: path.read_text(encoding="utf-8") for path in DEFAULT_WORKSPACE.iterdir()}
@@ -135,10 +135,10 @@ class TaskTests(unittest.TestCase):
             report = json.loads((Path(directory) / "report.json").read_text(encoding="utf-8"))
             logs = [json.loads(line) for line in (Path(directory) / "doc-ghi-chu" / "terminal.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual(code, 0)
-        self.assertIn("Tỉ lệ thành công: 5/5 (100%)", output)
+        self.assertIn("Tỉ lệ thành công: 6/6 (100%)", output)  # M19: 6 nhiệm vụ
         for phrase in ("=== tinh-bieu-thuc: ĐẠT ===", "tool[calculator]: 549", "tool[terminal]: bao_cao.md", "Mã số đơn hàng: DH-4827", "Công cụ đã gọi: terminal, calculator"):
             with self.subTest(phrase): self.assertIn(phrase, output)
-        self.assertEqual((report["passed"], report["total"], report["success_rate"]), (5, 5, 1.0))
+        self.assertEqual((report["passed"], report["total"], report["success_rate"]), (6, 6, 1.0))
         self.assertEqual(logs[0]["command"], ["cat", "ghi_chu.txt"])  # TerminalTool thật, có ghi log
 
     def test_task_fails_on_wrong_answer_or_missing_tool(self):
@@ -176,7 +176,7 @@ class OpenAIAdapterTests(unittest.TestCase):
             models.write_text(json.dumps({"models": [{"name": "ollama-gia", "backend": "openai_compatible", "base_url": server.base_url, "source": "qwen3:4b", "kind": "text", "capabilities": ["chat", "reasoning", "tool_calling"]}]}), encoding="utf-8")
             code, output = run_cli(["--model", "ollama-gia", "--models", str(models), "--workspace", str(Path(directory) / "runs")])
         self.assertEqual(code, 0)
-        self.assertIn("Tỉ lệ thành công: 5/5 (100%)", output)
+        self.assertIn("Tỉ lệ thành công: 6/6 (100%)", output)  # M19: 6 nhiệm vụ
         self.assertEqual(len(server.requests), len(replies))
         self.assertTrue(all(request["path"] == "/v1/chat/completions" and request["body"]["model"] == "qwen3:4b" for request in server.requests))
         first, decision = (request["body"]["messages"][-1]["content"] for request in server.requests[:2])

@@ -61,7 +61,7 @@ class ScoringTests(unittest.TestCase):
 class CaseFileTests(unittest.TestCase):
     def test_case_file_has_about_30_questions_in_both_languages(self):
         cases = load_cases()
-        self.assertTrue(28 <= len(cases) <= 35)
+        self.assertTrue(28 <= len(cases) <= 40)  # M19 (chủ repo chọn 26/9) thêm 8 câu tool_use: 30 → 38 câu
         languages = [item.language for item in cases]
         self.assertGreaterEqual(languages.count("vi"), 10); self.assertGreaterEqual(languages.count("en"), 10)
         self.assertEqual({item.group for item in cases}, {"code", "reasoning", "tool_use"})
@@ -118,7 +118,7 @@ class CommandTests(unittest.TestCase):
     def test_scripted_run_writes_reports(self):
         with tempfile.TemporaryDirectory() as directory:
             code, stdout, _ = self.run_command(["--scripted", "--output", directory])
-            self.assertEqual(code, 0); self.assertIn("30/30", stdout)
+            self.assertEqual(code, 0); self.assertIn(f"{len(load_cases())}/{len(load_cases())}", stdout)  # M19: 38 câu
             self.assertEqual(json.loads((Path(directory) / "report.json").read_text(encoding="utf-8"))["model"], "scripted-reference")
             self.assertTrue((Path(directory) / "report.md").exists())
 

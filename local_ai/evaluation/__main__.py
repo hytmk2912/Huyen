@@ -13,6 +13,7 @@ from typing import Any
 
 from local_ai.config.settings import find_model_config
 from local_ai.evaluation.suite import DEFAULT_CASES, check_train_overlap, load_cases, run_eval, write_reports
+from local_ai.models.adapters import ModelConfig
 from local_ai.models.router import ScriptedModelAdapter, create_adapter
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,8 +29,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", help="Thư mục ghi báo cáo (mặc định .runs/eval/<model>-<thời điểm>)")
     parser.add_argument("--train-data", action="append", default=[], help="File dữ liệu train (train.jsonl hoặc sft.jsonl) cần kiểm tra trùng với eval; lặp lại được")
     parser.add_argument("--max-new-tokens", type=int, help="Ghi đè số token tối đa model được sinh cho mỗi câu (nhỏ hơn thì chấm nhanh hơn)")
+    parser.add_argument("--no-thinking", action="store_true", help="Tắt chế độ suy nghĩ <think> của Qwen3 (truyền enable_thinking=False vào chat template), để model không dùng hết số token cho phần suy nghĩ")
     parser.add_argument("--hub-repo", help="Repo Hugging Face riêng tư lưu báo cáo (tên-người-dùng/tên-repo): chấm xong thì đẩy lên; chạy lại mà repo đã có báo cáo cùng cài đặt thì dùng lại, không chấm lại")
     parser.add_argument("--hub-path", default="eval", help="Thư mục trong repo chứa report.json (mặc định eval)")
+    parser.add_argument("--no-reuse", action="store_true", help="Luôn chấm lại, không dùng lại báo cáo đã có trên Hub (vẫn đẩy báo cáo mới lên nếu có --hub-repo); dùng khi adapter có thể đã đổi")
     parser.add_argument("--dry-run", action="store_true", help="Chỉ kiểm tra tham số và in kế hoạch, không nạp model")
     args = parser.parse_args(argv)
     if args.hub_repo:
@@ -37,12 +40,13 @@ def main(argv: list[str] | None = None) -> int:
         check_repo_id(args.hub_repo)
 
     cases = load_cases(args.cases)
+    config = None if args.scripted else eval_model_config(args)
     if args.dry_run:
         plan = {"status": "dry-run", "cases": len(cases), "output": args.output or ".runs/eval/<model>-<thời điểm>", "train_data": {path: Path(path).is_file() for path in args.train_data}}
-        if not args.scripted:
-            config = find_model_config(args.models, args.model)
-            plan["model"] = {"name": config.name, "backend": config.backend, "source": config.source, "adapter_path": config.adapter_path, "max_new_tokens": args.max_new_tokens or config.max_new_tokens}
-        if args.hub_repo: plan["hub"] = {"repo": args.hub_repo, "path": f"{args.hub_path}/report.json"}
+        if config is not None:
+            plan["model"] = {"name": config.name, "backend": config.backend, "source": config.source, "revision": config.revision, "adapter_path": config.adapter_path, "max_new_tokens": config.max_new_tokens}
+        plan["settings"] = eval_settings(config, args.cases)
+        if args.hub_repo: plan["hub"] = {"repo": args.hub_repo, "path": f"{args.hub_path}/report.json"}; plan["reuse_hub_report"] = not args.no_reuse
         print(json.dumps(plan, ensure_ascii=False, indent=2)); return 0
     missing_files = [path for path in args.train_data if not Path(path).is_file()]
     if missing_files:
@@ -52,12 +56,10 @@ def main(argv: list[str] | None = None) -> int:
     if overlap:
         print(f"Không chạy eval: dữ liệu train trùng với câu eval: {', '.join(f'{identifier} (trùng {reason})' for identifier, reason in overlap)}", file=sys.stderr)
         return 2
-    config = None if args.scripted else find_model_config(args.models, args.model)
-    if config is not None and args.max_new_tokens: config = replace(config, max_new_tokens=args.max_new_tokens)
     name = "scripted-reference" if config is None else config.name
     output = Path(args.output or ROOT / ".runs" / "eval" / f"{name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
-    settings = eval_settings(name, None if config is None else config.max_new_tokens, args.cases)
-    if args.hub_repo and reuse_hub_report(args.hub_repo, args.hub_path, settings, output): return 0
+    settings = eval_settings(config, args.cases)
+    if args.hub_repo and not args.no_reuse and reuse_hub_report(args.hub_repo, args.hub_path, settings, output): return 0
     if config is None:
         model = ScriptedModelAdapter("scripted-reference", [case.reference or "" for case in cases])
     else:
@@ -78,9 +80,22 @@ def main(argv: list[str] | None = None) -> int:
 REPORT_KEYS = {"model", "generated_at", "cases", "passed", "accuracy", "groups", "languages", "failures"}  # đủ để ghi report.md
 
 
-def eval_settings(model: str, max_new_tokens: int | None, cases_path: str | Path) -> dict[str, Any]:
-    """Những gì quyết định kết quả chấm: model, số token tối đa mỗi câu, nội dung bộ câu hỏi (mã băm)."""
-    return {"model": model, "max_new_tokens": max_new_tokens, "cases_sha256": hashlib.sha256(Path(cases_path).read_bytes()).hexdigest()}
+def eval_model_config(args: argparse.Namespace) -> ModelConfig:
+    """Cấu hình model khi chấm: lấy từ danh sách model, ghi đè max_new_tokens và tắt chế độ suy nghĩ nếu có tùy chọn."""
+    config = find_model_config(args.models, args.model)
+    if args.max_new_tokens: config = replace(config, max_new_tokens=args.max_new_tokens)
+    if args.no_thinking: config = replace(config, enable_thinking=False)
+    return config
+
+
+def eval_settings(config: ModelConfig | None, cases_path: str | Path) -> dict[str, Any]:
+    """Những gì quyết định kết quả chấm: model (tên, nguồn, revision), số token tối đa mỗi câu, cách sinh chữ
+    (greedy hay lấy mẫu, temperature, seed, có tắt chế độ suy nghĩ không) và nội dung bộ câu hỏi (mã băm).
+    `config` là None khi chạy `--scripted` (model giả trả lời đúng đáp án mẫu)."""
+    cases_sha256 = hashlib.sha256(Path(cases_path).read_bytes()).hexdigest()
+    if config is None: return {"model": "scripted-reference", "source": None, "revision": None, "max_new_tokens": None, "generation": None, "cases_sha256": cases_sha256}
+    revision = config.revision if config.backend == "transformers" else None  # model qua server: tên model trên server (source) đã đủ xác định
+    return {"model": config.name, "source": config.source, "revision": revision, "max_new_tokens": config.max_new_tokens, "generation": config.generation_settings, "cases_sha256": cases_sha256}
 
 
 def reuse_hub_report(repo: str, hub_path: str, settings: dict[str, Any], output: Path) -> bool:
@@ -93,7 +108,7 @@ def reuse_hub_report(repo: str, hub_path: str, settings: dict[str, Any], output:
     cached = json.loads(path.read_text(encoding="utf-8")) if path else None
     if not cached: return False
     if cached.get("status") != "completed" or cached.get("settings") != settings:
-        print("Báo cáo trên Hugging Face dùng cài đặt khác (model, max_new_tokens hoặc bộ câu hỏi); sẽ chấm lại."); return False
+        print("Báo cáo trên Hugging Face dùng cài đặt khác (model, revision, max_new_tokens, cách sinh chữ hoặc bộ câu hỏi); sẽ chấm lại."); return False
     if not REPORT_KEYS <= set(cached):
         print("Báo cáo trên Hugging Face thiếu thông tin; sẽ chấm lại."); return False
     json_path, _ = write_reports(cached, output)

@@ -14,8 +14,8 @@ Link notebook (dùng được sau khi PR tuần 2 được gộp vào `main`): <
 ## Chọn model và thời gian ước tính
 | Model | Train | Chấm mỗi lần (tối đa) | Tổng, chưa tính cài đặt và tải model |
 | --- | --- | --- | --- |
-| `smoke` (Qwen2.5-0.5B), nên chạy trước | khoảng 16 phút | khoảng 4 phút | khoảng 23 phút |
-| `light` (Qwen3-4B) | khoảng 86 phút | khoảng 17 phút | khoảng 121 phút |
+| `smoke` (Qwen2.5-0.5B), nên chạy trước | khoảng 16 phút | khoảng 5 phút | khoảng 25 phút |
+| `light` (Qwen3-4B) | khoảng 86 phút | khoảng 22 phút | khoảng 130 phút |
 
 - Cài thư viện và tải model thường mất thêm 5–10 phút.
 - Số trong bảng tính bằng `python -m local_ai.training.estimate` (2000 dòng, GPU T4). Đây là ước lượng thô. Tốc độ train đã sửa theo lần chạy thật ngày 25/9: `smoke` train 14,9 phút, mỗi lần chấm 2–3 phút; `light` khoảng 42 giây mỗi bước (khoảng 88 phút cho 125 bước), chấm trước khi train 17,4 phút.
@@ -73,7 +73,7 @@ Trong lúc train, checkpoint mới nhất được đẩy lên repo riêng tư: 
 
 Bước 6 sẽ báo "Đã train N/125 bước", rồi Bước 8 tự tải checkpoint về và train tiếp. Chỉ mất phần việc làm sau checkpoint cuối cùng.
 
-Bước 7 không chấm lại model gốc: lần đầu chấm xong, báo cáo đã được lưu vào repo riêng tư (`eval/truoc/`), nên lần chạy lại tải về dùng luôn. Chỉ chấm lại khi bạn đổi model hoặc cài đặt chấm.
+Bước 7 không chấm lại model gốc: lần đầu chấm xong, báo cáo đã được lưu vào repo riêng tư (`eval/truoc/`), nên lần chạy lại tải về dùng luôn. Chỉ chấm lại khi bạn đổi model hoặc cài đặt chấm. Bước 9 (chấm sau khi train) luôn chấm lại, và báo cáo được lưu vào `eval/sau/` để xem lại câu nào sai.
 
 ## Lỗi hay gặp
 | Thấy gì | Cách xử lý |
