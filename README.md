@@ -8,22 +8,24 @@ dataset Hugging Face → kiểm tra, loại trùng, lọc chất lượng, chặ
 
 Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ, 27,78 tỷ tham số); các model khác nằm trong `configs/models/platform.json`. Repo không tự tải model: test chạy được mà không cần mạng hay GPU.
 
-Kế hoạch tuần 1–2 (M1–M14) và bằng chứng từng mốc: `TASKS.md`. Tiến độ, việc chủ repo tự làm và lỗi còn tồn: `memory.md`.
+Kế hoạch tuần 1–3 và bằng chứng từng mốc: `TASKS.md` (tuần 3) và `archive/tasks-tuan-1-2.md` (tuần 1–2). Tiến độ, việc chủ repo tự làm và lỗi còn tồn: `memory.md`.
 
 Chạy trên Colab miễn phí, không cần máy có GPU:
 - train model nhỏ: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`);
 - agent với model thật (Ollama): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb).
 
-## Trạng thái sau tuần 1 và tuần 2
+## Trạng thái hiện tại
+Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
+
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
 | --- | --- | --- |
-| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json` | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng |
-| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ; GPU không bf16 thì dùng fp16. **Tuần 2:** đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian trên T4 | **Chạy thật LoRA trên CPU** với model tí hon (khoảng 6 giây). QLoRA, model ảnh + chữ và phần đẩy lên Hugging Face **mới test bằng module giả**, chưa chạy trên GPU |
-| Eval | 30 câu Việt + Anh, 4 cách chấm, báo cáo JSON + Markdown. **Tuần 2:** bảng so sánh trước/sau khi train | Test đủ 4 cách chấm; **chạy thật** với model tí hon sau khi train |
-| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | Test bằng server HTTP giả; **chưa chạy với server thật** |
-| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn. **Tuần 2:** prompt gửi danh sách công cụ; 5 nhiệm vụ mẫu với calculator và TerminalTool | Test bằng model giả và server OpenAI giả (5/5 nhiệm vụ); **chưa chạy với model thật** |
-| Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm |
-| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); hướng dẫn trên iPhone | Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run`. **Chưa chạy trên Colab thật** |
+| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json` | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng. Notebook Colab lấy 2000 dòng thật mỗi lần chạy |
+| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ (LoRA chỉ gắn phần ngôn ngữ, M17); GPU không bf16 thì dùng fp16. Đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian và VRAM trên T4 theo số đo thật | **Chạy thật trên Colab T4** (25–26/9): QLoRA `smoke` và `light`, mỗi model 125 bước; `light` có một lần Colab ngắt và train tiếp được. LoRA chạy thật trên CPU với model tí hon (cả model ảnh + chữ Qwen3.5 tí hon). **Chưa chạy trên Colab thật:** model chính 27B (cần GPU 40–48 GB) |
+| Eval | 30 câu Việt + Anh, 4 cách chấm, báo cáo JSON + Markdown; bảng so sánh trước/sau khi train | **Chạy thật trên Colab T4**: `smoke` 16 → 14/30; `light` 17 → 19/30 nhưng tool_use 7/8 → 3/8 (sửa ở M19, M20) |
+| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả |
+| Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 5 nhiệm vụ mẫu với calculator và TerminalTool | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút. Test bằng model giả và server OpenAI giả (5/5 nhiệm vụ) |
+| Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm; trên Colab, TerminalTool chạy thật với agent |
+| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
@@ -33,10 +35,11 @@ Chạy trên Colab miễn phí, không cần máy có GPU:
 - `local_ai/agents`, `local_ai/tools`: agent có giới hạn vòng lặp và các công cụ (dùng để thử model); công cụ lỗi không làm sập agent; 5 nhiệm vụ mẫu cho agent (`agents/tasks.py`).
 - `local_ai/runtime`: runtime chạy việc gộp từ repo Agent: chạy lệnh dạng list không qua shell, `TerminalTool` cho agent (allowlist, tắt mặc định), hàng đợi job và gateway HTTP (tắt mặc định). Chi tiết gộp và rủi ro bảo mật: `docs/GOP_AGENT.md`.
 - `local_ai/colab.py`: hàm `run` cho notebook Colab. Lệnh chạy không qua shell; lệnh lỗi thì ô báo đỏ và Run all dừng.
+- `local_ai/check.py`: lệnh kiểm tra chung `python -m local_ai.check` (test, compileall, secret-scan).
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc. `docs/TRAIN_COLAB.md`: train trên Colab bằng iPhone.
 - `notebooks/`: notebook Colab, sinh từ `notebooks/build.py` (lưu không kèm output).
-- `archive/`: phần đã cất, không còn dùng (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent, nhật ký tuần 1).
+- `archive/`: phần đã cất (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent), kế hoạch tuần 1–2 (`tasks-tuan-1-2.md`) và nhật ký chi tiết tuần 1–3 (`memory-tuan-*.md`).
 
 ## Cài đặt và kiểm tra
 Chạy mọi lệnh trong README từ thư mục gốc của repo, vì các đường dẫn trong file cấu hình (`dataset_path`, `output_dir`...) tính từ đó.
@@ -47,10 +50,14 @@ python -m pip install torch transformers trl peft     # huấn luyện (cần GP
 # máy không có GPU: cài torch bản CPU trước, rồi mới cài các thư viện kia
 # python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install bitsandbytes                    # nén 4bit/8bit và QLoRA (cần GPU CUDA)
-python -m unittest discover -s tests -v
-python -m compileall -q local_ai
-python -m local_ai.data secret-scan
+python -m pip install tokenizers nbformat             # test model tí hon và test notebook
+python -m local_ai.check                              # test + compileall + secret-scan
 ```
+
+`python -m local_ai.check` chạy toàn bộ test (`unittest`), `compileall` thư mục `local_ai` và `secret-scan`, rồi in "KẾT QUẢ: XANH" hoặc "CHƯA XANH" (mã thoát khác 0).
+- Test bị bỏ qua vì thiếu thư viện (torch, transformers, trl, peft, datasets, tokenizers, nbformat) cũng tính là chưa xanh, vì khi đó các test train thật trên CPU không chạy. Máy không có GPU thì cài torch bản CPU trước (dòng chú thích ở trên), rồi cài các thư viện kia và chạy lại.
+- `--allow-skip` cho phép bỏ qua các test đó, chỉ để xem nhanh; không dùng để đánh dấu mốc Xong hay gộp PR.
+- Từng lệnh riêng vẫn chạy được: `python -m unittest discover -s tests -v`, `python -m compileall -q local_ai`, `python -m local_ai.data secret-scan`.
 
 Phiên bản đã chạy thử: Python 3.11, torch 2.14.0 (bản CPU), transformers 5.17.0, trl 1.13.0, peft 0.21.0, datasets 5.0.1. Model chính cần transformers bản 5.x.
 
@@ -82,7 +89,7 @@ Model có `backend: "openai_compatible"` được gọi qua `POST {base_url}/cha
 - `ollama`: `http://localhost:11434/v1`, model `huihui_ai/Qwen3.8-abliterated:27b`;
 - `llamacpp`: `http://localhost:8080/v1`.
 
-Cần cài Ollama, llama.cpp hoặc vLLM trước. Các lệnh `ollama`, `llama-server`, `vllm` dưới đây **chưa chạy thử** trong môi trường phát triển của repo, vì cần cài phần mềm và tải model. Phần của repo gọi tới server đã được test bằng server giả.
+Cần cài Ollama, llama.cpp hoặc vLLM trước. Các lệnh `ollama`, `llama-server`, `vllm` dưới đây chưa chạy thử trong môi trường phát triển của repo, vì cần cài phần mềm và tải model; riêng Ollama với `qwen3:4b` đã chạy thật trên Colab T4 (26/9, notebook `agent_colab`). Phần của repo gọi tới server đã được test bằng server giả.
 
 ```bash
 # Ollama
@@ -274,7 +281,7 @@ Nếu model lỗi (ví dụ server chưa chạy), lệnh dừng và ghi `status:
 `PythonSandbox` chỉ chạy code trong một tiến trình riêng, có giới hạn thời gian. Nó không phải lớp cách ly an toàn. Nếu chấm code của model lạ, hãy chạy trong container.
 
 ## Train trên GPU: smoke → light → primary
-Làm lần lượt từ model nhỏ đến model lớn; mỗi bước chạy `--dry-run` trước để xem cấu hình. **Các lệnh train trên GPU chưa chạy thử** (môi trường phát triển không có GPU); lệnh đã chạy được trên CPU với model tí hon (xem trên).
+Làm lần lượt từ model nhỏ đến model lớn; mỗi bước chạy `--dry-run` trước để xem cấu hình. Lệnh train đã chạy thật trên GPU T4 của Colab với `smoke` và `light` (QLoRA, `configs/training/colab_*.json`, 25–26/9) và trên CPU với model tí hon. Các cấu hình trong bảng dưới (LoRA bf16, model chính 27B) chưa chạy trên GPU.
 
 Chuẩn bị:
 - trên máy GPU, cài torch bản CUDA, rồi `python -m pip install transformers trl peft datasets bitsandbytes`;
@@ -366,14 +373,14 @@ Giữ nguyên (có số đo, không cần sửa): tốc độ chấm (`token_ove
 
 Hệ số VRAM trong `so_do/light.json` (2,07) không dùng được: lần chạy lại 26/9 không train bước nào, nên VRAM đo được (4,68 GB) chỉ là lúc nạp model. Số đo lúc train thật là 8,17 GB (lần 25/9). Từ nay lệnh train không ghi đè số đo của lần đã train khi checkpoint đã đủ bước, và `calibrate` bỏ qua VRAM của lần chạy 0 bước.
 
-**Vì sao tool_use tụt sau khi train, và cách giữ (đề xuất, chưa làm):**
+**Vì sao tool_use tụt sau khi train, và cách giữ:**
 - Nguyên nhân có thể: 2000 dòng train (code, toán, hội thoại tiếng Việt) không có dòng nào trả lời bằng JSON gọi công cụ, và gần như không có phần suy nghĩ `<think>` (chỉ preset `reasoning` có). Sau khi train, model trả lời ngắn, bỏ suy nghĩ, và quên dạng JSON `{"tool": ..., "arguments": ...}` mà bộ chấm yêu cầu. Chỉ 8 câu tool_use nên mỗi câu là 12,5%, nhưng tụt 4 câu là rõ.
 - Cách 1 (nên làm trước): trộn khoảng 10% dữ liệu gọi công cụ vào dữ liệu train (khoảng 200/2000 dòng). Dữ liệu này sinh tự động từ mẫu có sẵn trong repo (calculator, read_file, search, và câu không cần công cụ trả `null`), không dùng API trả phí. Phải kiểm tra không trùng câu chấm bằng `--train-data` và MinHash của M12.
 - Cách 2: giữ phần suy nghĩ: thêm dòng có `<think>` cho câu hỏi thường, hoặc khi chấm tắt chế độ suy nghĩ của Qwen3 cho cả trước và sau, để so sánh công bằng.
 - Cách 3: train nhẹ tay hơn để model ít quên: learning rate 2e-4 → 1e-4, hoặc LoRA `r` 16 → 8.
 - Cách 4: tăng số câu tool_use trong bộ chấm (đề xuất M19), để biết thay đổi nào là thật, không phải ngẫu nhiên.
 
-Cách 1 hợp với đề xuất M20 (dữ liệu); cách 2 và 4 hợp với M19 (eval). Chủ repo chọn mốc thì mới làm.
+Chủ repo đã chọn làm (26/9): cách 1 ở M20 (dữ liệu); cách 2 và 4 ở M19 (chấm công bằng hơn). Cách 3 chưa chọn.
 
 Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy nghĩ" trong khối `<think>` hết 512 token trước khi kịp viết code. Đây là giới hạn của bộ chấm, không phải lỗi train.
 
@@ -381,11 +388,11 @@ Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy
 
 **Ước tính thời gian** (`python -m local_ai.training.estimate`) không tải model, chỉ dựa vào cấu hình và `sft.jsonl`:
 - số token mỗi dòng, kể cả phần đệm khi batch lớn hơn 1;
-- thông lượng train của T4 (5,4 TFLOPS, đo khi train `smoke`).
+- thông lượng train của T4 (5,2 TFLOPS, đo khi train `smoke` và `light`).
 
-Đây là ước lượng thô: thông lượng train đã sửa theo lần đo thật của `smoke` (bảng trên), các phần khác chưa đo; cách tính ghi ở đầu `local_ai/training/estimate.py`.
+Đây là ước lượng thô: thông lượng train và VRAM QLoRA đã sửa theo số đo thật (bảng trên); tốc độ chấm giữ nguyên vì đã khớp số đo; cách tính ghi ở đầu `local_ai/training/estimate.py`.
 
-Nút Colab mở notebook ở nhánh `main`. Notebook đã chạy xong trên Colab thật với `smoke` (25/9); **`light` chưa chạy thử trên Colab thật.** Test `tests/test_m10_colab.py` và `tests/test_m11_colab_light.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run` với cả 2 model, ví dụ:
+Nút Colab mở notebook ở nhánh `main`. Notebook đã chạy thật trên Colab T4 với cả `smoke` và `light` (25–26/9). Test `tests/test_m10_colab.py` và `tests/test_m11_colab_light.py` chỉ kiểm tra notebook hợp lệ và chạy các lệnh của nó bằng `--dry-run` với cả 2 model, ví dụ:
 
 ```bash
 python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --output data/processed/hf_sft --dry-run
@@ -437,20 +444,24 @@ Test `tests/test_m13_agent_colab.py` (chạy không cần Ollama) gồm:
 - chạy 5 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
-Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việc chạy thật trên GPU và thử Ollama (notebook Colab train và agent), nhưng chưa chạy thật. Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
+Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU và thử Ollama (notebook Colab train và agent); tuần 3 đã chạy thật trên Colab T4 (M15). Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
 1. **M15 – Số đo thật trên Colab** (xong 26/9: đủ số đo `smoke`, `light` và agent; bảng số đo ở mục "Train trên Colab miễn phí"). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
 2. **M16 – Notebook bền hơn** (xong):
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ)** (xong 26/9): chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.) Train thật model 27B trên GPU 40–48 GB vẫn chờ chủ repo.
 4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
-5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train; chấm Qwen3 công bằng khi bật/tắt chế độ suy nghĩ (xem "Vì sao tool_use tụt" ở trên); nhiệm vụ agent khi lệnh bị TerminalTool từ chối (đo 26/9: model không thử lại bằng lệnh khác).
-6. **M20 – Dữ liệu:**
-   - chặn gần trùng giữa dữ liệu train và eval bằng MinHash của M12 (hiện chỉ chặn trùng chính xác và trùng câu hỏi);
-   - thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép;
-   - trộn khoảng 10% dữ liệu gọi công cụ tự sinh vào dữ liệu train, để model không quên cách dùng công cụ (đo ngày 26/9: tool_use của `light` tụt 7/8 → 3/8 sau khi train).
+5. **M19 – Chấm công bằng hơn** (chủ repo chọn 26/9, làm trước; tiêu chí trong `TASKS.md`):
+   - tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False`), ghi vào cài đặt chấm để không dùng lại nhầm báo cáo cũ; chấm trước và sau dùng cùng cài đặt;
+   - chấm sau khi train (Bước 9) đẩy báo cáo lên Hub ở `eval/sau`, luôn chấm lại (`--no-reuse`);
+   - câu tool_use trong bộ chấm tăng từ 8 lên ít nhất 16;
+   - TerminalTool từ chối lệnh thì gợi ý cách khác; thêm 1 nhiệm vụ agent phải thử lại sau khi bị từ chối (đo 26/9: model không thử lại bằng lệnh khác).
+6. **M20 – Dữ liệu giữ khả năng gọi công cụ** (chủ repo chọn 26/9, làm sau M19; tiêu chí trong `TASKS.md`):
+   - `hf-sft` trộn khoảng 10% dòng gọi công cụ tự sinh, đúng dạng JSON bộ chấm yêu cầu, có cả câu không cần công cụ, khác câu và số liệu của bộ chấm; notebook train bật mặc định (đo 26/9: tool_use của `light` tụt 7/8 → 3/8 sau khi train);
+   - chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12, `manifest.json` ghi số dòng bị loại;
+   - (chưa chọn) thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép.
 7. **M21 – Tổng kết tuần 3.**
 
-Việc cần chủ repo quyết định: PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B).
+PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B): **đề nghị đóng**, vì xung đột khoảng 65 file và xóa phần agent; phần sửa dữ liệu hữu ích của nó đã có trong `main`. Chủ repo tự đóng.
 
-Kế hoạch tuần 1–2 (M1–M14) và bằng chứng từng mốc nằm trong `TASKS.md`.
+Kế hoạch tuần 1–3 và bằng chứng từng mốc: tuần 3 trong `TASKS.md`, tuần 1–2 trong `archive/tasks-tuan-1-2.md`.

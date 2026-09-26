@@ -70,7 +70,8 @@ class ReadmeMatchesCodeTests(unittest.TestCase):
         self.assertIn("--output data/processed/hf_sft", README)  # lệnh tạo dữ liệu ghi đúng chỗ các cấu hình train đọc
 
     def test_readme_has_status_gpu_plan_and_proposed_roadmap(self):
-        for phrase in ("## Trạng thái sau tuần 1", "## Train trên GPU: smoke → light → primary", "## Lộ trình tiếp theo (đề xuất, chưa làm)", "chưa chạy thử", "TASKS.md"):
+        for phrase in ("## Trạng thái hiện tại", "## Train trên GPU: smoke → light → primary",  # rà soát tuần 3: tiêu đề cũ "## Trạng thái sau tuần 1" đổi thành "## Trạng thái hiện tại"
+                        "## Lộ trình tiếp theo (đề xuất, chưa làm)", "chưa chạy thử", "TASKS.md"):
             self.assertIn(phrase, README)
 
 

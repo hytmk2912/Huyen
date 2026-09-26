@@ -8,7 +8,8 @@ from local_ai.agents.tasks import load_tasks
 
 ROOT = Path(__file__).resolve().parent.parent
 README = (ROOT / "README.md").read_text(encoding="utf-8")
-TASKS = (ROOT / "TASKS.md").read_text(encoding="utf-8")
+# Từ lượt rà soát tuần 3 (26/9), kế hoạch tuần 1–2 được chép nguyên văn từ TASKS.md sang archive/tasks-tuan-1-2.md (chủ repo cho phép đổi chỗ đọc).
+TASKS = (ROOT / "archive" / "tasks-tuan-1-2.md").read_text(encoding="utf-8")
 COLAB = "https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/"
 
 
@@ -45,7 +46,7 @@ class ReadmeMatchesCodeTests(unittest.TestCase):
             with self.subTest(name): self.assertIn(name, README)
 
     def test_status_table_covers_both_weeks(self):
-        status = README.split("## Trạng thái sau tuần 1 và tuần 2", 1)[1].split("\n## ", 1)[0]
+        status = README.split("## Trạng thái hiện tại", 1)[1].split("\n## ", 1)[0]  # rà soát tuần 3: trước là "## Trạng thái sau tuần 1 và tuần 2"
         for part in ("Dữ liệu", "Fine-tune", "Eval", "Model qua server local", "Agent", "Runtime gộp từ repo Agent (tuần 2)", "Notebook Colab (tuần 2)"):
             with self.subTest(part): self.assertIn(f"| {part} |", status)
         self.assertIn("Chưa chạy trên Colab thật", status)
@@ -58,7 +59,7 @@ class ReadmeMatchesCodeTests(unittest.TestCase):
 
 class TasksTests(unittest.TestCase):
     def test_week_two_milestones_are_all_done(self):
-        week_two = TASKS.split("# Nhiệm vụ tuần 2", 1)[1].split("# Nhiệm vụ tuần 1", 1)[0]  # tuần 3 được thêm lên đầu file
+        week_two = TASKS.split("# Nhiệm vụ tuần 2", 1)[1].split("# Nhiệm vụ tuần 1", 1)[0]
         rows = re.findall(r"(?m)^\| (M\d+) \| [^|]+ \| ([^|]+) \| ([^|]+) \|", week_two)
         self.assertEqual([row[0] for row in rows], [f"M{number}" for number in range(8, 15)])
         for milestone, status, progress in rows:

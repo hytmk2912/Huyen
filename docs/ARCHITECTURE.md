@@ -152,8 +152,9 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
 - model là server kiểu OpenAI (`--model`, ví dụ `ollama-colab`) hoặc câu trả lời mẫu (`--scripted`).
 
 ## Kiểm thử
-- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1; `tests/test_m8_…` đến `tests/test_m14_…` là các mốc tuần 2 trong `TASKS.md`. Test không cần mạng hay GPU.
+- `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1; `tests/test_m8_…` đến `tests/test_m14_…` là các mốc tuần 2 (kế hoạch ở `archive/tasks-tuan-1-2.md`); `tests/test_m15_…` trở đi là các mốc tuần 3 trong `TASKS.md`. Test không cần mạng hay GPU.
 - `tests/test_m6_cpu_pipeline.py` chạy thật cả chuỗi (dữ liệu → LoRA → adapter → eval) trên CPU với model tí hon tự tạo; máy thiếu thư viện thì test tự bỏ qua.
+- `python -m local_ai.check` (`local_ai/check.py`) chạy toàn bộ test, `compileall` và `secret-scan`; test bị bỏ qua vì thiếu thư viện tính là chưa xanh (trừ khi có `--allow-skip`). Chỉ khi lệnh này xanh mới đánh dấu mốc Xong và tự gộp PR.
 - `tests/test_m8_runtime.py`, `tests/test_m9_terminal.py`:
   - kiểm tra runtime gộp từ repo Agent: chuỗi chèn lệnh chỉ được in ra như chữ, không được chạy;
   - `TerminalTool` chặn tham số nguy hiểm và đường dẫn ra ngoài thư mục làm việc;
