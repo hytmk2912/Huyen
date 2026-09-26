@@ -3,9 +3,9 @@
 ## Nhiệm vụ tuần
 **Đọc `memory.md` trước khi làm việc.**
 
-Kế hoạch nằm trong `TASKS.md`: tuần 3 (chủ repo chọn từng mốc trong M15–M21) ở đầu file, rồi tuần 2 (M8–M14) và tuần 1 (M1–M7), đều đã xong. Mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi gặp nằm trong `memory.md` (nhật ký tuần 1–2 trong `archive/`). Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
+Kế hoạch tuần 3 (chủ repo chọn từng mốc trong M15–M21) nằm trong `TASKS.md`; tuần 1–2 (M1–M14, đều đã xong) chép nguyên văn ở `archive/tasks-tuan-1-2.md`. Mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi còn tồn nằm trong `memory.md` (tối đa 5.000 ký tự; nhật ký chi tiết trong `archive/`). Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
 - Mỗi lượt làm tối đa **1 mốc**: mốc chủ repo gọi tên, hoặc mốc đầu tiên chưa xong trong `TASKS.md`.
-- Chỉ đánh dấu một mốc là xong khi test xanh (kèm `compileall` và `secret-scan`) và mọi tiêu chí của mốc đã đạt.
+- Chỉ đánh dấu một mốc là xong, và chỉ tự gộp PR, khi `python -m local_ai.check` (không có `--allow-skip`) xanh và mọi tiêu chí của mốc đã đạt. Lệnh này chạy test, `compileall` và `secret-scan`; test bị bỏ qua vì thiếu thư viện cũng tính là chưa xanh. Thiếu thư viện thì cài theo README (torch bản CPU) rồi chạy lại.
 - Không dùng API trả phí (OpenAI, Anthropic, Gemini...). Chỉ chạy model cục bộ hoặc qua server local.
 - Không tải trọng số model hay dataset lớn. Test không dùng mạng, không cần GPU (dùng model tí hon khởi tạo ngẫu nhiên, loader giả). Dataset thật chỉ đọc streaming với `limit` nhỏ.
 - Token chỉ đọc từ biến môi trường hoặc Colab Secrets; không ghi khóa vào repo hay notebook.
@@ -23,7 +23,5 @@ Giữ nguyên tiếng Anh cho: tên hàm/biến/lớp, khóa JSON, giá trị tr
 
 ## Kiểm tra trước khi đẩy
 ```bash
-python -m unittest discover -s tests -v
-python -m compileall -q local_ai
-python -m local_ai.data secret-scan
+python -m local_ai.check    # test + compileall + secret-scan; test bị bỏ qua vì thiếu thư viện thì không xanh
 ```

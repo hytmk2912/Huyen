@@ -4,6 +4,7 @@ thì dùng lại báo cáo chấm trước đã lưu trên Hugging Face.
 `run` được test với tiến trình thật; Hugging Face Hub là module giả; không cần mạng hay GPU.
 """
 import contextlib
+import gc
 import importlib.machinery
 import io
 import json
@@ -12,6 +13,7 @@ import sys
 import tempfile
 import types
 import unittest
+import warnings
 from pathlib import Path
 from unittest import mock
 
@@ -105,6 +107,23 @@ class RunHelperTests(unittest.TestCase):
         self.assertEqual(printed.strip(), "a; echo pwned $(id)")  # không qua shell: ký tự shell chỉ là chữ
         self.assertEqual(command_argv("pip install -q x==1"), [sys.executable, "-m", "pip", "install", "-q", "x==1"])
 
+
+class RunCleanupTests(unittest.TestCase):
+    """Rà soát tuần 3: `run` đóng pipe của tiến trình con và in nốt chữ còn trong decoder."""
+
+    def test_pipe_is_closed_on_success_and_failure(self):
+        for label, command in (("chạy xong", ["python", "-c", "print('xong')"]), ("lỗi", ["python", "-c", "raise SystemExit(4)"])):
+            with self.subTest(label), warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", ResourceWarning)
+                try: run(command, "Bước thử", output=io.StringIO())
+                except StepFailed: pass
+                gc.collect()
+                self.assertEqual([str(item.message) for item in caught if issubclass(item.category, ResourceWarning)], [])
+
+    def test_flushes_incomplete_utf8_at_the_end(self):
+        output = io.StringIO()
+        run(["python", "-c", "import sys; sys.stdout.buffer.write('chữ cuối'.encode() + b'\\xe1')"], "Bước thử", output=output)
+        self.assertEqual(output.getvalue(), "chữ cuối\ufffd")  # byte cuối bị cắt vẫn được in (thành ký tự thay thế), không mất
 
 class NotebookTests(unittest.TestCase):
     def test_no_shell_escapes_except_first_clone(self):

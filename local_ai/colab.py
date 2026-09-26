@@ -39,11 +39,17 @@ def run(command: str | list[str], step: str, env: dict[str, str] | None = None, 
     except FileNotFoundError as error:
         raise StepFailed(f"{step} lỗi: không tìm thấy lệnh '{argv[0]}'. Hãy chạy lại các bước cài đặt phía trên.") from error
     decoder, captured = codecs.getincrementaldecoder("utf-8")(errors="replace"), []
+
+    def emit(text: str) -> None:
+        if not text: return
+        if quiet: captured.append(text)
+        else: stream.write(text); stream.flush()
+
     try:
-        while chunk := process.stdout.read1(4096):  # đọc mẩu nào in mẩu đó; giữ nguyên \r để thanh tiến trình hiện đúng
-            text = decoder.decode(chunk)
-            if quiet: captured.append(text)
-            else: stream.write(text); stream.flush()
+        with process.stdout:  # đóng pipe khi xong (kể cả khi lỗi), không để sót file mở
+            while chunk := process.stdout.read1(4096):  # đọc mẩu nào in mẩu đó; giữ nguyên \r để thanh tiến trình hiện đúng
+                emit(decoder.decode(chunk))
+            emit(decoder.decode(b"", final=True))  # in nốt phần còn dở trong decoder (ví dụ byte UTF-8 cuối bị cắt ngang)
         code = process.wait()
     except KeyboardInterrupt:  # bấm dừng ô thì dừng cả lệnh con, không để nó chạy ngầm
         process.terminate(); process.wait()
