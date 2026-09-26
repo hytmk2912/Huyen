@@ -1,5 +1,5 @@
 {
-  "_note": "SỐ ĐO THẬT: light trên Colab T4 ngày 25/9/2026, lấy từ repo riêng tư Hytmk2912/huyen-light-qlora. measurements là nguyên file measurements.json (lần chạy tiếp từ bước 30 sau khi Colab ngắt); eval_before lấy các trường tóm tắt của eval/truoc/report.json (tính cả thời gian tải và nạp model); loss lấy từ last-checkpoint/trainer_state.json. Chưa có so_do/light.json và báo cáo chấm sau khi train.",
+  "_note": "SỐ ĐO THẬT: light trên Colab T4, lấy từ repo riêng tư Hytmk2912/huyen-light-qlora. measurements là file measurements.json của lần train 25/9 (chạy tiếp từ bước 30 sau khi Colab ngắt); lần chạy lại 26/9 không train thêm bước nào nên file trên Hub đã bị ghi đè bằng số đo 0 bước (train_seconds 0,0073, VRAM 4,68 GB chỉ là lúc nạp model). eval_before lấy từ eval/truoc/report.json (tính cả thời gian tải và nạp model); eval_after lấy từ so_do/light.json (26/9) và ảnh chụp Bước 10 của chủ repo (tool_use 7/8 → 3/8); loss lấy từ last-checkpoint/trainer_state.json.",
   "measurements": {
     "model": "light",
     "source": "Qwen/Qwen3-4B",
@@ -25,9 +25,41 @@
     "generated_at": "2026-09-25T12:31:39.492338+00:00",
     "cases": 30,
     "passed": 17,
-    "groups": {"code": {"cases": 8, "passed": 1}, "reasoning": {"cases": 14, "passed": 9}, "tool_use": {"cases": 8, "passed": 7}},
+    "groups": {
+      "code": {
+        "cases": 8,
+        "passed": 1
+      },
+      "reasoning": {
+        "cases": 14,
+        "passed": 9
+      },
+      "tool_use": {
+        "cases": 8,
+        "passed": 7
+      }
+    },
     "duration_s": 1044.29,
     "output_chars": 40400
   },
-  "loss": {"first_step": 5, "first": 1.5050018310546875, "last_step": 125, "last": 0.9717856407165527}
+  "eval_after": {
+    "status": "completed",
+    "model": "light-colab",
+    "cases": 30,
+    "passed": 19,
+    "measured_minutes": 2.5,
+    "seconds_per_token": 0.1223,
+    "groups": {
+      "tool_use": {
+        "cases": 8,
+        "passed": 3
+      }
+    }
+  },
+  "loss": {
+    "first_step": 5,
+    "first": 1.5050018310546875,
+    "last_step": 125,
+    "last": 0.9717856407165527
+  }
 }

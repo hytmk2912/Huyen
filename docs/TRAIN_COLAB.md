@@ -7,7 +7,7 @@ Hướng dẫn chạy notebook `notebooks/train_colab.ipynb` trên GPU T4 miễn
 4. chấm lại, in bảng so sánh trước/sau;
 5. đẩy adapter lên repo Hugging Face riêng tư của bạn.
 
-**Lưu ý:** notebook đã chạy trên Colab thật ngày 25/9: `smoke` chạy hết; `light` train xong (có một lần Colab ngắt và chạy tiếp được), nhưng phần chấm sau khi train của `light` chưa chạy thử trên Colab thật. Nếu gặp lỗi không có trong mục "Lỗi hay gặp", hãy chụp màn hình ô báo lỗi đầu tiên và gửi lại.
+**Lưu ý:** notebook đã chạy hết trên Colab thật với cả `smoke` và `light` (25–26/9; `light` có một lần Colab ngắt và chạy tiếp được). Notebook `agent_colab` chưa chạy thử trên Colab thật. Nếu gặp lỗi không có trong mục "Lỗi hay gặp", hãy chụp màn hình ô báo lỗi đầu tiên và gửi lại.
 
 Link notebook (dùng được sau khi PR tuần 2 được gộp vào `main`): <https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb>
 
@@ -86,4 +86,5 @@ Bước 7 không chấm lại model gốc: lần đầu chấm xong, báo cáo �
 | Ô báo đỏ "Bước N lỗi (mã thoát ...)" | Lệnh của bước đó lỗi nên **Run all** dừng ngay ở ô này; các ô sau chưa chạy. Đọc thông báo ngay phía trên dòng đỏ, sửa xong thì chạy lại từ ô đó (menu Runtime → Run after). |
 | pip in dòng "ERROR: pip's dependency resolver ..." khi cài thư viện | Thường chỉ là xung đột với gói có sẵn của Colab. Nếu các ô sau vẫn chạy được thì có thể bỏ qua. |
 | Colab ngắt giữa chừng | Xem mục "Khi Colab ngắt giữa chừng". |
+| Lỗi nhắc tới `torchao` khi train | Bước 3 nay tự gỡ `torchao` (Colab cài sẵn, không hợp với thư viện đã ghim). Nếu vẫn gặp: chạy lại từ Bước 3 (menu Runtime → Run after). |
 | Bước 8 báo `NotImplementedError: "_amp_foreach_non_finite_check_and_unscale_cuda" not implemented for 'BFloat16'` | Lỗi cũ, đã sửa ngày 25/9 (PR #10). Chỉ cần **Run all** lại: Bước 3 tự tải code mới. Log Bước 8 có dòng "Tham số được train: ... torch.float32" là đã có bản sửa. |

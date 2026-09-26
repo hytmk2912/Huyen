@@ -62,7 +62,9 @@ def compare(config: FinetuneConfig, measurements: dict[str, Any], eval_reports: 
     precision = effective_quantization(config, model) or "bf16"
     weights = weights_gb(model.params_b, precision)
     vram = {"estimated_gb": plan["vram_gb"], "measured_gb": measured_vram, "implied_training_factor": round(measured_vram / weights, 2) if measured_vram else None}
-    if profile and measured_vram:
+    if steps <= 0:  # lần chạy không train bước nào: VRAM đỉnh chỉ là lúc nạp model, không phải lúc train
+        vram["note"] = "lần chạy này không train bước nào (checkpoint đã đủ bước), nên không có số đo VRAM khi train"
+    elif profile and measured_vram:
         # Model nhỏ: bộ nhớ cho logits/activation (tỉ lệ với batch × max_length × số từ vựng) lớn hơn trọng số nhiều lần,
         # nên hằng số VRAM tính từ model nhỏ không dùng được cho model lớn.
         note = f"đo với max_length {config.max_length}, batch {config.per_device_batch_size}" + ("" if weights >= MIN_WEIGHTS_GB else f"; trọng số chỉ {weights:.2f} GB nên KHÔNG dùng số này để sửa hệ số, hãy dùng số đo của model lớn hơn (ví dụ light)")
@@ -96,7 +98,8 @@ def _number(value: Any, digits: int = 1) -> str:
 def format_comparison(result: dict[str, Any]) -> str:
     lines = [f"Số đo thật của model {result['model']} trên {result['gpu']}, so với ước tính của estimate.py và vram.py:", "", "| Mục | Ước tính | Đo thật |", "| --- | ---: | ---: |"]
     if result["train"]: lines.append(f"| Train {result['train']['steps']} bước (phút) | {_number(result['train']['estimated_minutes'])} | {_number(result['train']['measured_minutes'])} |")
-    lines.append(f"| VRAM khi train (GB) | {_number(result['vram']['estimated_gb'])} | {_number(result['vram']['measured_gb'])} |")
+    if result["vram"].get("note"): lines.append(f"| VRAM khi train (GB) | {_number(result['vram']['estimated_gb'])} | — ({result['vram']['note']}) |")
+    else: lines.append(f"| VRAM khi train (GB) | {_number(result['vram']['estimated_gb'])} | {_number(result['vram']['measured_gb'])} |")
     names = {"before": "Chấm trước khi train", "after": "Chấm sau khi train"}
     for label, item in result["eval"].items():
         name = names.get(label, label)

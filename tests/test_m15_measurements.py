@@ -254,8 +254,63 @@ class RealLightMeasurementTests(unittest.TestCase):
     def test_readme_table_has_light_column(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         table = readme.split("**Số đo thật trên Colab**", 1)[1].split("\n\n", 2)[1]
-        for phrase in ("`light` (25/9/2026)", "66,7 phút", "8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB)", "17/30 → chưa có"):
+        before, after = self.real["eval_before"], self.real["eval_after"]
+        tool = (before["groups"]["tool_use"], after["groups"]["tool_use"])
+        score = f"{before['passed']}/{before['cases']} → {after['passed']}/{after['cases']}; riêng tool_use {tool[0]['passed']}/{tool[0]['cases']} → {tool[1]['passed']}/{tool[1]['cases']}"
+        for phrase in ("`light` (25/9/2026)", "66,7 phút", "8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB)", score, f"sau: {after['measured_minutes']:.1f} phút".replace(".", ",")):
             with self.subTest(phrase): self.assertIn(phrase, table)
+        self.assertIn("Vì sao tool_use tụt sau khi train", readme)  # có đề xuất cách giữ khả năng dùng công cụ
+
+
+class ZeroStepRerunTests(unittest.TestCase):
+    """Chạy lại notebook khi checkpoint đã đủ bước (light ngày 26/9: train_seconds 0,0073): không ghi đè số đo của lần đã train."""
+
+    def rerun(self, local_previous=None, hub_previous=None):
+        class Trainer:
+            def __init__(self, **kwargs): self.state = types.SimpleNamespace(log_history=[], global_step=125)
+            def train(self, resume_from_checkpoint): return types.SimpleNamespace(global_step=125, metrics={"train_runtime": 0.0073})
+            def save_model(self, path): pass
+
+        class Auto:
+            @staticmethod
+            def from_pretrained(source, **kwargs):
+                return types.SimpleNamespace(pad_token=None, eos_token="e", save_pretrained=lambda path: None, config=types.SimpleNamespace())
+
+        cuda = types.SimpleNamespace(is_available=lambda: True, is_bf16_supported=lambda: False, get_device_name=lambda index: "Tesla T4",
+                                     max_memory_allocated=lambda: 4.23e9, max_memory_reserved=lambda: 4.68e9)
+        dataset = types.SimpleNamespace(select_columns=lambda columns: dataset)
+        modules = {"torch": fake_module("torch", bfloat16="bf16", float16="fp16", float32="fp32", cuda=cuda),
+                   "transformers": fake_module("transformers", AutoTokenizer=Auto, AutoModelForCausalLM=Auto, BitsAndBytesConfig=lambda **kwargs: kwargs),
+                   "bitsandbytes": fake_module("bitsandbytes"), "trl": fake_module("trl", SFTConfig=lambda **kwargs: kwargs, SFTTrainer=Trainer),
+                   "peft": fake_module("peft", LoraConfig=lambda **kwargs: kwargs, prepare_model_for_kbit_training=lambda model, **kwargs: model),
+                   "datasets": fake_module("datasets", load_dataset=lambda *args, **kwargs: dataset)}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); output = root / "out"
+            (root / "sft.jsonl").write_text('{"messages": []}\n', encoding="utf-8")
+            (output / "checkpoint-125").mkdir(parents=True); (output / "checkpoint-125" / "trainer_state.json").write_text('{"global_step": 125}', encoding="utf-8")
+            if local_previous: (output / MEASUREMENTS).write_text(json.dumps(local_previous), encoding="utf-8")
+            remote = root / "tu_hub.json"
+            if hub_previous: remote.write_text(json.dumps(hub_previous), encoding="utf-8")
+            config = load_finetune_config(CONFIGS["light"], dataset_path=str(root / "sft.jsonl"), output_dir=str(output), push_to_hub=True, hub_model_id="nguoi-dung/huyen-light-qlora")
+            with mock.patch.dict(sys.modules, modules), mock.patch("local_ai.training.finetune.download_file", lambda repo, name: remote if hub_previous else None), contextlib.redirect_stderr(io.StringIO()):
+                result = train(config)
+            return result["measurements"], json.loads((output / MEASUREMENTS).read_text(encoding="utf-8"))
+
+    def test_keeps_measurements_of_the_run_that_trained(self):
+        real = fixture("that_light_t4_2026-09-25.json")["measurements"]
+        for label, options in (("trên máy", {"local_previous": real}), ("trên Hub", {"hub_previous": real})):
+            with self.subTest(label):
+                returned, written = self.rerun(**options)
+                self.assertEqual((returned, written), (real, real))
+        returned, written = self.rerun()  # chưa có số đo nào: ghi số đo 0 bước như trước
+        self.assertEqual((written["start_step"], written["end_step"], written["peak_reserved_gb"]), (125, 125, 4.68))
+
+    def test_calibrate_does_not_use_vram_of_a_zero_step_run(self):
+        zero = {**fixture("that_light_t4_2026-09-25.json")["measurements"], "start_step": 125, "end_step": 125, "train_seconds": 0.0073, "peak_reserved_gb": 4.68}
+        result = calibrate.compare(config_without_data("light"), zero)
+        self.assertIsNone(result["train"])
+        self.assertNotIn("KBIT_OVERHEAD_GB", result["proposals"])
+        self.assertIn("không train bước nào", calibrate.format_comparison(result))
 
 
 @unittest.skipIf(MISSING, f"thiếu thư viện: {', '.join(MISSING)}")

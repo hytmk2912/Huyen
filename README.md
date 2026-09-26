@@ -345,18 +345,29 @@ Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất ch
 
 | Mục | `smoke` (25/9/2026) | `light` (25/9/2026) | Agent (`qwen3:4b`) |
 | --- | --- | --- | --- |
-| Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | Colab ngắt sau bước 30, chạy tiếp được: 95 bước sau trong 66,7 phút (khoảng 42 giây/bước; ước tính cũ 56,9); 5,17 TFLOPS; 856.769 token | — |
+| Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | Colab ngắt sau bước 30, chạy tiếp được: 95 bước sau trong 66,7 phút (khoảng 42 giây/bước; ước tính cũ 56,9); 5,17 TFLOPS; 856.769 token. Lần chạy lại 26/9 không train thêm bước nào | — |
 | VRAM khi train | 2,5 GB (ước tính cũ 1,3 GB, công thức mới 3,2 GB) | 8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB) | — |
 | Loss | 1,48 (bước 5) → 1,27 (bước 125) | 1,51 (bước 5) → 0,97 (bước 125) | — |
-| Chấm 30 câu (tối đa 256 token/câu với `smoke`, 512 với `light`) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | trước: 17,4 phút, tính cả nạp model (ước tính tối đa 17,2); sau: chưa có | — |
-| Điểm eval trước → sau | 16/30 → 14/30 | 17/30 → chưa có | — |
+| Chấm 30 câu (tối đa 256 token/câu với `smoke`, 512 với `light`) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | trước: 17,4 phút, tính cả nạp model (ước tính tối đa 17,2); sau: 2,5 phút (câu trả lời ngắn hơn hẳn, không còn phần suy nghĩ `<think>`) | — |
+| Điểm eval trước → sau | 16/30 → 14/30 | 17/30 → 19/30; riêng tool_use 7/8 → 3/8 | — |
 | Nhiệm vụ agent | — | — | chưa chạy |
 
 Đã sửa theo số đo này:
 - thông lượng train của T4 trong `estimate.py`: 6 → 5,2 TFLOPS;
 - VRAM khi train QLoRA trong `vram.py` (chủ repo đồng ý ngày 26/9): công thức cũ ước tính `light` 3,8 GB, đo thật 8,2 GB. Phần thiếu là phần không tăng theo tỉ lệ số tham số: embedding bị đổi sang float32, và logits trên bộ từ vựng khoảng 152 nghìn token. Công thức mới cộng thêm 2,67 × √(tỷ tham số) GB cho model nén: `light` 9,2 GB, `smoke` 3,2 GB (hơi cao hơn số đo, an toàn khi chọn GPU). Với model chính 27B, ước tính tăng từ 20,5 lên 34,6 GB, nên GPU 24 GB có thể không đủ; con số này suy ra từ model 4B, cần đo lại khi làm M17.
 
-Chưa sửa: tốc độ chấm (`token_overhead_s`). Báo cáo chấm của cả 2 lần tính cả thời gian tải và nạp model. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`).
+Giữ nguyên (có số đo, không cần sửa): tốc độ chấm (`token_overhead_s`). Ước tính thời gian chấm tối đa của `light` (17,2 phút) đã khớp lần chấm trước khi train (17,4 phút, câu nào cũng sinh gần đủ 512 token). Lần chấm sau khi train có câu trả lời rất ngắn, nên số giây mỗi token (0,12) bị chi phí cố định của từng câu đẩy lên; không dùng số này để sửa. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`).
+
+Hệ số VRAM trong `so_do/light.json` (2,07) không dùng được: lần chạy lại 26/9 không train bước nào, nên VRAM đo được (4,68 GB) chỉ là lúc nạp model. Số đo lúc train thật là 8,17 GB (lần 25/9). Từ nay lệnh train không ghi đè số đo của lần đã train khi checkpoint đã đủ bước, và `calibrate` bỏ qua VRAM của lần chạy 0 bước.
+
+**Vì sao tool_use tụt sau khi train, và cách giữ (đề xuất, chưa làm):**
+- Nguyên nhân có thể: 2000 dòng train (code, toán, hội thoại tiếng Việt) không có dòng nào trả lời bằng JSON gọi công cụ, và gần như không có phần suy nghĩ `<think>` (chỉ preset `reasoning` có). Sau khi train, model trả lời ngắn, bỏ suy nghĩ, và quên dạng JSON `{"tool": ..., "arguments": ...}` mà bộ chấm yêu cầu. Chỉ 8 câu tool_use nên mỗi câu là 12,5%, nhưng tụt 4 câu là rõ.
+- Cách 1 (nên làm trước): trộn khoảng 10% dữ liệu gọi công cụ vào dữ liệu train (khoảng 200/2000 dòng). Dữ liệu này sinh tự động từ mẫu có sẵn trong repo (calculator, read_file, search, và câu không cần công cụ trả `null`), không dùng API trả phí. Phải kiểm tra không trùng câu chấm bằng `--train-data` và MinHash của M12.
+- Cách 2: giữ phần suy nghĩ: thêm dòng có `<think>` cho câu hỏi thường, hoặc khi chấm tắt chế độ suy nghĩ của Qwen3 cho cả trước và sau, để so sánh công bằng.
+- Cách 3: train nhẹ tay hơn để model ít quên: learning rate 2e-4 → 1e-4, hoặc LoRA `r` 16 → 8.
+- Cách 4: tăng số câu tool_use trong bộ chấm (đề xuất M19), để biết thay đổi nào là thật, không phải ngẫu nhiên.
+
+Cách 1 hợp với đề xuất M20 (dữ liệu); cách 2 và 4 hợp với M19 (eval). Chủ repo chọn mốc thì mới làm.
 
 Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy nghĩ" trong khối `<think>` hết 512 token trước khi kịp viết code. Đây là giới hạn của bộ chấm, không phải lỗi train.
 
@@ -425,10 +436,11 @@ Tuần 1 đề xuất 6 việc. Tuần 2 đã làm phần chuẩn bị cho việ
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ):** chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.)
 4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 5 nhiệm vụ mẫu với model vừa train, so với model gốc.
-5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train.
+5. **M19 – Mở rộng eval:** thêm nhiệm vụ agent nhiều bước (10 nhiệm vụ) và câu dùng công cụ; tự chấm ngay sau mỗi lần train; chấm Qwen3 công bằng khi bật/tắt chế độ suy nghĩ (xem "Vì sao tool_use tụt" ở trên).
 6. **M20 – Dữ liệu:**
    - chặn gần trùng giữa dữ liệu train và eval bằng MinHash của M12 (hiện chỉ chặn trùng chính xác và trùng câu hỏi);
-   - thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép.
+   - thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép;
+   - trộn khoảng 10% dữ liệu gọi công cụ tự sinh vào dữ liệu train, để model không quên cách dùng công cụ (đo ngày 26/9: tool_use của `light` tụt 7/8 → 3/8 sau khi train).
 7. **M21 – Tổng kết tuần 3.**
 
 Việc cần chủ repo quyết định: PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B).
