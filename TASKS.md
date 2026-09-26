@@ -11,9 +11,9 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M15 | Số đo thật trên Colab | **Xong** | 4/4 (100%) | `tests/test_m15_measurements.py` (21 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (13 test, 2 test thêm ở lượt rà soát tuần 3) |
 | M17 | Model chính (ảnh + chữ): LoRA chỉ gắn vào phần ngôn ngữ | **Xong** | 4/4 (100%) | `tests/test_m17_multimodal_lora.py` (5 test) |
-| M19 | Chấm công bằng hơn | **Chưa làm** (chọn 26/9, làm trước M20) | 0/8 (0%) | — |
+| M19 | Chấm công bằng hơn | **Xong** | 8/8 (100%) | `tests/test_m19_cham_cong_bang.py` (23 test) |
 | M20 | Dữ liệu giữ khả năng gọi công cụ | **Chưa làm** (chọn 26/9) | 0/4 (0%) | — |
-| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 3 **Xong**, 2 chưa làm | 3/5 mốc (60%) | `python -m local_ai.check`: 271 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
+| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 4 **Xong**, 1 chưa làm | 4/5 mốc (80%) | `python -m local_ai.check`: 294 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
@@ -64,14 +64,28 @@ Chủ repo chọn ngày 26/9. Mục tiêu: model chính (`huihui-ai/Huihui-Qwen3
 
 ## M19: Chấm công bằng hơn
 Chủ repo chọn ngày 26/9; làm trước M20 (chủ repo gọi `/lam-moc`). Mục tiêu: sửa các điểm chấm chưa công bằng thấy khi chạy thật trên Colab (M15): Qwen3 "suy nghĩ" hết 512 token trước khi viết code; báo cáo chấm sau khi train không được lưu; chỉ 8 câu tool_use; agent không thử lại khi TerminalTool từ chối lệnh.
-- [ ] 1. Tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False` truyền vào `apply_chat_template`). Cài đặt này nằm trong `eval_settings`, để không dùng lại nhầm báo cáo cũ trên Hub. Notebook dùng cùng cài đặt cho chấm trước và chấm sau.
-- [ ] 2. Bước 9 (chấm sau) đẩy báo cáo lên Hub ở `eval/sau` và luôn chấm lại (thêm tùy chọn `--no-reuse` cho lệnh eval).
-- [ ] 3. Câu tool_use trong bộ chấm tăng từ 8 lên ít nhất 16.
-- [ ] 4. TerminalTool từ chối lệnh thì kèm gợi ý cách khác (các lệnh được phép; chạy từng lệnh, không pipe hay redirect). Thêm 1 nhiệm vụ agent phải thử lại sau khi bị từ chối; test bằng `--scripted` hoặc server giả.
-- [ ] 5. Chấm lặp lại được. Hiện `generate()` dùng cấu hình sinh chữ mặc định của Qwen (lấy mẫu ngẫu nhiên, không seed) nên chạy lại ra điểm khác. Model transformers mặc định greedy (`do_sample=False`); model qua server gửi `temperature` 0 và `seed` cố định. Cách sinh chữ và revision model nằm trong `eval_settings` và trong báo cáo. Test: chấm 2 lần bằng model tí hon ra cùng kết quả.
-- [ ] 6. Chấm nhiệm vụ agent so số theo giá trị. Hiện `answer_matches` chỉ kiểm tra chuỗi con nên "187" được tính đúng khi cần "87". Sửa để 187 hay 87,5 không khớp 87; 337500.0 vẫn khớp 337500.
-- [ ] 7. Ghim revision (mã commit) cho các model transformers trong `configs/models/platform.json`; mục `-lora`, `-colab` dùng cùng revision với model gốc. Không lấy được mã commit thì ghi vào "Việc dở", không đoán.
-- [ ] 8. `python -m local_ai.check` xanh.
+- [x] 1. Tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False` truyền vào `apply_chat_template`). Cài đặt này nằm trong `eval_settings`, để không dùng lại nhầm báo cáo cũ trên Hub. Notebook dùng cùng cài đặt cho chấm trước và chấm sau.
+
+  Đã làm: lệnh eval có `--no-thinking`; `ModelConfig.enable_thinking` truyền vào chat template (model chữ và model ảnh + chữ) và gửi `chat_template_kwargs` cho server; Bước 7 và Bước 9 đều dùng `--no-thinking`. Bằng chứng: `ThinkingTests` (5 test, gồm báo cáo cũ trên Hub không được dùng lại khi bật `--no-thinking`), `ReproducibleEvalTests.test_no_thinking_reaches_the_chat_template` (chat template kiểu Qwen3 nhận khối suy nghĩ rỗng).
+- [x] 2. Bước 9 (chấm sau) đẩy báo cáo lên Hub ở `eval/sau` và luôn chấm lại (thêm tùy chọn `--no-reuse` cho lệnh eval).
+
+  Bằng chứng: `AfterTrainingReportTests` (2 test: `--no-reuse` không tải báo cáo cũ, chấm lại rồi đẩy lên). Test M16 `test_eval_before_training_is_cached_on_hub` trước kiểm tra Bước 9 không có `--hub-repo`; nay kiểm tra có `--hub-path eval/sau --no-reuse` (vẫn giữ ý: chấm sau luôn chấm lại).
+- [x] 3. Câu tool_use trong bộ chấm tăng từ 8 lên ít nhất 16.
+
+  Đã làm: thêm 8 câu (4 Việt, 4 Anh: calculator, read_file, search, không cần công cụ), bộ chấm 30 → 38 câu. `calibrate` ước tính thời gian chấm theo số câu của từng báo cáo, nên so sánh với số đo thật 30 câu (M15) vẫn đúng. Thời gian trong README và `docs/TRAIN_COLAB.md` tính lại theo 38 câu. Bằng chứng: `ToolUseCasesTests` (3 test, gồm mỗi câu tool_use từ chối đáp án của câu khác). Test cũ khóa số câu (M5 `28–35 câu`, `30/30`; M11 `eval_cases` 30; `test_consistency` `30/30`) sửa theo 38 câu, không bỏ kiểm tra nào.
+- [x] 4. TerminalTool từ chối lệnh thì kèm gợi ý cách khác (các lệnh được phép; chạy từng lệnh, không pipe hay redirect). Thêm 1 nhiệm vụ agent phải thử lại sau khi bị từ chối; test bằng `--scripted` hoặc server giả.
+
+  Đã làm: lỗi từ chối kèm "Gợi ý" tiếng Việt và "Hint" tiếng Anh cho model (trừ khi công cụ đang tắt); nhiệm vụ `thu-lai-khi-bi-tu-choi` (chạy `wc -l` bị từ chối, rồi thử lại bằng `cat`), chỉ đạt khi có lệnh bị từ chối rồi một lần gọi TerminalTool thành công. Bằng chứng: `TerminalHintTests` (3 test: `--scripted`, model không thử lại thì không đạt, server OpenAI giả nhận được gợi ý). Test M13 và M15 khóa 5 nhiệm vụ sửa theo 6 nhiệm vụ (số đo thật 26/9 vẫn so với 5 nhiệm vụ đầu).
+- [x] 5. Chấm lặp lại được. Hiện `generate()` dùng cấu hình sinh chữ mặc định của Qwen (lấy mẫu ngẫu nhiên, không seed) nên chạy lại ra điểm khác. Model transformers mặc định greedy (`do_sample=False`); model qua server gửi `temperature` 0 và `seed` cố định. Cách sinh chữ và revision model nằm trong `eval_settings` và trong báo cáo. Test: chấm 2 lần bằng model tí hon ra cùng kết quả.
+
+  Đã làm: `ModelConfig` có `temperature` (mặc định 0: greedy, ghi đè `do_sample` của model), `seed`, `generation_settings`; server nhận `temperature` 0 và `seed`; `report.json` có khóa `settings` (model, nguồn, revision, `max_new_tokens`, cách sinh chữ, mã băm bộ câu hỏi), `report.md` có dòng "Cài đặt". Bằng chứng: `ReproducibleEvalTests` (4 test, model tí hon với `generation_config` lấy mẫu như Qwen: mặc định cũ ra kết quả khác nhau, nay 2 lần chấm giống hệt), `GenerationConfigTests` (2 test). Test M3 (payload gửi server) và M16 (khóa của `settings`) sửa theo cài đặt mới.
+- [x] 6. Chấm nhiệm vụ agent so số theo giá trị. Hiện `answer_matches` chỉ kiểm tra chuỗi con nên "187" được tính đúng khi cần "87". Sửa để 187 hay 87,5 không khớp 87; 337500.0 vẫn khớp 337500.
+
+  Bằng chứng: `NumericAnswerTests` (2 test; mục chữ như `DH-4827` vẫn so chuỗi con).
+- [x] 7. Ghim revision (mã commit) cho các model transformers trong `configs/models/platform.json`; mục `-lora`, `-colab` dùng cùng revision với model gốc. Không lấy được mã commit thì ghi vào "Việc dở", không đoán.
+
+  Mã commit lấy ngày 26/9 từ API Hugging Face (`/api/models/<repo>/revision/main`, chỉ đọc thông tin, không tải trọng số): Qwen2.5-0.5B-Instruct `7ae5576…`, Qwen3-4B `1cfa9a7…`, Qwen2.5-Coder-7B-Instruct `c03e6d3…`, Huihui-Qwen3.8-27B-abliterated `739e3c5…`. Bằng chứng: `PinnedRevisionTests` (2 test: đủ 40 ký tự hex, biến thể dùng cùng revision, train và eval dùng revision này).
+- [x] 8. `python -m local_ai.check` xanh: 294 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
 
 ## M20: Dữ liệu giữ khả năng gọi công cụ
 Chủ repo chọn ngày 26/9; làm sau M19. Mục tiêu: sau khi train, `light` tụt tool_use 7/8 → 3/8 vì dữ liệu train không có dòng gọi công cụ; dữ liệu train mới giữ được khả năng này và không gần trùng với bộ chấm.

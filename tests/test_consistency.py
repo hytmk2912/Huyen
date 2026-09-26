@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 from local_ai.data.hub import DEFAULT_SFT_DIR
+from local_ai.evaluation.suite import load_cases
 
 ROOT = Path(__file__).resolve().parent.parent
 README = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -58,7 +59,7 @@ class CommandTests(unittest.TestCase):
             vram = subprocess.run([sys.executable, "-m", "local_ai.models.vram"], cwd=directory, env=env, capture_output=True, text=True)
             self.assertEqual(vram.returncode, 0, vram.stderr); self.assertIn("| primary |", vram.stdout)
             evaluation = subprocess.run([sys.executable, "-m", "local_ai.evaluation", "--scripted", "--output", str(Path(directory) / "eval")], cwd=directory, env=env, capture_output=True, text=True)
-            self.assertEqual(evaluation.returncode, 0, evaluation.stderr); self.assertIn("30/30", evaluation.stdout)
+            self.assertEqual(evaluation.returncode, 0, evaluation.stderr); self.assertIn(f"{len(load_cases())}/{len(load_cases())}", evaluation.stdout)  # M19: bộ chấm từ 30 lên 38 câu
 
 
 class LanguageTests(unittest.TestCase):

@@ -10,7 +10,7 @@ Luồng chính:
 ```
 preset / dataset Hugging Face ──► local_ai.data (kiểm tra, loại trùng, lọc chất lượng, chặn trùng với eval) ──► sft.jsonl
 sft.jsonl ──► local_ai.training.finetune (full | LoRA | QLoRA) ──► adapter (.runs/<tên>/adapter)
-model gốc + adapter_path ──► local_ai.evaluation (30 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
+model gốc + adapter_path ──► local_ai.evaluation (38 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
 ```
 
 Trên Colab (tuần 2), `notebooks/train_colab.ipynb` gọi đúng các lệnh trên. Trong lúc train, checkpoint được đẩy lên repo Hugging Face riêng tư để chạy tiếp khi Colab ngắt. `notebooks/agent_colab.ipynb` chạy Ollama ở `localhost` rồi cho agent làm các nhiệm vụ mẫu:
@@ -98,7 +98,7 @@ Số đo thật (M15):
 - Lệnh: `python -m local_ai.evaluation --model <tên> | --scripted`. Tùy chọn `--train-data` từ chối chạy nếu dữ liệu train chứa câu eval.
 - `--max-new-tokens` ghi đè độ dài câu trả lời; `--dry-run` chỉ in kế hoạch, không nạp model.
 - `compare.py` (`python -m local_ai.evaluation.compare TRUOC SAU`): bảng so sánh 2 báo cáo theo nhóm và ngôn ngữ, kèm câu mới đạt và câu mới trượt.
-- Bộ đề `data/eval/eval_v1.jsonl`: 30 câu Việt + Anh, mỗi câu có đáp án mẫu.
+- Bộ đề `data/eval/eval_v1.jsonl`: 38 câu Việt + Anh (16 câu tool_use), mỗi câu có đáp án mẫu. Chấm greedy nên chạy lại ra cùng kết quả; cài đặt chấm (model, revision, cách sinh chữ, mã băm bộ đề) ghi trong báo cáo.
 - `benchmarks.py` là phần chấm khớp đúng cũ, vẫn giữ lại.
 
 ### Runtime (`local_ai/runtime`, gộp từ repo Agent)
@@ -118,7 +118,7 @@ Import không mở cổng mạng, không tạo thư mục.
 ### Notebook Colab (`notebooks/`)
 `notebooks/build.py` sinh các notebook (không kèm output, thư viện ghim phiên bản, mỗi ô có chú thích tiếng Việt). Từ M16:
 - mọi lệnh chạy qua `local_ai/colab.py` (`run`): lệnh dạng list, không qua shell, in output ngay khi có; mã thoát khác 0 thì ném `StepFailed`, nên Run all dừng ở đúng ô lỗi;
-- bước chấm trước khi train lưu và dùng lại báo cáo trên Hub (`--hub-repo`, `--hub-path` của lệnh eval, so khớp cài đặt model, `max_new_tokens`, mã băm bộ câu hỏi).
+- bước chấm trước khi train lưu và dùng lại báo cáo trên Hub (`--hub-repo`, `--hub-path` của lệnh eval, so khớp cài đặt model, revision, `max_new_tokens`, cách sinh chữ, mã băm bộ câu hỏi); từ M19, bước chấm sau khi train cũng đẩy báo cáo lên (`eval/sau`) nhưng luôn chấm lại (`--no-reuse`), và cả hai bước dùng `--no-thinking`.
 
 Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test chạy được đúng các lệnh đó bằng `--dry-run`:
 

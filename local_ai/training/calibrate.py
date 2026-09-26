@@ -78,8 +78,10 @@ def compare(config: FinetuneConfig, measurements: dict[str, Any], eval_reports: 
     for label, report in (eval_reports or {}).items():
         if not report or report.get("status") != "completed" or not report.get("duration_s") or not report.get("output_chars"): continue
         per_token = report["duration_s"] / (report["output_chars"] / CHARS_PER_TOKEN)
+        # Ước tính theo số câu của chính báo cáo này (bộ chấm có thể đã thêm câu sau lần đo, ví dụ M19 tăng từ 30 lên 38 câu).
+        estimated_max = report["cases"] * plan["max_new_tokens"] * seconds_per_generated_token(model.params_b, gpu) / 60
         evaluations[label] = {"model": report["model"], "passed": report["passed"], "cases": report["cases"], "measured_minutes": round(report["duration_s"] / 60, 1),
-                              "estimated_max_minutes": plan["eval_minutes"], "seconds_per_token": round(per_token, 4), "estimated_seconds_per_token": round(seconds_per_generated_token(model.params_b, gpu), 4)}
+                              "estimated_max_minutes": round(estimated_max, 1), "seconds_per_token": round(per_token, 4), "estimated_seconds_per_token": round(seconds_per_generated_token(model.params_b, gpu), 4)}
         overheads.append(per_token - 2 * model.params_b / gpu.memory_gbps); clean = clean and "load_s" in report
     if profile and overheads:
         proposals["token_overhead_s"] = {"current": gpu.token_overhead_s, "measured": round(max(0.0, sum(overheads) / len(overheads)), 4), "reliable": clean}

@@ -42,6 +42,9 @@ class ModelConfig:
     timeout_s: float = 120.0
     adapter_path: str | None = None  # thư mục LoRA adapter đã train (ví dụ .runs/sft/adapter), nạp chồng lên model gốc
     max_new_tokens: int = 512
+    temperature: float = 0.0  # 0: greedy (do_sample=False), chạy lại ra đúng câu trả lời cũ; lớn hơn 0 thì lấy mẫu ngẫu nhiên với seed cố định
+    seed: int = 0  # seed khi lấy mẫu (temperature > 0); model qua server nhận seed này trong yêu cầu
+    enable_thinking: bool | None = None  # False: tắt chế độ suy nghĩ <think> của Qwen3 (truyền vào chat template); None: để mặc định của template
 
     def __post_init__(self) -> None:
         if self.kind not in MODEL_KINDS: raise ValueError(f"Model '{self.name}': kind phải là {' hoặc '.join(MODEL_KINDS)}, không phải '{self.kind}'")
@@ -54,10 +57,18 @@ class ModelConfig:
             if url.scheme not in ("http", "https") or not url.hostname: raise ValueError(f"Model '{self.name}': backend openai_compatible cần base_url dạng http://máy:cổng/v1, không phải '{self.base_url}'")
         if isinstance(self.timeout_s, bool) or not isinstance(self.timeout_s, (int, float)) or self.timeout_s <= 0: raise ValueError(f"Model '{self.name}': timeout_s phải là số giây lớn hơn 0")
         if isinstance(self.max_new_tokens, bool) or not isinstance(self.max_new_tokens, int) or self.max_new_tokens <= 0: raise ValueError(f"Model '{self.name}': max_new_tokens phải là số nguyên lớn hơn 0")
+        if isinstance(self.temperature, bool) or not isinstance(self.temperature, (int, float)) or self.temperature < 0: raise ValueError(f"Model '{self.name}': temperature phải là số lớn hơn hoặc bằng 0 (0 là greedy)")
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int) or self.seed < 0: raise ValueError(f"Model '{self.name}': seed phải là số nguyên không âm")
+        if self.enable_thinking is not None and not isinstance(self.enable_thinking, bool): raise ValueError(f"Model '{self.name}': enable_thinking phải là true, false hoặc bỏ trống")
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "ModelConfig":
         return cls(**{**value, "capabilities": frozenset(ModelCapability(capability) for capability in value.get("capabilities", []))})
+
+    @property
+    def generation_settings(self) -> dict[str, Any]:
+        """Cách sinh chữ (ghi vào cài đặt và báo cáo chấm): greedy hay lấy mẫu, temperature, seed, có tắt chế độ suy nghĩ không."""
+        return {"do_sample": self.temperature > 0, "temperature": self.temperature, "seed": self.seed, "enable_thinking": self.enable_thinking}
 
     @property
     def configuration_hash(self) -> str:
@@ -141,13 +152,23 @@ class HuggingFaceModelAdapter:
         source = self.config.tokenizer_source or self.config.source; revision = self.config.tokenizer_revision or self.config.revision
         payload = {"model_id": self.config.source, "model_revision": self.config.revision, "tokenizer_id": source, "tokenizer_revision": revision, "tokenizer_class": self.tokenizer.__class__.__name__}
         return {**payload, "configuration_hash": hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()}
+    def template_kwargs(self) -> dict[str, Any]:
+        """Tham số thêm cho chat template: enable_thinking khi cấu hình có đặt (template không dùng biến này thì bỏ qua)."""
+        return {} if self.config.enable_thinking is None else {"enable_thinking": self.config.enable_thinking}
+    def generation_kwargs(self) -> dict[str, Any]:
+        """Tham số sinh chữ: temperature 0 thì greedy (ghi đè cấu hình lấy mẫu mặc định của model, ví dụ Qwen đặt do_sample=True);
+        lớn hơn 0 thì lấy mẫu sau khi đặt seed, để chạy lại vẫn ra cùng kết quả."""
+        if self.config.temperature == 0: return {"do_sample": False, "temperature": None, "top_p": None, "top_k": None}
+        import torch
+        torch.manual_seed(self.config.seed)
+        return {"do_sample": True, "temperature": float(self.config.temperature)}
     def generate(self, messages: list[Message]) -> str:
         conversation = chat_messages(self.config, messages)
         if self.model is None or self.tokenizer is None: self.load()
         if self.config.kind == "multimodal":
-            inputs = self.tokenizer.apply_chat_template(conversation, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt").to(self.model.device)
+            inputs = self.tokenizer.apply_chat_template(conversation, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt", **self.template_kwargs()).to(self.model.device)
         else:
-            prompt = self.tokenizer.apply_chat_template(conversation, tokenize=False, add_generation_prompt=True)
+            prompt = self.tokenizer.apply_chat_template(conversation, tokenize=False, add_generation_prompt=True, **self.template_kwargs())
             inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
-        output = self.model.generate(**inputs, max_new_tokens=self.config.max_new_tokens)
+        output = self.model.generate(**inputs, max_new_tokens=self.config.max_new_tokens, **self.generation_kwargs())
         return self.tokenizer.decode(output[0][inputs["input_ids"].shape[-1]:], skip_special_tokens=True)

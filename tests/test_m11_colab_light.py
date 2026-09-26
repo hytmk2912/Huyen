@@ -16,6 +16,7 @@ from pathlib import Path
 from unittest import mock
 
 from local_ai.config.settings import find_model_config
+from local_ai.evaluation.suite import load_cases
 from local_ai.models.vram import training_gb
 from local_ai.training import estimate as timing
 from local_ai.training.finetune import load_finetune_config
@@ -102,7 +103,7 @@ class EstimateTests(unittest.TestCase):
         self.assertTrue(smoke["fits"] and light["fits"])
         self.assertGreater(light["train_minutes"], 4 * smoke["train_minutes"])
         self.assertGreater(light["eval_minutes"], smoke["eval_minutes"])
-        self.assertEqual((light["steps"], light["eval_cases"], light["data"]), (125, 30, "đo mẫu"))
+        self.assertEqual((light["steps"], light["eval_cases"], light["data"]), (125, len(load_cases()), "đo mẫu"))  # M19: số câu chấm lấy từ bộ chấm hiện tại (38)
         too_long = timing.estimate(load_finetune_config(CONFIGS["light"], max_length=8192), rows=2000)
         self.assertFalse(too_long["fits"])
         self.assertIn("CẢNH BÁO", timing.format_estimate(too_long))

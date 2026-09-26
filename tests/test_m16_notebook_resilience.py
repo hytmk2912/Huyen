@@ -150,7 +150,8 @@ class NotebookTests(unittest.TestCase):
     def test_eval_before_training_is_cached_on_hub(self):
         cell = code_cells(NOTEBOOKS["train_colab"])["buoc-7-cham-truoc"]
         self.assertIn("--hub-repo {HUB_REPO} --hub-path eval/truoc", cell)
-        self.assertNotIn("--hub-repo", code_cells(NOTEBOOKS["train_colab"])["buoc-9-cham-sau"])  # chấm sau luôn chấm lại vì adapter có thể đã đổi
+        # M19 (chủ repo chọn 26/9): chấm sau cũng đẩy báo cáo lên Hub (eval/sau), nhưng vẫn luôn chấm lại vì adapter có thể đã đổi
+        self.assertIn("--hub-repo {HUB_REPO} --hub-path eval/sau --no-reuse", code_cells(NOTEBOOKS["train_colab"])["buoc-9-cham-sau"])
 
 
 class EvalReuseTests(unittest.TestCase):
@@ -174,7 +175,7 @@ class EvalReuseTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual([call for call in hub.calls if call[0] == "upload"], [("upload", "eval/truoc/report.json"), ("upload", "eval/truoc/report.md")])
         pushed = json.loads((self.root / "hub" / "eval" / "truoc" / "report.json").read_text(encoding="utf-8"))
-        self.assertEqual(set(pushed["settings"]), {"model", "max_new_tokens", "cases_sha256"})
+        self.assertEqual(set(pushed["settings"]), {"model", "source", "revision", "max_new_tokens", "generation", "cases_sha256"})  # M19 thêm nguồn, revision, cách sinh chữ
         code, printed = self.evaluate(hub, "--scripted", output="lan2")
         self.assertEqual(code, 0); self.assertIn("Dùng lại báo cáo đã chấm trên Hugging Face", printed)
         self.assertEqual(json.loads((self.root / "lan2" / "report.json").read_text(encoding="utf-8")), pushed)
@@ -184,8 +185,9 @@ class EvalReuseTests(unittest.TestCase):
         hub = FakeHub(self.root / "hub")
         cached = {"status": "completed", "model": "may-chu-tat", "generated_at": "2026-09-25T03:00:00+00:00", "cases": 30, "passed": 7, "accuracy": 0.23, "groups": {}, "languages": {}, "failures": [], "results": []}
         with hub.patch(), contextlib.redirect_stdout(io.StringIO()):
+            from local_ai.config.settings import find_model_config
             from local_ai.evaluation.__main__ import eval_settings
-            settings = eval_settings("may-chu-tat", 64, ROOT / "data" / "eval" / "eval_v1.jsonl")
+            settings = eval_settings(find_model_config(self.models, "may-chu-tat"), ROOT / "data" / "eval" / "eval_v1.jsonl")  # M19: cài đặt tính từ cấu hình model (max_new_tokens 64)
         target = self.root / "hub" / "eval" / "truoc" / "report.json"; target.parent.mkdir(parents=True)
         target.write_text(json.dumps({**cached, "settings": settings}), encoding="utf-8")
         code, printed = self.evaluate(hub, "--model", "may-chu-tat")  # máy chủ model đang tắt: nếu chấm thật thì sẽ lỗi

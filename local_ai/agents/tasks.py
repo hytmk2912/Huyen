@@ -6,6 +6,10 @@
 Mỗi nhiệm vụ chạy trong một thư mục làm việc riêng, chép từ `data/eval/agent_workspace/`. TerminalTool chỉ được bật
 trong thư mục đó, vẫn giữ mọi giới hạn của allowlist. Nhiệm vụ tính là đạt khi câu trả lời chứa đủ các chuỗi `expected`
 và agent đã gọi thành công mọi công cụ trong `tools` (để chắc là model dùng công cụ chứ không đoán).
+
+Từ M19:
+- mục `expected` là số thì so theo giá trị (187 hay 87,5 không khớp 87; 337500.0 và 337.500 vẫn khớp 337500), chữ thì so chuỗi con;
+- nhiệm vụ có `retry_after_rejection: true` chỉ đạt khi TerminalTool từ chối một lệnh và sau đó agent gọi lại TerminalTool thành công.
 """
 from __future__ import annotations
 
@@ -16,13 +20,14 @@ import shutil
 import sys
 import time
 from dataclasses import dataclass, replace
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable
 
 from local_ai.agents.loop import AutonomousAgent
 from local_ai.config.settings import find_model_config
 from local_ai.models.router import ModelRouter, ScriptedModelAdapter, create_adapter
-from local_ai.runtime.terminal import TERMINAL_DESCRIPTION, TerminalConfig, TerminalTool
+from local_ai.runtime.terminal import TERMINAL_DESCRIPTION, CommandRejected, TerminalConfig, TerminalTool
 from local_ai.tools.core import CALCULATOR_DESCRIPTION, ToolRegistry, calculator
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +36,8 @@ DEFAULT_WORKSPACE = ROOT / "data" / "eval" / "agent_workspace"
 DEFAULT_MODELS = ROOT / "configs" / "models" / "platform.json"
 TOOLS = ("calculator", "terminal")
 THOUSANDS = re.compile(r"(?<=\d)[.,\s](?=\d{3}(?!\d))")
+NUMBER = re.compile(r"(?<![\w.,])-?\d+(?:[.,]\d+)?")  # số đứng riêng (không nằm giữa chữ hay số khác), phần thập phân dùng dấu . hoặc ,
+NUMERIC = re.compile(r"-?\d+(?:[.,]\d+)?")
 
 
 @dataclass(frozen=True)
@@ -40,6 +47,7 @@ class AgentTask:
     expected: tuple[str, ...]  # mọi chuỗi phải có trong câu trả lời (không phân biệt hoa thường, bỏ dấu phân cách hàng nghìn)
     tools: tuple[str, ...]  # công cụ agent phải gọi thành công ít nhất một lần
     reference: tuple[str, ...] = ()  # câu trả lời mẫu của model theo từng lượt hỏi, dùng cho --scripted
+    retry_after_rejection: bool = False  # phải có một lệnh bị TerminalTool từ chối, rồi một lần gọi TerminalTool thành công sau đó
 
 
 def load_tasks(path: str | Path = DEFAULT_TASKS) -> list[AgentTask]:
@@ -47,7 +55,8 @@ def load_tasks(path: str | Path = DEFAULT_TASKS) -> list[AgentTask]:
     for line in Path(path).read_text(encoding="utf-8").splitlines():
         if not line.strip(): continue
         value = json.loads(line)
-        task = AgentTask(value["id"], value["prompt"], tuple(value["expected"]), tuple(value["tools"]), tuple(value.get("reference", ())))
+        task = AgentTask(value["id"], value["prompt"], tuple(value["expected"]), tuple(value["tools"]), tuple(value.get("reference", ())), bool(value.get("retry_after_rejection", False)))
+        if task.retry_after_rejection and "terminal" not in task.tools: raise ValueError(f"Nhiệm vụ '{task.id}': retry_after_rejection cần công cụ terminal")
         unknown = set(task.tools) - set(TOOLS)
         if unknown or not task.expected: raise ValueError(f"Nhiệm vụ '{task.id}': công cụ không có ({', '.join(sorted(unknown))}) hoặc thiếu expected")
         tasks.append(task)
@@ -59,15 +68,35 @@ def normalize_answer(text: str) -> str:
     return THOUSANDS.sub("", " ".join(str(text).casefold().split()))
 
 
+def answer_numbers(answer: str) -> list[Decimal]:
+    """Các số trong câu trả lời, sau khi bỏ dấu phân cách hàng nghìn ("337.500" → 337500; "87,5" → 87.5)."""
+    return [Decimal(match.replace(",", ".")) for match in NUMBER.findall(normalize_answer(answer))]
+
+
 def answer_matches(answer: str, expected: tuple[str, ...]) -> bool:
-    return all(normalize_answer(item) in normalize_answer(answer) for item in expected)
+    """Mỗi mục `expected` phải có trong câu trả lời: mục là số thì so theo giá trị với từng số trong câu trả lời
+    (nên "187" hay "87,5" không khớp 87, còn "337500.0" khớp 337500); mục chữ thì so chuỗi con, không phân biệt hoa thường."""
+    numbers = None
+    for item in expected:
+        wanted = normalize_answer(item)
+        if NUMERIC.fullmatch(wanted):
+            numbers = answer_numbers(answer) if numbers is None else numbers
+            if Decimal(wanted.replace(",", ".")) not in numbers: return False
+        elif wanted not in normalize_answer(answer): return False
+    return True
 
 
-def build_tools(workspace: Path, log_path: Path, used: list[str]) -> ToolRegistry:
-    """calculator và TerminalTool (bật, chỉ trong `workspace`); ghi tên công cụ mỗi lần gọi thành công vào `used`."""
+def build_tools(workspace: Path, log_path: Path, used: list[str], rejected: list[int] | None = None) -> ToolRegistry:
+    """calculator và TerminalTool (bật, chỉ trong `workspace`); ghi tên công cụ mỗi lần gọi thành công vào `used`.
+    Lệnh bị TerminalTool từ chối thì ghi vào `rejected` vị trí lúc đó trong `used` (để biết agent có thử lại thành công sau đó không)."""
     def tracked(name: str, tool: Callable[..., str]) -> Callable[..., str]:
         def call(**arguments: Any) -> str:
-            output = tool(**arguments); used.append(name); return output
+            try:
+                output = tool(**arguments)
+            except CommandRejected:
+                if rejected is not None: rejected.append(len(used))
+                raise
+            used.append(name); return output
         return call
     terminal = TerminalTool(replace(TerminalConfig.from_file(), workspace=workspace, log_path=log_path), enabled=True)
     registry = ToolRegistry()
@@ -85,14 +114,17 @@ def prepare_workspace(root: Path, task: AgentTask, source: Path = DEFAULT_WORKSP
 
 def run_task(task: AgentTask, model: Any, root: Path, max_iterations: int) -> dict[str, Any]:
     workspace, log_path = prepare_workspace(root, task)
-    used: list[str] = []
-    result = AutonomousAgent(ModelRouter([model], default=model.name), build_tools(workspace, log_path, used), max_iterations).run(task.prompt)
+    used: list[str] = []; rejected: list[int] = []
+    result = AutonomousAgent(ModelRouter([model], default=model.name), build_tools(workspace, log_path, used, rejected), max_iterations).run(task.prompt)
     missing = [tool for tool in task.tools if tool not in used]
+    retried = any("terminal" in used[index:] for index in rejected)
     if not result.completed: reason = "agent không hoàn thành"
     elif not answer_matches(result.answer, task.expected): reason = "câu trả lời thiếu " + ", ".join(task.expected)
     elif missing: reason = "không gọi công cụ bắt buộc: " + ", ".join(missing)
+    elif task.retry_after_rejection and not retried: reason = "không có lệnh bị TerminalTool từ chối rồi thử lại thành công"
     else: reason = None
-    return {"id": task.id, "prompt": task.prompt, "success": reason is None, "reason": reason, "answer": result.answer, "tools_used": used, "trace": list(result.trace)}
+    return {"id": task.id, "prompt": task.prompt, "success": reason is None, "reason": reason, "answer": result.answer, "tools_used": used,
+            "rejected_commands": len(rejected), "trace": list(result.trace)}
 
 
 def run_tasks(tasks: list[AgentTask], model_factory: Callable[[AgentTask], Any], root: str | Path, max_iterations: int = 4) -> dict[str, Any]:
