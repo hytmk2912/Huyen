@@ -160,9 +160,12 @@ class RealSmokeMeasurementTests(unittest.TestCase):
 
     def test_t4_train_throughput_follows_real_measurement(self):
         self.assertEqual((self.real["gpu"], self.real["measurements"]["end_step"]), ("Tesla T4", 125))
-        self.assertEqual(GPUS["T4"].train_tflops, round(self.real["train"]["effective_tflops"], 1))
+        light = fixture("that_light_t4_2026-09-25.json")["measurements"]
+        # Hằng số lấy theo 2 lần đo thật (smoke 5,36; light 5,17 TFLOPS): nằm giữa hai số đo, ước tính của mỗi model lệch dưới 5%.
+        light_tflops = 2 * light["params_b"] * 1e9 * light["num_tokens"] * 3 / light["train_seconds"] / 1e12  # batch 1: không có phần đệm
+        self.assertTrue(light_tflops <= GPUS["T4"].train_tflops <= self.real["train"]["effective_tflops"])
         result = calibrate.compare(config_without_data("smoke"), self.real["measurements"])  # tính lại từ số đo gốc, không lấy số đã làm tròn
-        self.assertAlmostEqual(result["proposals"]["train_tflops"]["measured"], GPUS["T4"].train_tflops, delta=0.1)
+        self.assertAlmostEqual(result["proposals"]["train_tflops"]["measured"], self.real["train"]["effective_tflops"], delta=0.05)
         plan = estimate(config_without_data("smoke"), rows=2000)
         self.assertLess(abs(plan["train_minutes"] - self.real["train"]["measured_minutes"]) / self.real["train"]["measured_minutes"], 0.05)
         self.assertFalse(result["proposals"]["TRAINING_FACTOR"]["reliable"])  # chưa sửa vram.py theo smoke
@@ -207,6 +210,43 @@ class RealSmokeMeasurementTests(unittest.TestCase):
         for phrase in (f"{self.real['vram']['measured_gb']:.1f} GB".replace(".", ","), f"{before['passed']}/{before['cases']} → {after['passed']}/{after['cases']}"):
             with self.subTest(phrase): self.assertIn(phrase, table)
         self.assertIn("chưa chạy", table)  # light và agent chưa có số đo thật
+
+
+class RealLightMeasurementTests(unittest.TestCase):
+    """Số đo THẬT của light trên Colab T4 ngày 25/9: Colab ngắt sau bước 30, lần chạy tiếp train nốt 95 bước."""
+
+    def setUp(self):
+        self.real = fixture("that_light_t4_2026-09-25.json")
+        self.measured = self.real["measurements"]
+
+    def test_resumed_run_counts_only_its_own_steps_and_tokens(self):
+        self.assertEqual((self.measured["gpu"], self.measured["start_step"], self.measured["end_step"]), ("Tesla T4", 30, 125))
+        tokens_per_step = self.measured["num_tokens"] / (self.measured["end_step"] - self.measured["start_step"])
+        self.assertLess(abs(tokens_per_step - 16 * 558) / (16 * 558), 0.05)  # khớp số token mỗi dòng đo mẫu (cắt ở 2048, batch 1)
+
+    def test_train_estimate_matches_real_run(self):
+        result = calibrate.compare(config_without_data("light"), self.measured, {"before": self.real["eval_before"]}, max_new_tokens=512)
+        train = result["train"]
+        self.assertEqual(train["steps"], 95)
+        self.assertLess(abs(train["estimated_minutes"] - train["measured_minutes"]) / train["measured_minutes"], 0.05)
+        before = result["eval"]["before"]
+        self.assertLess(abs(before["estimated_max_minutes"] - before["measured_minutes"]) / before["measured_minutes"], 0.05)
+        self.assertFalse(result["proposals"]["token_overhead_s"]["reliable"])  # báo cáo cũ tính cả thời gian nạp model
+
+    def test_vram_factor_from_light_is_measured_but_not_applied_yet(self):
+        result = calibrate.compare(config_without_data("light"), self.measured)
+        factor = result["proposals"]["TRAINING_FACTOR"]
+        self.assertTrue(factor["reliable"])
+        self.assertAlmostEqual(factor["measured"], self.measured["peak_reserved_gb"] / weights_gb(4.02, "4bit"), places=2)
+        # Chưa sửa vram.py: sửa thì ước tính cho model 27B vượt 24 GB, trái với M2; chờ chủ repo quyết định (ghi trong memory.md).
+        self.assertEqual(factor["current"], 1.25)
+        self.assertGreater(self.measured["peak_reserved_gb"], 2 * result["vram"]["estimated_gb"])
+
+    def test_readme_table_has_light_column(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        table = readme.split("**Số đo thật trên Colab**", 1)[1].split("\n\n", 2)[1]
+        for phrase in ("`light` (25/9/2026)", "66,7 phút", "8,2 GB (ước tính 3,8 GB)", "17/30 → chưa có"):
+            with self.subTest(phrase): self.assertIn(phrase, table)
 
 
 @unittest.skipIf(MISSING, f"thiếu thư viện: {', '.join(MISSING)}")

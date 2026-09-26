@@ -309,7 +309,7 @@ Notebook `notebooks/train_colab.ipynb` train trên GPU T4 miễn phí của Cola
 | Model | Cấu hình train | Chấm sau khi train | Thời gian ước tính (train + 2 lần chấm) |
 | --- | --- | --- | --- |
 | `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 23 phút |
-| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 3,8 GB | `light-colab` | khoảng 118 phút |
+| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 3,8 GB | `light-colab` | khoảng 121 phút |
 
 Các ô sau chạy lần lượt:
 1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
@@ -343,18 +343,20 @@ Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất ch
 
 **Số đo thật trên Colab** (GPU Tesla T4, file `so_do/<model>.json` trong repo riêng tư; bản chép của `smoke` ở `tests/fixtures/measurements/that_smoke_t4_2026-09-25.json`):
 
-| Mục | `smoke` (25/9/2026) | `light` | Agent (`qwen3:4b`) |
+| Mục | `smoke` (25/9/2026) | `light` (25/9/2026) | Agent (`qwen3:4b`) |
 | --- | --- | --- | --- |
-| Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | chưa chạy | — |
-| VRAM khi train | 2,5 GB (ước tính 1,3 GB) | chưa chạy | — |
-| Loss | 1,48 (bước 5) → 1,27 (bước 125) | chưa chạy | — |
-| Chấm 30 câu (tối đa 256 token/câu) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | chưa chạy | — |
-| Điểm eval trước → sau | 16/30 → 14/30 | chưa chạy | — |
+| Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | Colab ngắt sau bước 30, chạy tiếp được: 95 bước sau trong 66,7 phút (khoảng 42 giây/bước; ước tính cũ 56,9); 5,17 TFLOPS; 856.769 token | — |
+| VRAM khi train | 2,5 GB (ước tính 1,3 GB) | 8,2 GB (ước tính 3,8 GB) | — |
+| Loss | 1,48 (bước 5) → 1,27 (bước 125) | 1,51 (bước 5) → 0,97 (bước 125) | — |
+| Chấm 30 câu (tối đa 256 token/câu với `smoke`, 512 với `light`) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | trước: 17,4 phút, tính cả nạp model (ước tính tối đa 17,2); sau: chưa có | — |
+| Điểm eval trước → sau | 16/30 → 14/30 | 17/30 → chưa có | — |
 | Nhiệm vụ agent | — | — | chưa chạy |
 
-Đã sửa theo số đo này: thông lượng train của T4 trong `estimate.py` (6 → 5,4 TFLOPS). Chưa sửa:
-- hệ số VRAM (`TRAINING_FACTOR` trong `vram.py`): số đo của `smoke` không dùng được cho model lớn, chờ số đo của `light`;
-- tốc độ chấm (`token_overhead_s`): báo cáo chấm lần này tính cả thời gian tải và nạp model. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`), nên lần chạy `light` sẽ đo được đúng.
+Đã sửa theo số đo này: thông lượng train của T4 trong `estimate.py` (6 → 5,2 TFLOPS). Chưa sửa:
+- hệ số VRAM (`TRAINING_FACTOR` trong `vram.py`): `light` dùng 8,2 GB, gấp khoảng 2 lần ước tính 3,8 GB (vẫn vừa T4 15 GB). Phần lớn chênh lệch là phần không tăng theo số tham số (embedding giữ float32, logits trên bộ từ vựng khoảng 152 nghìn token). Sửa công thức theo số đo này thì ước tính cho model chính 27B vượt 24 GB, trái với kết luận của M2 ("QLoRA 27B vừa GPU 24 GB"): chờ chủ repo quyết định;
+- tốc độ chấm (`token_overhead_s`): báo cáo chấm của cả 2 lần tính cả thời gian tải và nạp model. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`).
+
+Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy nghĩ" trong khối `<think>` hết 512 token trước khi kịp viết code. Đây là giới hạn của bộ chấm, không phải lỗi train.
 
 Điểm sau khi train của `smoke` giảm 2 câu (16 → 14 trên 30). Với 30 câu, chênh 2 câu có thể chỉ là ngẫu nhiên. Báo cáo chấm sau khi train không được đẩy lên Hugging Face, nên chưa xem được câu nào sai thêm.
 
