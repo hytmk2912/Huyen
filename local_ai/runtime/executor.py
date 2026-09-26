@@ -17,6 +17,21 @@ from typing import Literal, Sequence
 
 DEFAULT_TIMEOUT = 120
 DEFAULT_MAX_OUTPUT = 12_000
+DEFAULT_PATH = "/usr/local/bin:/usr/bin:/bin"
+LOCALE_VARIABLES = ("LANG", "LC_ALL", "LC_CTYPE", "PYTHONIOENCODING", "PYTHONUTF8")
+
+
+def minimal_env(home: str | Path, extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Biến môi trường tối thiểu cho code hay lệnh không tin cậy (code model viết, lệnh của agent).
+
+    Chỉ gồm PATH, biến ngôn ngữ/mã hóa và HOME là thư mục tạm `home`. Không truyền HF_TOKEN, khóa API hay biến nào khác
+    của tiến trình cha: trên Colab, notebook đặt HF_TOKEN (quyền Write) vào os.environ, và trước đây code trong sandbox
+    đọc được token này (lỗi bảo mật sửa ngày 26/9).
+    """
+    environ = {"PATH": os.environ.get("PATH") or DEFAULT_PATH, "HOME": str(home)}
+    environ.update({name: os.environ[name] for name in LOCALE_VARIABLES if os.environ.get(name)})
+    environ.setdefault("LANG", "C.UTF-8")
+    return {**environ, **(extra or {})}
 
 
 @dataclass(frozen=True)
@@ -36,8 +51,11 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def run_command(argv: Sequence[str], workspace: str | Path, timeout: float = DEFAULT_TIMEOUT, max_output: int = DEFAULT_MAX_OUTPUT) -> CommandResult:
-    """Chạy `argv` (list chuỗi) trong `workspace`; giữ tối đa `max_output` ký tự cuối của stdout/stderr."""
+def run_command(argv: Sequence[str], workspace: str | Path, timeout: float = DEFAULT_TIMEOUT, max_output: int = DEFAULT_MAX_OUTPUT,
+                env: dict[str, str] | None = None) -> CommandResult:
+    """Chạy `argv` (list chuỗi) trong `workspace`; giữ tối đa `max_output` ký tự cuối của stdout/stderr.
+
+    `env`: biến môi trường của lệnh (ví dụ `minimal_env(...)`); None thì dùng môi trường của tiến trình hiện tại."""
     if isinstance(argv, (str, bytes)) or not argv or not all(isinstance(item, str) for item in argv):
         raise TypeError("Lệnh phải là list các chuỗi (ví dụ ['ls', '-la']), không nhận chuỗi lệnh để tránh bị chèn lệnh qua shell")
     if timeout <= 0: raise ValueError("timeout phải lớn hơn 0 giây")
@@ -45,7 +63,7 @@ def run_command(argv: Sequence[str], workspace: str | Path, timeout: float = DEF
     job_id, started, command = str(uuid.uuid4()), _now(), tuple(argv)
     try:
         process = subprocess.Popen(list(command), cwd=directory, shell=False, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   text=True, encoding="utf-8", errors="replace", start_new_session=True)
+                                   text=True, encoding="utf-8", errors="replace", start_new_session=True, env=env)
     except (FileNotFoundError, PermissionError) as error:
         reason = "không tìm thấy chương trình này trên máy" if isinstance(error, FileNotFoundError) else "không có quyền chạy"
         return CommandResult(job_id, command, "failed", started, _now(), None, "", f"Không chạy được lệnh '{command[0]}': {reason}")

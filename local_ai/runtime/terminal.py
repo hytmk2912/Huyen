@@ -7,11 +7,16 @@ mọi lệnh (kể cả lệnh bị từ chối) được ghi vào file log JSON
 3. tên lệnh phải là tên trần có trong allowlist (không nhận đường dẫn như `/bin/ls`);
 4. lệnh con (`git status`), bộ tham số cố định (`python --version`), tham số bị cấm (`find -exec`), số tham số tối đa;
 5. mọi đường dẫn phải nằm trong thư mục làm việc (chặn `/etc/passwd`, `../..`).
+
+Khi chạy (sửa ngày 26/9): lệnh nhận môi trường tối thiểu (`minimal_env`: PATH, ngôn ngữ/mã hóa, HOME là thư mục tạm; không có
+HF_TOKEN hay khóa nào), và `GIT_CEILING_DIRECTORIES` là thư mục cha của thư mục làm việc. Trước đây thư mục làm việc của agent
+nằm trong repo, git tự tìm `.git` ở thư mục cha nên `git log -p` in được nội dung và lịch sử cả repo.
 """
 from __future__ import annotations
 
 import json
 import shlex
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -19,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
-from local_ai.runtime.executor import CommandResult, run_command
+from local_ai.runtime.executor import CommandResult, minimal_env, run_command
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG = ROOT / "configs" / "tools" / "terminal.json"
@@ -123,9 +128,15 @@ class TerminalTool:
         except CommandRejected as error:
             self._log({"command": command if isinstance(command, str) else list(command) if isinstance(command, (list, tuple)) else repr(command), "allowed": False, "reason": str(error)})
             raise
-        result = run_command(argv, self.config.workspace, timeout=self.config.timeout_s, max_output=self.config.max_output)
+        with tempfile.TemporaryDirectory(prefix="terminal-home-") as home:
+            result = run_command(argv, self.config.workspace, timeout=self.config.timeout_s, max_output=self.config.max_output, env=self.environment(home))
         self._log({"command": argv, "allowed": True, "job_id": result.job_id, "status": result.status, "exit_code": result.exit_code, "timed_out": result.timed_out, "duration_s": round(time.monotonic() - started, 3)})
         return result
+
+    def environment(self, home: str | Path) -> dict[str, str]:
+        """Môi trường của lệnh: tối thiểu, và git không tìm repo ở trên thư mục làm việc (GIT_DIR, GIT_WORK_TREE không được truyền)."""
+        workspace = self.config.workspace.resolve()
+        return minimal_env(home, {"GIT_CEILING_DIRECTORIES": str(workspace.parent)})
 
     def __call__(self, command: str | Sequence[str]) -> str:
         result = self.run(command)

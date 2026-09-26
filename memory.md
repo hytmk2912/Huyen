@@ -28,7 +28,7 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Việc dở
 - Nhánh: `claude/nhiem-vu-tuan-jixv6i`, dựng lại từ `main` sau mỗi lần gộp PR.
-- Phát hiện khi chạy thật đã đưa vào tiêu chí M19 (tắt suy nghĩ khi chấm, đẩy báo cáo chấm sau, thêm câu tool_use, gợi ý khi TerminalTool từ chối) và M20 (dữ liệu gọi công cụ, chặn gần trùng).
+- Phát hiện khi chạy thật đã đưa vào tiêu chí M19 (tắt suy nghĩ, báo cáo chấm sau, câu tool_use, gợi ý khi TerminalTool từ chối, chấm lặp lại được, so số theo giá trị, ghim revision) và M20 (dữ liệu gọi công cụ, chặn gần trùng, loss chỉ trên câu trả lời).
 
 ## Lỗi còn tồn
 | Lỗi | Nơi |
@@ -46,3 +46,4 @@ Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-3.md`.
 | 25–26/9 | M15 | Số đo thật `smoke`, `light`, agent; sửa ước tính thời gian và VRAM; xong 26/9 (PR #11–#14). |
 | 26/9 | M17 | LoRA chỉ gắn phần ngôn ngữ của model ảnh + chữ; xong (PR #15). |
 | 26/9 | Rà soát tuần 3 | README khớp thực tế; tuần 1–2 của `TASKS.md` sang `archive/tasks-tuan-1-2.md`; `memory.md` ≤ 5.000 ký tự; lệnh `python -m local_ai.check`; `run` đóng pipe; ghi tiêu chí M19, M20. 266 test, check xanh. Tiếp theo: M19. |
+| 26/9 | Sửa 2 lỗi bảo mật | TerminalTool: git chỉ thấy repo trong thư mục làm việc (`GIT_CEILING_DIRECTORIES`); sandbox và TerminalTool dùng môi trường tối thiểu, không lộ `HF_TOKEN`. Ghi thêm tiêu chí M19 (8) và M20 (4). 271 test, check xanh. Tiếp theo: M19. |

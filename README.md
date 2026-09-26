@@ -119,7 +119,9 @@ Khi server lỗi, agent dừng lại và báo lỗi bằng tiếng Việt, khôn
 `TerminalTool` (`local_ai/runtime/terminal.py`) cho agent chạy lệnh thật trên máy, nhưng **tắt sẵn**. Cấu hình ở `configs/tools/terminal.json`:
 - chỉ các lệnh có trong `allowed_commands` được chạy: `pwd`, `ls`, `cat`, `head`, `tail`, `grep`, `find`, `git status`/`git log`, `python --version`, `uname`, `whoami`, `date`...;
 - lệnh chạy dạng list, **không qua shell**, trong thư mục `workspace`, có `timeout_s`;
-- mọi lệnh, kể cả lệnh bị từ chối, được ghi vào `log_path` (JSONL).
+- mọi lệnh, kể cả lệnh bị từ chối, được ghi vào `log_path` (JSONL);
+- lệnh chạy với môi trường tối thiểu: chỉ PATH, biến ngôn ngữ/mã hóa và HOME là thư mục tạm, không có `HF_TOKEN` hay khóa nào;
+- `git status`/`git log` chỉ thấy repo nằm trong thư mục làm việc (`GIT_CEILING_DIRECTORIES`), không đọc được repo chứa thư mục làm việc. Trước ngày 26/9, thư mục làm việc của agent nằm trong repo nên `git log -p` in được cả repo.
 
 Các trường hợp bị từ chối:
 - lệnh có ký tự điều khiển shell (`;` `&&` `|` `$()` backtick `<` `>`, xuống dòng);
@@ -278,7 +280,7 @@ Nếu model lỗi (ví dụ server chưa chạy), lệnh dừng và ghi `status:
 - Bước build dữ liệu (`hf-sft`, `build`) dừng và báo lỗi nếu dữ liệu train trùng với file trong `eval_sources`. Các cấu hình có sẵn đã chặn cả `seed_eval.jsonl` lẫn `eval_v1.jsonl`.
 - Lệnh eval với `--train-data <train.jsonl hoặc sft.jsonl>` từ chối chạy nếu dữ liệu train chứa câu eval.
 
-`PythonSandbox` chỉ chạy code trong một tiến trình riêng, có giới hạn thời gian. Nó không phải lớp cách ly an toàn. Nếu chấm code của model lạ, hãy chạy trong container.
+`PythonSandbox` chỉ chạy code trong một tiến trình riêng, có giới hạn thời gian, với môi trường tối thiểu (PATH, ngôn ngữ/mã hóa, HOME là thư mục tạm): code của model không đọc được `HF_TOKEN` hay khóa nào của tiến trình cha (trước ngày 26/9 thì đọc được, vì notebook đặt `HF_TOKEN` vào `os.environ`). Nó vẫn không phải lớp cách ly an toàn: code vẫn đọc được file trên máy. Nếu chấm code của model lạ, hãy chạy trong container.
 
 ## Train trên GPU: smoke → light → primary
 Làm lần lượt từ model nhỏ đến model lớn; mỗi bước chạy `--dry-run` trước để xem cấu hình. Lệnh train đã chạy thật trên GPU T4 của Colab với `smoke` và `light` (QLoRA, `configs/training/colab_*.json`, 25–26/9) và trên CPU với model tí hon. Các cấu hình trong bảng dưới (LoRA bf16, model chính 27B) chưa chạy trên GPU.
@@ -455,10 +457,14 @@ Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU v�
    - tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False`), ghi vào cài đặt chấm để không dùng lại nhầm báo cáo cũ; chấm trước và sau dùng cùng cài đặt;
    - chấm sau khi train (Bước 9) đẩy báo cáo lên Hub ở `eval/sau`, luôn chấm lại (`--no-reuse`);
    - câu tool_use trong bộ chấm tăng từ 8 lên ít nhất 16;
-   - TerminalTool từ chối lệnh thì gợi ý cách khác; thêm 1 nhiệm vụ agent phải thử lại sau khi bị từ chối (đo 26/9: model không thử lại bằng lệnh khác).
+   - TerminalTool từ chối lệnh thì gợi ý cách khác; thêm 1 nhiệm vụ agent phải thử lại sau khi bị từ chối (đo 26/9: model không thử lại bằng lệnh khác);
+   - chấm lặp lại được: model transformers sinh chữ greedy, model qua server `temperature` 0 và `seed` cố định; cách sinh chữ và revision model ghi trong cài đặt chấm và báo cáo;
+   - nhiệm vụ agent so số theo giá trị (187 hay 87,5 không còn khớp 87);
+   - ghim revision (mã commit) cho các model transformers trong `configs/models/platform.json`.
 6. **M20 – Dữ liệu giữ khả năng gọi công cụ** (chủ repo chọn 26/9, làm sau M19; tiêu chí trong `TASKS.md`):
    - `hf-sft` trộn khoảng 10% dòng gọi công cụ tự sinh, đúng dạng JSON bộ chấm yêu cầu, có cả câu không cần công cụ, khác câu và số liệu của bộ chấm; notebook train bật mặc định (đo 26/9: tool_use của `light` tụt 7/8 → 3/8 sau khi train);
    - chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12, `manifest.json` ghi số dòng bị loại;
+   - chỉ tính loss trên câu trả lời (`assistant_only_loss=True`), báo lỗi rõ ràng nếu chat template không hỗ trợ;
    - (chưa chọn) thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép.
 7. **M21 – Tổng kết tuần 3.**
 
