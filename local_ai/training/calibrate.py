@@ -7,7 +7,9 @@ Số đo lấy từ:
 
 Hằng số đề xuất được tính ngược từ số đo, cùng công thức với `estimate.py` và `vram.py`:
 - `train_tflops` = 2 × số tham số × số token đã train × số lượt chạy qua model ÷ số giây train;
-- `TRAINING_FACTOR` = VRAM đỉnh do torch đếm ÷ GB trọng số (torch không đếm phần CUDA context, nên không trừ CUDA_CONTEXT_GB);
+- model nén (QLoRA): `KBIT_OVERHEAD_GB` = (VRAM đỉnh do torch đếm − GB trọng số × TRAINING_FACTOR) ÷ √(tỷ tham số);
+  model không nén: `TRAINING_FACTOR` = VRAM đỉnh do torch đếm ÷ GB trọng số. Torch không đếm phần CUDA context, nên không
+  trừ CUDA_CONTEXT_GB (ước tính vì vậy hơi cao hơn số đo, an toàn khi chọn GPU);
 - `token_overhead_s` = số giây mỗi token khi chấm − thời gian đọc trọng số cho mỗi token. Báo cáo chấm cũ chưa có `load_s`
   (như lần chạy `smoke` ngày 25/9) tính cả thời gian tải và nạp model vào `duration_s`, nên số này bị đánh dấu là không dùng được.
 
@@ -17,16 +19,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
 
-from local_ai.models.vram import TRAINING_FACTOR, weights_gb
+from local_ai.models.vram import KBIT_OVERHEAD_GB, TRAINING_FACTOR, weights_gb
 from local_ai.training.estimate import CHARS_PER_TOKEN, GPUS, estimate, seconds_per_generated_token
 from local_ai.training.finetune import MEASUREMENTS, FinetuneConfig, effective_quantization, load_finetune_config, resolve_base_model
 
 
-MIN_WEIGHTS_GB = 1.0  # trọng số nhỏ hơn thì hệ số VRAM đo được không đại diện cho model lớn
+MIN_WEIGHTS_GB = 1.0  # trọng số nhỏ hơn thì hằng số VRAM đo được không đại diện cho model lớn
 
 
 def gpu_profile(name: str | None) -> str | None:
@@ -56,13 +59,18 @@ def compare(config: FinetuneConfig, measurements: dict[str, Any], eval_reports: 
         if profile: proposals["train_tflops"] = {"current": gpu.train_tflops, "measured": round(tflops, 2)}
 
     measured_vram = measurements.get("peak_reserved_gb") or measurements.get("peak_vram_gb")
-    weights = weights_gb(model.params_b, effective_quantization(config, model) or "bf16")
+    precision = effective_quantization(config, model) or "bf16"
+    weights = weights_gb(model.params_b, precision)
     vram = {"estimated_gb": plan["vram_gb"], "measured_gb": measured_vram, "implied_training_factor": round(measured_vram / weights, 2) if measured_vram else None}
     if profile and measured_vram:
         # Model nhỏ: bộ nhớ cho logits/activation (tỉ lệ với batch × max_length × số từ vựng) lớn hơn trọng số nhiều lần,
-        # nên hệ số "trọng số × TRAINING_FACTOR" tính từ model nhỏ không dùng được cho model lớn.
+        # nên hằng số VRAM tính từ model nhỏ không dùng được cho model lớn.
         note = f"đo với max_length {config.max_length}, batch {config.per_device_batch_size}" + ("" if weights >= MIN_WEIGHTS_GB else f"; trọng số chỉ {weights:.2f} GB nên KHÔNG dùng số này để sửa hệ số, hãy dùng số đo của model lớn hơn (ví dụ light)")
-        proposals["TRAINING_FACTOR"] = {"current": TRAINING_FACTOR, "measured": vram["implied_training_factor"], "note": note, "reliable": weights >= MIN_WEIGHTS_GB}
+        if precision in ("4bit", "8bit"):
+            overhead = (measured_vram - weights * TRAINING_FACTOR) / math.sqrt(model.params_b)
+            proposals["KBIT_OVERHEAD_GB"] = {"current": KBIT_OVERHEAD_GB, "measured": round(overhead, 2), "note": note, "reliable": weights >= MIN_WEIGHTS_GB}
+        else:
+            proposals["TRAINING_FACTOR"] = {"current": TRAINING_FACTOR, "measured": vram["implied_training_factor"], "note": note, "reliable": weights >= MIN_WEIGHTS_GB}
 
     evaluations, overheads, clean = {}, [], True
     for label, report in (eval_reports or {}).items():
@@ -101,7 +109,7 @@ def format_comparison(result: dict[str, Any]) -> str:
         lines.append(f"GPU {result['gpu']} chưa có hồ sơ ước tính (hiện chỉ có {', '.join(GPUS)}), nên chỉ ghi số đo, không đề xuất hằng số.")
     elif result["proposals"]:
         lines.append("Hằng số đề xuất (chưa sửa code; chụp màn hình bảng này gửi lại để sửa ước tính):")
-        where = {"train_tflops": f'estimate.py GPUS["{result["profile"]}"].train_tflops', "TRAINING_FACTOR": "vram.py TRAINING_FACTOR", "token_overhead_s": f'estimate.py GPUS["{result["profile"]}"].token_overhead_s'}
+        where = {"train_tflops": f'estimate.py GPUS["{result["profile"]}"].train_tflops', "TRAINING_FACTOR": "vram.py TRAINING_FACTOR", "KBIT_OVERHEAD_GB": "vram.py KBIT_OVERHEAD_GB", "token_overhead_s": f'estimate.py GPUS["{result["profile"]}"].token_overhead_s'}
         lines += [f"- {where[key]}: {item['current']:g} → {item['measured']:g}" + (f" ({item['note']})" if item.get("note") else "") for key, item in result["proposals"].items()]
     return "\n".join(lines)
 

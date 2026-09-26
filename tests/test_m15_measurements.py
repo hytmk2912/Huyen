@@ -9,6 +9,7 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import math
 import os
 import sys
 import tempfile
@@ -20,7 +21,7 @@ from unittest import mock
 from local_ai.agents.tasks import load_tasks, format_report, run_tasks
 from local_ai.evaluation.suite import load_cases, run_eval
 from local_ai.models.router import ScriptedModelAdapter
-from local_ai.models.vram import weights_gb
+from local_ai.models.vram import CUDA_CONTEXT_GB, TRAINING_FACTOR, training_gb, weights_gb
 from local_ai.training import calibrate
 from local_ai.training.estimate import GPUS, estimate
 from local_ai.training.finetune import MEASUREMENTS, load_finetune_config, train
@@ -56,16 +57,19 @@ class CalibrateTests(unittest.TestCase):
         tflops = 2 * 4.02e9 * plan["tokens_per_step"] * steps * 3 / measured["train_seconds"] / 1e12
         self.assertEqual(result["train"], {"steps": 65, "estimated_minutes": round(plan["train_minutes"] * 65 / plan["steps"], 1), "measured_minutes": 50.0, "effective_tflops": round(tflops, 3)})
         self.assertEqual(result["proposals"]["train_tflops"], {"current": GPUS["T4"].train_tflops, "measured": round(tflops, 2)})
-        factor = result["proposals"]["TRAINING_FACTOR"]
-        self.assertEqual((factor["measured"], factor["reliable"]), (round(7.9 / weights_gb(4.02, "4bit"), 2), True))
+        overhead = result["proposals"]["KBIT_OVERHEAD_GB"]  # model nén: tính ngược phần thêm của QLoRA (vram.py), không phải TRAINING_FACTOR
+        self.assertEqual((overhead["measured"], overhead["reliable"]), (round((7.9 - weights_gb(4.02, "4bit") * TRAINING_FACTOR) / math.sqrt(4.02), 2), True))
+        self.assertNotIn("TRAINING_FACTOR", result["proposals"])
         per_token = 200.0 / (13000 / 3.4)
         self.assertAlmostEqual(result["proposals"]["token_overhead_s"]["measured"], round(per_token - 2 * 4.02 / GPUS["T4"].memory_gbps, 4))
         self.assertEqual(result["agent"], {"passed": 3, "total": 5, "success_rate": 0.6, "measured_minutes": 9.0})
 
     def test_small_model_vram_factor_is_flagged(self):
         result = calibrate.compare(config_without_data("smoke"), fixture("smoke_t4.json"))
-        self.assertFalse(result["proposals"]["TRAINING_FACTOR"]["reliable"])
+        self.assertFalse(result["proposals"]["KBIT_OVERHEAD_GB"]["reliable"])
         self.assertIn("KHÔNG dùng số này", calibrate.format_comparison(result))
+        unquantized = calibrate.compare(config_without_data("smoke", quantization="none"), fixture("smoke_t4.json"))
+        self.assertFalse(unquantized["proposals"]["TRAINING_FACTOR"]["reliable"])  # model không nén vẫn đề xuất TRAINING_FACTOR
 
     def test_unknown_gpu_only_records(self):
         result = calibrate.compare(config_without_data("smoke"), {**fixture("smoke_t4.json"), "gpu": "NVIDIA L4"})
@@ -168,7 +172,7 @@ class RealSmokeMeasurementTests(unittest.TestCase):
         self.assertAlmostEqual(result["proposals"]["train_tflops"]["measured"], self.real["train"]["effective_tflops"], delta=0.05)
         plan = estimate(config_without_data("smoke"), rows=2000)
         self.assertLess(abs(plan["train_minutes"] - self.real["train"]["measured_minutes"]) / self.real["train"]["measured_minutes"], 0.05)
-        self.assertFalse(result["proposals"]["TRAINING_FACTOR"]["reliable"])  # chưa sửa vram.py theo smoke
+        self.assertFalse(result["proposals"]["KBIT_OVERHEAD_GB"]["reliable"])  # không sửa vram.py theo smoke (model quá nhỏ)
 
     def test_old_eval_reports_include_load_time_so_overhead_is_not_used(self):
         report = {"status": "completed", "model": "smoke", "passed": 16, "cases": 30, "duration_s": 132.0, "output_chars": 10200}
@@ -233,19 +237,24 @@ class RealLightMeasurementTests(unittest.TestCase):
         self.assertLess(abs(before["estimated_max_minutes"] - before["measured_minutes"]) / before["measured_minutes"], 0.05)
         self.assertFalse(result["proposals"]["token_overhead_s"]["reliable"])  # báo cáo cũ tính cả thời gian nạp model
 
-    def test_vram_factor_from_light_is_measured_but_not_applied_yet(self):
+    def test_qlora_vram_formula_follows_light(self):
+        # Chủ repo đồng ý sửa công thức VRAM ngày 26/9: phần thêm của QLoRA lấy theo số đo của light.
         result = calibrate.compare(config_without_data("light"), self.measured)
-        factor = result["proposals"]["TRAINING_FACTOR"]
-        self.assertTrue(factor["reliable"])
-        self.assertAlmostEqual(factor["measured"], self.measured["peak_reserved_gb"] / weights_gb(4.02, "4bit"), places=2)
-        # Chưa sửa vram.py: sửa thì ước tính cho model 27B vượt 24 GB, trái với M2; chờ chủ repo quyết định (ghi trong memory.md).
-        self.assertEqual(factor["current"], 1.25)
-        self.assertGreater(self.measured["peak_reserved_gb"], 2 * result["vram"]["estimated_gb"])
+        overhead = result["proposals"]["KBIT_OVERHEAD_GB"]
+        self.assertTrue(overhead["reliable"])
+        self.assertAlmostEqual(overhead["current"], overhead["measured"], delta=0.02)
+        # Ước tính = số đo torch + 1 GB CUDA context (torch không đếm phần này): hơi cao hơn số đo, không thấp hơn.
+        light_gb, measured_gb = training_gb(4.02, "4bit"), self.measured["peak_reserved_gb"]
+        self.assertTrue(measured_gb <= light_gb <= measured_gb + CUDA_CONTEXT_GB + 0.05)
+        smoke = fixture("that_smoke_t4_2026-09-25.json")["measurements"]
+        smoke_gb = training_gb(smoke["params_b"], "4bit")
+        self.assertTrue(smoke["peak_reserved_gb"] <= smoke_gb <= smoke["peak_reserved_gb"] * 1.3)  # smoke không dùng để hiệu chỉnh, chỉ để kiểm tra
+        self.assertLess(result["vram"]["estimated_gb"], GPUS["T4"].memory_gb)
 
     def test_readme_table_has_light_column(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         table = readme.split("**Số đo thật trên Colab**", 1)[1].split("\n\n", 2)[1]
-        for phrase in ("`light` (25/9/2026)", "66,7 phút", "8,2 GB (ước tính 3,8 GB)", "17/30 → chưa có"):
+        for phrase in ("`light` (25/9/2026)", "66,7 phút", "8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB)", "17/30 → chưa có"):
             with self.subTest(phrase): self.assertIn(phrase, table)
 
 

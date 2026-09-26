@@ -62,7 +62,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
   - `create_adapter` chọn adapter theo `backend`;
   - `ModelRouter` chọn model theo khả năng;
   - `ScriptedModelAdapter` là model giả dùng trong test và demo.
-- `vram.py`: ước tính VRAM từ `params_b`, không tải model.
+- `vram.py`: ước tính VRAM từ `params_b`, không tải model. Phần QLoRA cộng thêm `KBIT_OVERHEAD_GB` × √(tỷ tham số), đo trên Qwen3-4B (M15).
 
 ### Huấn luyện (`local_ai/training`)
 `finetune.py` là khung SFT dùng transformers, trl và peft:
@@ -79,12 +79,12 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 - phép tính ≈ 2 × số tham số × số token × số lượt chạy qua model, chia cho thông lượng giả định của GPU;
 - báo số bước đã train nếu có checkpoint trên máy hoặc trên Hub.
 
-Các hằng số ghi ở đầu file. Mới có một lần đo thật trên T4 (`smoke`, 25/9): thông lượng train đã sửa theo lần đo đó; thời gian chấm và VRAM chưa sửa.
+Các hằng số ghi ở đầu file. Đã đo thật trên T4 (`smoke`, `light`, 25/9): thông lượng train và VRAM khi train QLoRA đã sửa theo số đo; tốc độ chấm chưa sửa.
 
 Số đo thật (M15):
 - lệnh train ghi `measurements.json` trong `output_dir` (GPU, VRAM đỉnh, thời gian, bước bắt đầu/kết thúc, số token của lần chạy), trước khi lưu adapter, nên được đẩy lên Hub cùng adapter;
 - báo cáo eval ghi `duration_s` (không tính thời gian nạp model, ghi riêng ở `load_s`) và `output_chars`; báo cáo agent ghi `duration_s`;
-- `calibrate.py` (`python -m local_ai.training.calibrate`) đặt số đo cạnh ước tính và tính ngược hằng số đề xuất (`train_tflops`, `TRAINING_FACTOR`, `token_overhead_s`), không tự sửa code;
+- `calibrate.py` (`python -m local_ai.training.calibrate`) đặt số đo cạnh ước tính và tính ngược hằng số đề xuất (`train_tflops`, `KBIT_OVERHEAD_GB` với model nén hoặc `TRAINING_FACTOR` với model không nén, `token_overhead_s`), không tự sửa code;
 - hệ số VRAM đo từ model nhỏ, và tốc độ chấm từ báo cáo cũ không có `load_s`, được đánh dấu là không dùng được.
 
 `RunTracker` ghi cấu hình, chỉ số và đường dẫn adapter vào thư mục của lượt chạy.

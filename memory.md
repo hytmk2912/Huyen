@@ -10,14 +10,14 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Checklist tuần 3
 Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào được chọn thì mới có tiêu chí trong `TASKS.md`.
-- [ ] M15 Số đo thật trên Colab (đã chọn 25/9; **đang làm**: có `smoke` và phần train của `light`; chờ chấm sau của `light`, agent, và quyết định về VRAM)
+- [ ] M15 Số đo thật trên Colab (đã chọn 25/9; **đang làm**: có `smoke` và phần train của `light`; đã sửa thông lượng và VRAM; chờ chấm sau của `light` và agent)
 - [x] M16 Notebook bền hơn (xong 25/9)
 - M17 Model chính: LoRA chỉ phần ngôn ngữ (phần `dtype` đã làm khi rà soát 25/9) · M18 Agent dùng model đã train (GGUF) · M19 Mở rộng eval · M20 Dữ liệu: gần trùng train/eval, thêm preset tiếng Việt · M21 Tổng kết tuần 3 (chưa chọn)
 
 ## Mốc đang làm
 - **M15 — đang làm.** Có số đo `smoke` (PR #11 đã gộp) và phần train của `light` (`Hytmk2912/huyen-light-qlora`: `measurements.json`, `eval/truoc`; chưa có `eval/sau`, `so_do/light.json`). `train_tflops` T4 = 5,2 (smoke 5,36, light 5,17).
-  - Chờ chủ repo: (1) cho biết Bước 9–12 của `light` có chạy không (chạy lại Run all với `light`: Bước 8 thấy checkpoint 125/125 nên xong ngay, rồi chấm sau khoảng 17 phút); (2) chạy `agent_colab`; (3) quyết định VRAM (dưới).
-  - **Cần chủ repo quyết định:** `light` dùng 8,2 GB, ước tính 3,8 (hệ số đo 3,61, cũ 1,25). Sửa `vram.py` theo số đo thì ước tính QLoRA 27B vượt 24 GB (nhân hệ số: khoảng 57 GB; tách phần cố định khoảng 5,3 GB: khoảng 26 GB), làm hỏng test M2 `test_numbers_for_27b` ("27B vừa 24 GB"). Đề xuất: tách phần cố định (embedding float32, logits), sửa test M2 kèm lý do; 27B đo lại khi làm M17.
+  - 26/9 chủ repo trả lời: gộp PR #12 (đã gộp `8e44ac9`); đồng ý sửa công thức VRAM "tùy chỉnh sao cho hợp" (đã làm: `KBIT_OVERHEAD_GB` = 2,67 × √(tỷ tham số) cho model nén, 27B thành 34,6 GB, sửa test M2); việc 1 (chấm sau của `light`), 2 (`agent_colab`), 4 (tắt suy nghĩ của Qwen3 khi chấm) chủ repo tự kiểm tra rồi báo lại.
+  - Chờ chủ repo: (1) Bước 9–12 của `light` (chạy lại Run all với `light`: Bước 8 thấy checkpoint 125/125 nên xong ngay, rồi chấm sau khoảng 17 phút); (2) chạy `agent_colab`; (4) có sửa chế độ suy nghĩ khi chấm Qwen3 không.
   - Khi có `so_do/light.json` (báo cáo chấm mới có `load_s`): sửa `token_overhead_s`; điền điểm sau khi train. Lưu ý: lần chạy lại chỉ train 0 bước, nên `measurements.json` trên Hub bị ghi đè và phần train/VRAM trong `so_do/light.json` không dùng được; số đo train đúng đã chép ở `tests/fixtures/measurements/that_light_t4_2026-09-25.json`. Khi có báo cáo agent: điền cột Agent. Xong cả 3 nguồn thì M15 mới xong.
 
 ## Việc chủ repo tự làm (rà soát M1–M16 ngày 25/9)
@@ -30,7 +30,7 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 7. Archive repo Agent cũ `huyenytmk2912/agent` (không đổi từ `78a3e25`). `hytmk2912/Agent`: Claude không truy cập được; chỉ cấp quyền nếu repo đó có code mới hơn.
 8. Sửa mô tả repo trên GitHub (trang chính repo → mục About → biểu tượng ⚙️), hiện vẫn là "Train Từ Số 0"; cân nhắc chuyển repo sang Private (khi đó `git clone` trong notebook phải dùng token).
 9. Đọc `docs/GIAY_PHEP_DATASET.md`, chấp nhận hoặc bỏ preset (`vietnamese` chỉ dùng cá nhân, không thương mại).
-10. Model chính 27B cần GPU 24 GB trở lên (Colab free không đủ). Chọn mốc tiếp theo trong M17–M21.
+10. Model chính 27B: ước tính mới khoảng 35 GB khi train QLoRA, cần GPU 40–48 GB (Colab free không đủ; chưa đo, đo ở M17). Chọn mốc tiếp theo trong M17–M21.
 
 ## Việc dở
 - Nhánh làm việc tuần 3: `claude/nhiem-vu-tuan-jixv6i` (nhánh phiên được giao; dựng lại từ `main` tại `40e23a5` sau khi gộp PR #10).
@@ -52,3 +52,4 @@ Chủ repo chọn từng mốc trong 7 đề xuất (cuối README); mốc nào 
 | 25/9 | Sửa lỗi Bước 8 trên T4 | Chủ repo chạy `smoke` trên T4: Bước 8 lỗi `_amp_foreach_non_finite_check_and_unscale_cuda ... 'BFloat16'`. Nguyên nhân: TRL 1.13 đổi tham số LoRA của model nạp 4bit sang bf16 ngay trong `SFTTrainer(...)`; train fp16 thì GradScaler không nhận gradient bf16. transformers 5.17 vẫn đọc `torch_dtype` (chỉ cảnh báo), nên không phải do `torch_dtype`. Sửa: `trainable_to_float32` đổi tham số được train sang float32 sau khi tạo SFTTrainer, trước `trainer.train()` (khi train fp16 hoặc QLoRA), in dtype ra log. Test `tests/test_sua_loi_fp16_t4.py` (4 test, có test TRL thật cho thấy tham số LoRA thành bf16 rồi được đổi về float32 và train được). Gộp vào PR #10. |
 | 25/9 | M15 (dở) | Chủ repo chạy lại `smoke` sau PR #10: train xong 125 bước. Số đo thật (`so_do/smoke.json`): train 14,9 phút (ước tính 13,3), 5,36 TFLOPS, VRAM 2,5 GB (ước tính 1,3), chấm 2,2 và 2,6 phút, điểm 16 → 14/30. Sửa `train_tflops` T4 6 → 5,4, tính lại thời gian trong README và `docs/TRAIN_COLAB.md`, thêm bảng số đo thật. Lỗi gặp: `duration_s` của eval tính cả thời gian tải và nạp model (model nạp lười ở câu đầu), nên `token_overhead_s` đề xuất (0,054) không dùng được; sửa: eval nạp model trước khi bấm giờ, ghi `load_s`, `calibrate` đánh dấu báo cáo cũ. 240 test qua, compileall và secret-scan sạch. Tiếp theo: chờ `light` và agent. |
 | 25/9 | M15 (dở, lượt 2) | Chủ repo gọi M15 và nhờ gộp PR #11 (đã gộp `e6fb23c`). `light` đã train xong 125 bước trên T4 (Colab ngắt sau bước 30, chạy tiếp được): 95 bước trong 66,7 phút, VRAM 8,2 GB (ước tính 3,8), chấm trước 17/30 trong 17,4 phút. Chưa có chấm sau và `so_do/light.json`. Sửa `train_tflops` 5,4 → 5,2; tính lại thời gian (light 121 phút); điền cột `light` trong README. Không sửa `TRAINING_FACTOR` vì sẽ làm hỏng test M2 (27B vừa 24 GB): chờ chủ repo. Phát hiện: Qwen3 dùng hết 512 token cho `<think>` nên code 1/8 (ghi Việc dở). 244 test qua. |
+| 26/9 | M15 (dở, lượt 3) | Chủ repo: gộp PR #12 (đã gộp), đồng ý sửa công thức VRAM. Không nhân hệ số 3,61 cho mọi model (27B thành 57 GB, quá cao); thêm `KBIT_OVERHEAD_GB` × √(tỷ tham số) cho model nén (embedding float32, logits), đo trên `light`: light 9,2 GB, smoke 3,2 GB, 27B 34,6 GB. `calibrate` đề xuất hằng số mới cho model nén. Sửa test M2 (27B QLoRA trên 24 GB, không quá 48) và các test M15 liên quan; cập nhật README, cấu hình, ARCHITECTURE. 244 test qua. Tiếp theo: chờ chấm sau của `light` và agent. |

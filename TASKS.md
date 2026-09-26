@@ -8,7 +8,7 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 
 | Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
 | --- | --- | --- | --- | --- |
-| M15 | Số đo thật trên Colab | **Đang làm** (có số đo `smoke` và phần train của `light`; chờ chấm sau của `light` và agent) | 3/4 (75%) | `tests/test_m15_measurements.py` (17 test) |
+| M15 | Số đo thật trên Colab | **Đang làm** (có số đo `smoke` và phần train của `light`, đã sửa thông lượng và VRAM; chờ chấm sau của `light` và agent) | 3/4 (75%) | `tests/test_m15_measurements.py` (17 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (11 test) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
@@ -37,7 +37,7 @@ Mục tiêu: sửa các hằng số ước tính (`local_ai/training/estimate.py
   - Chưa sửa: `TRAINING_FACTOR` (số đo model nhỏ không dùng được, chờ `light`); `token_overhead_s` (thời gian chấm lần này tính cả thời gian tải và nạp model). Đã sửa cách đo: lệnh eval nạp model trước khi bấm giờ và ghi `load_s` riêng; `calibrate` đánh dấu số đo từ báo cáo cũ là không dùng được.
   - [ ] `light` (Colab T4, 25/9): **có phần train**, thiếu phần chấm sau khi train và file `so_do/light.json`. Colab ngắt sau bước 30, lần chạy tiếp train nốt 95 bước trong 66,7 phút (42 giây/bước); VRAM 8,2 GB (ước tính 3,8); chấm trước 17/30 trong 17,4 phút (ước tính tối đa 17,2). Số đo chép vào `tests/fixtures/measurements/that_light_t4_2026-09-25.json`.
     - Đã sửa: `train_tflops` 5,4 → 5,2 (smoke 5,36, light 5,17): ước tính của cả 2 model lệch dưới 5%; thời gian trong tài liệu tính lại (`light` 121 phút). README điền cột `light`.
-    - Chưa sửa `TRAINING_FACTOR`: hệ số đo được 3,61 (ước tính cũ thấp khoảng 2 lần), nhưng sửa thì ước tính QLoRA 27B vượt 24 GB, trái với test M2 `test_numbers_for_27b`. Chờ chủ repo quyết định.
+    - VRAM (chủ repo đồng ý ngày 26/9, "tùy chỉnh sao cho hợp"): không nhân hệ số 3,61 cho mọi model (27B sẽ thành 57 GB, quá cao), mà cộng thêm phần cho model nén `KBIT_OVERHEAD_GB` × √(tỷ tham số) = 2,67 × √(tỷ tham số) GB (embedding float32, logits), đo trên `light`. Ước tính: `light` 9,2 GB (đo 8,2 + CUDA context), `smoke` 3,2 GB (đo 2,5), 27B 34,6 GB (trước 20,5; chưa đo, cần đo ở M17). `calibrate` đề xuất `KBIT_OVERHEAD_GB` cho model nén. Test M2 `test_numbers_for_27b` sửa theo (27B QLoRA trên 24 GB, không quá 48 GB).
   - [ ] agent: chờ chủ repo chạy `agent_colab`.
 
   Bằng chứng: `RealSmokeMeasurementTests` (4 test: hằng số T4 nằm giữa 2 số đo thật, ước tính `smoke` lệch dưới 5%, eval nạp model trước khi bấm giờ, README có bảng số đo); `RealLightMeasurementTests` (4 test: lần chạy tiếp chỉ đếm bước và token của nó, ước tính train và chấm lệch dưới 5%, hệ số VRAM đo được nhưng chưa áp dụng, README có cột `light`).
@@ -306,6 +306,7 @@ Dọn repo:
 - [x] 6. GPU không có bf16 (ví dụ T4) thì tự chuyển sang fp16 và in cảnh báo, cả khi nạp model lẫn khi train. Bằng chứng: `DtypeFallbackTests` (3 test), `QloraFinetuneTests.test_t4_trains_in_fp16`.
 - [x] 7. Lệnh `python -m local_ai.models.vram` in bảng cho **mọi** model trong `configs/models/platform.json`: số tham số, trọng số ở bf16/8bit/4bit, train LoRA/QLoRA. Không cần mạng, không import torch/transformers, ghi rõ là ước lượng. Bằng chứng: `VramEstimateTests.test_command_prints_every_model_without_loading`, `test_model_without_params_is_marked`.
 - [x] 8. Số liệu ước tính cho model 27B: bf16 = 54 GB, 4bit trong khoảng 14–16 GB, train QLoRA dưới 24 GB. Bằng chứng: `VramEstimateTests.test_numbers_for_27b`.
+  - Cập nhật 26/9 (M15, chủ repo đồng ý): số đo thật của Qwen3-4B cho thấy công thức cũ ước tính thấp khoảng 2 lần. Công thức mới ước tính train QLoRA 27B khoảng 34,6 GB (trên 24 GB), test sửa theo.
 
 ---
 

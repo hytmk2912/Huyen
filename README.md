@@ -68,7 +68,7 @@ Xem VRAM ước tính cho mọi model (không tải model, không cần mạng):
 ```bash
 python -m local_ai.models.vram
 ```
-Bảng in ra trọng số ở bf16/8bit/4bit và bộ nhớ khi train LoRA/QLoRA. Ví dụ model chính (27,78 tỷ tham số): trọng số bf16 khoảng 55,6 GB, 4bit khoảng 15,6 GB, train QLoRA khoảng 20,5 GB. Đây chỉ là ước lượng, chưa đo trên GPU thật.
+Bảng in ra trọng số ở bf16/8bit/4bit và bộ nhớ khi train LoRA/QLoRA. Ví dụ model chính (27,78 tỷ tham số): trọng số bf16 khoảng 55,6 GB, 4bit khoảng 15,6 GB, train QLoRA khoảng 34,6 GB. Phần QLoRA đã hiệu chỉnh theo số đo thật của model 4B trên T4 (M15, xem bảng số đo thật); model 27B chưa đo, nên con số này chỉ là suy ra.
 
 ## Chạy model qua server local (Ollama, llama.cpp, vLLM)
 Model có `backend: "openai_compatible"` được gọi qua `POST {base_url}/chat/completions` theo chuẩn OpenAI, chỉ dùng thư viện chuẩn của Python. Khi đó:
@@ -287,8 +287,8 @@ python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset
 | Bước | Model | Lệnh train | VRAM ước tính | GPU gợi ý |
 | --- | --- | --- | ---: | --- |
 | 1. smoke | `smoke` (Qwen2.5-0.5B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json` | 2,2 GB | GPU bất kỳ từ 4 GB (T4 tự dùng fp16) |
-| 2. light | `light` (Qwen3-4B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json --base-model light --output-dir .runs/sft_light` | 11,0 GB | T4 16 GB, RTX 3060 12 GB; thêm `--quantization 4bit` (QLoRA) thì còn 3,8 GB |
-| 3. primary | `primary` (27,78 tỷ), QLoRA 4bit | `python -m local_ai.training.finetune --config configs/training/qlora_primary.json` | 20,5 GB | 24 GB (RTX 3090/4090, L4, A10); LoRA bf16 không nén cần khoảng 70,5 GB (A100 80 GB) |
+| 2. light | `light` (Qwen3-4B), LoRA bf16 | `python -m local_ai.training.finetune --config configs/training/sft.json --base-model light --output-dir .runs/sft_light` | 11,0 GB | T4 16 GB, RTX 3060 12 GB; thêm `--quantization 4bit` (QLoRA) thì còn 9,2 GB |
+| 3. primary | `primary` (27,78 tỷ), QLoRA 4bit | `python -m local_ai.training.finetune --config configs/training/qlora_primary.json` | 34,6 GB | 40–48 GB (A100 40 GB, L40S hoặc RTX A6000 48 GB); suy ra từ số đo model 4B, cần đo lại khi làm M17. LoRA bf16 không nén cần khoảng 70,5 GB (A100 80 GB) |
 
 Chấm sau mỗi bước: `smoke-lora`, `light-lora`, `primary-qlora` trong `configs/models/platform.json` đã trỏ sẵn `adapter_path` tới thư mục adapter của từng bước. So với model gốc bằng cùng một bộ eval:
 ```bash
@@ -309,7 +309,7 @@ Notebook `notebooks/train_colab.ipynb` train trên GPU T4 miễn phí của Cola
 | Model | Cấu hình train | Chấm sau khi train | Thời gian ước tính (train + 2 lần chấm) |
 | --- | --- | --- | --- |
 | `smoke` (Qwen2.5-0.5B) | `configs/training/colab_smoke.json`: QLoRA 4bit, fp16, batch 4, `max_length` 1024 | `smoke-colab` | khoảng 23 phút |
-| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 3,8 GB | `light-colab` | khoảng 121 phút |
+| `light` (Qwen3-4B) | `configs/training/colab_light.json`: QLoRA 4bit, fp16, batch 1 (tích lũy 16), `max_length` 2048, VRAM ước tính 9,2 GB (đo thật 8,2 GB) | `light-colab` | khoảng 121 phút |
 
 Các ô sau chạy lần lượt:
 1. kiểm tra GPU; chưa có thì hướng dẫn chọn T4;
@@ -346,15 +346,17 @@ Lệnh in bảng "ước tính và đo thật", kèm hằng số đề xuất ch
 | Mục | `smoke` (25/9/2026) | `light` (25/9/2026) | Agent (`qwen3:4b`) |
 | --- | --- | --- | --- |
 | Train | 125 bước trong 14,9 phút (ước tính cũ 13,3); 5,36 TFLOPS hiệu dụng; 1.013.077 token | Colab ngắt sau bước 30, chạy tiếp được: 95 bước sau trong 66,7 phút (khoảng 42 giây/bước; ước tính cũ 56,9); 5,17 TFLOPS; 856.769 token | — |
-| VRAM khi train | 2,5 GB (ước tính 1,3 GB) | 8,2 GB (ước tính 3,8 GB) | — |
+| VRAM khi train | 2,5 GB (ước tính cũ 1,3 GB, công thức mới 3,2 GB) | 8,2 GB (ước tính cũ 3,8 GB, công thức mới 9,2 GB) | — |
 | Loss | 1,48 (bước 5) → 1,27 (bước 125) | 1,51 (bước 5) → 0,97 (bước 125) | — |
 | Chấm 30 câu (tối đa 256 token/câu với `smoke`, 512 với `light`) | trước: 2,2 phút; sau: 2,6 phút (cả hai tính cả thời gian nạp model) | trước: 17,4 phút, tính cả nạp model (ước tính tối đa 17,2); sau: chưa có | — |
 | Điểm eval trước → sau | 16/30 → 14/30 | 17/30 → chưa có | — |
 | Nhiệm vụ agent | — | — | chưa chạy |
 
-Đã sửa theo số đo này: thông lượng train của T4 trong `estimate.py` (6 → 5,2 TFLOPS). Chưa sửa:
-- hệ số VRAM (`TRAINING_FACTOR` trong `vram.py`): `light` dùng 8,2 GB, gấp khoảng 2 lần ước tính 3,8 GB (vẫn vừa T4 15 GB). Phần lớn chênh lệch là phần không tăng theo số tham số (embedding giữ float32, logits trên bộ từ vựng khoảng 152 nghìn token). Sửa công thức theo số đo này thì ước tính cho model chính 27B vượt 24 GB, trái với kết luận của M2 ("QLoRA 27B vừa GPU 24 GB"): chờ chủ repo quyết định;
-- tốc độ chấm (`token_overhead_s`): báo cáo chấm của cả 2 lần tính cả thời gian tải và nạp model. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`).
+Đã sửa theo số đo này:
+- thông lượng train của T4 trong `estimate.py`: 6 → 5,2 TFLOPS;
+- VRAM khi train QLoRA trong `vram.py` (chủ repo đồng ý ngày 26/9): công thức cũ ước tính `light` 3,8 GB, đo thật 8,2 GB. Phần thiếu là phần không tăng theo tỉ lệ số tham số: embedding bị đổi sang float32, và logits trên bộ từ vựng khoảng 152 nghìn token. Công thức mới cộng thêm 2,67 × √(tỷ tham số) GB cho model nén: `light` 9,2 GB, `smoke` 3,2 GB (hơi cao hơn số đo, an toàn khi chọn GPU). Với model chính 27B, ước tính tăng từ 20,5 lên 34,6 GB, nên GPU 24 GB có thể không đủ; con số này suy ra từ model 4B, cần đo lại khi làm M17.
+
+Chưa sửa: tốc độ chấm (`token_overhead_s`). Báo cáo chấm của cả 2 lần tính cả thời gian tải và nạp model. Từ nay lệnh eval nạp model trước khi bấm giờ và ghi riêng thời gian nạp (`load_s`).
 
 Chấm `light` trước khi train: code chỉ đạt 1/8 câu, vì Qwen3-4B "suy nghĩ" trong khối `<think>` hết 512 token trước khi kịp viết code. Đây là giới hạn của bộ chấm, không phải lỗi train.
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "QLoRA cho model chính (27,78 tỷ tham số, multimodal): nạp model gốc nén 4bit (NF4, bitsandbytes) rồi gắn LoRA. Ước tính cần GPU khoảng 24 GB trở lên (xem `python -m local_ai.models.vram`). GPU không có bf16 (ví dụ T4) thì tự chuyển sang fp16.",
+  "_comment": "QLoRA cho model chính (27,78 tỷ tham số, multimodal): nạp model gốc nén 4bit (NF4, bitsandbytes) rồi gắn LoRA. Ước tính cần khoảng 35 GB, tức GPU 40–48 GB (xem `python -m local_ai.models.vram`; suy ra từ số đo thật của model 4B, chưa đo với model 27B). GPU không có bf16 (ví dụ T4) thì tự chuyển sang fp16.",
   "base_model": "primary",
   "models_config": "configs/models/platform.json",
   "dataset_path": "data/processed/hf_sft/sft.jsonl",

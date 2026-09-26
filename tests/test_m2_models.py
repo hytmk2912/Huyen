@@ -250,7 +250,9 @@ class VramEstimateTests(unittest.TestCase):
         self.assertAlmostEqual(weights_gb(27, "bf16"), 54.0)
         self.assertTrue(27 <= weights_gb(27, "8bit") <= 30)
         self.assertTrue(14 <= weights_gb(27, "4bit") <= 16)
-        self.assertLess(training_gb(27, "4bit"), 24)  # QLoRA 27B vừa GPU 24 GB
+        # Trước ghi "QLoRA 27B vừa GPU 24 GB". Số đo thật của Qwen3-4B trên T4 (M15) cho thấy công thức cũ ước tính thấp
+        # khoảng 2 lần; chủ repo đồng ý sửa công thức và test này ngày 26/9. Ước tính mới vượt 24 GB, vẫn vừa GPU 48 GB.
+        self.assertTrue(24 < training_gb(27, "4bit") <= 48)
         self.assertGreater(training_gb(27, "bf16"), weights_gb(27, "bf16"))
 
     def test_command_prints_every_model_without_loading(self):
