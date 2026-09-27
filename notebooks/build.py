@@ -1,4 +1,4 @@
-"""Sinh các notebook Colab trong thư mục này (lưu không kèm output). Sửa nội dung ô ở đây rồi chạy: python notebooks/build.py
+"""Sinh các notebook Colab và Kaggle trong thư mục này (lưu không kèm output). Sửa nội dung ô ở đây rồi chạy: python notebooks/build.py
 
 Chỉ dùng thư viện chuẩn; test `tests/test_m10_colab.py` kiểm tra file .ipynb luôn khớp với nội dung sinh ra từ đây.
 """
@@ -412,7 +412,170 @@ run(f"python -m local_ai.agents.compare .runs/agent_tasks/{MODEL}-goc.json .runs
     ], "agent_trained_colab.ipynb")
 
 
-NOTEBOOKS = {"train_colab.ipynb": train_colab, "agent_colab.ipynb": agent_colab, "agent_trained_colab.ipynb": agent_trained_colab}
+def kaggle_notebook(cells: list[dict]) -> dict:
+    """Notebook cho Kaggle (M24): metadata `kaggle` gợi ý bật GPU T4 và Internet khi mở từ GitHub; vẫn phải chọn lại trong Session options."""
+    return {"cells": cells, "metadata": {"kaggle": {"accelerator": "nvidiaTeslaT4", "dataSources": [], "isGpuEnabled": True, "isInternetEnabled": True, "language": "python", "sourceType": "notebook"},
+                                         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}, "language_info": {"name": "python"}},
+            "nbformat": 4, "nbformat_minor": 5}
+
+
+def train_kaggle() -> dict:
+    return kaggle_notebook([
+        markdown("gioi-thieu", f"""
+# Train model nhỏ trên Kaggle miễn phí (GPU T4)
+
+Notebook này làm đúng các bước của `train_colab`: fine-tune một model bằng QLoRA rồi so sánh điểm trước và sau khi train, nhưng trên GPU miễn phí của Kaggle. Theo Kaggle lúc viết (27/9/2026, có thể đổi): khoảng 30 giờ GPU mỗi tuần, mỗi phiên tối đa 12 giờ, và chạy được ở nền (**Save Version → Save & Run All**), khóa iPhone vẫn chạy. Có 2 lựa chọn (đổi ở Bước 1):
+- **smoke** (Qwen2.5-0.5B): nhanh, khoảng 30 phút cả notebook. Nên chạy thử cái này trước.
+- **light** (Qwen3-4B): khoảng 2 giờ. Phiên bị ngắt thì chạy lại, việc train tự chạy tiếp.
+
+Thời gian ước lượng theo GPU T4 của Colab; notebook này **chưa chạy thử trên Kaggle thật**. Bước 6 in ước tính chi tiết.
+
+**Cần chuẩn bị (làm một lần):**
+1. Tài khoản [Kaggle](https://www.kaggle.com) đã xác minh số điện thoại (ảnh đại diện → Settings → Phone Verification). Chưa xác minh thì không bật được Internet và GPU.
+2. Token [Hugging Face](https://huggingface.co) quyền **Write** (Settings → Access Tokens).
+3. Trong notebook này: menu **Add-ons → Secrets → Add Secret**, đặt tên `HF_TOKEN`, dán token, bấm Save, rồi đánh dấu chọn `HF_TOKEN` để notebook được đọc.
+4. Cột bên phải, mục **Session options**: **Accelerator → GPU T4 x2**, **Internet → On**.
+
+**Cách chạy:** chọn model ở Bước 1, rồi bấm **Save Version → Save & Run All (Commit) → Save** (chạy ở nền, xong thì xem tab Output), hoặc **Run All** (phải giữ trang mở).
+
+Mọi kết quả nằm trong `/kaggle/working`: code ở `/kaggle/working/Huyen`, kết quả chính được chép vào `/kaggle/working/ket_qua/<model>`. Notebook dùng chung repo Hugging Face với `train_colab` (`<tên>/huyen-<model>-qlora`), nên train dở trên Colab thì chạy tiếp ở đây được, và ngược lại.
+
+Hướng dẫn từng bước trên iPhone: mục "Train trên Kaggle miễn phí" trong [README]({REPO_URL.removesuffix(".git")}#readme).
+"""),
+        code("buoc-1-chon-model", """
+# Bước 1: chọn model rồi mới chạy. Muốn đổi thì sửa chữ trong ngoặc kép ở dòng MODEL thành "smoke" hoặc "light".
+# smoke = Qwen2.5-0.5B: nhanh, nên chạy thử trước. light = Qwen3-4B: lâu hơn nhiều; phiên bị ngắt thì chạy lại để train tiếp.
+MODEL = "smoke"  # "smoke" hoặc "light"
+
+if MODEL not in ("smoke", "light"):
+    raise ValueError('MODEL phải là "smoke" hoặc "light", đang là ' + repr(MODEL))
+# Độ dài tối đa mỗi câu trả lời khi chấm. Qwen3 (light) cần thêm chỗ cho phần suy nghĩ <think> trước câu trả lời.
+MAX_NEW_TOKENS = {"smoke": 256, "light": 512}[MODEL]
+print("Đã chọn model:", MODEL, "| cấu hình train: configs/training/colab_" + MODEL + ".json (giống Colab)")
+"""),
+        code("buoc-2-gpu", """
+# Bước 2: kiểm tra GPU và chỉ dùng 1 GPU. Nên chọn GPU T4 x2: mỗi GPU khoảng 15 GB, giống GPU T4 của Colab mà notebook train_colab đã chạy thật.
+# Có 2 GPU thì model bị chia ra 2 GPU (device_map="auto"), chậm hơn và chưa thử, nên notebook chỉ dùng GPU đầu tiên.
+# Nếu báo "Chưa có GPU": cột bên phải → Session options → Accelerator → GPU T4 x2, rồi chạy lại.
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # đặt trước khi import torch; các lệnh chạy bằng run(...) ở các bước sau cũng chỉ thấy GPU này
+import torch
+
+if not torch.cuda.is_available():
+    raise RuntimeError("Chưa có GPU. Cột bên phải → Session options → Accelerator → chọn GPU T4 x2, rồi chạy lại. Hết giờ GPU của tuần thì đợi tuần sau.")
+print("GPU:", torch.cuda.get_device_name(0), "| bộ nhớ:", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 1), "GB")
+"""),
+        code("buoc-3-cai-dat", f"""
+# Bước 3: tải code của repo vào /kaggle/working/Huyen và cài thư viện (đã ghim phiên bản; không cài lại torch). Cần bật Internet (Session options → Internet).
+# Mọi kết quả nằm trong /kaggle/working, thư mục Kaggle lưu lại ở tab Output khi Save Version. Từ đây, lệnh nào lỗi thì ô báo đỏ và notebook dừng ở ô đó.
+import os
+
+if not os.path.isdir("/kaggle/working/Huyen/local_ai"):
+    !git clone --depth 1 {REPO_URL} /kaggle/working/Huyen
+%cd /kaggle/working/Huyen
+if not os.path.isdir("local_ai"):
+    raise RuntimeError("Tải code thất bại: chưa có thư mục /kaggle/working/Huyen/local_ai. Kiểm tra đã bật Internet (Session options → Internet) rồi chạy lại ô này.")
+from local_ai.colab import run  # chạy lệnh: lệnh lỗi thì ô báo đỏ và notebook dừng ở đúng chỗ lỗi (dùng được cả trên Kaggle)
+
+run("git pull --ff-only", "Bước 3 (cập nhật code)")
+run("pip install -q {PINNED}", "Bước 3 (cài thư viện)")
+# Gỡ torchao như notebook Colab: bản cài sẵn không hợp với các thư viện đã ghim (gặp trên Colab ngày 25/9). Máy chưa có torchao thì lệnh này chỉ báo bỏ qua.
+run("pip uninstall -y -q torchao", "Bước 3 (gỡ torchao)")
+"""),
+        code("buoc-4-token", """
+# Bước 4: lấy HF_TOKEN từ Kaggle Secrets (menu Add-ons → Secrets). Token không bị in ra và không lưu vào notebook.
+import os
+from kaggle_secrets import UserSecretsClient
+
+try:
+    os.environ["HF_TOKEN"] = UserSecretsClient().get_secret("HF_TOKEN")
+except Exception as error:
+    raise RuntimeError("Chưa đọc được HF_TOKEN: vào Add-ons → Secrets, thêm secret tên HF_TOKEN và đánh dấu chọn nó cho notebook này (" + type(error).__name__ + ")") from None
+
+from huggingface_hub import whoami
+
+HF_USER = whoami()["name"]
+HUB_REPO = f"{HF_USER}/huyen-{MODEL}-qlora"  # cùng repo riêng tư với train_colab: checkpoint train dở ở Colab cũng train tiếp được ở đây
+print("Tài khoản Hugging Face:", HF_USER, "| repo:", HUB_REPO)
+"""),
+        code("buoc-5-du-lieu", """
+# Bước 5: lấy 2000 dòng dữ liệu như notebook Colab: 1800 dòng từ 3 preset (code 40%, lập luận 30%, tiếng Việt 30%) và 200 dòng (10%) gọi công cụ tự sinh.
+# Đọc kiểu streaming nên không tải cả dataset. Kết quả nằm ở /kaggle/working/Huyen/data/processed/hf_sft/sft.jsonl; số dòng bị bộ lọc bỏ ghi trong manifest.json.
+run("python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --tool-calls 0.1 --output data/processed/hf_sft", "Bước 5 (lấy dữ liệu)")
+"""),
+        code("buoc-6-uoc-tinh", """
+# Bước 6: ước tính thời gian train và chấm trên T4 (ước lượng thô theo số đo trên Colab T4).
+# Nếu phiên trước bị ngắt giữa chừng, ô này cho biết đã train được bao nhiêu bước; Bước 8 sẽ tự train tiếp từ đó.
+run(f"python -m local_ai.training.estimate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --hub-model-id {HUB_REPO}", "Bước 6 (ước tính)")
+"""),
+        code("buoc-7-cham-truoc", """
+# Bước 7: chấm model gốc (chưa train) trên bộ 38 câu eval, cùng cài đặt với Colab (greedy, --no-thinking). Báo cáo được lưu vào repo riêng tư;
+# chạy lại (kể cả sau khi đã chấm trên Colab) thì dùng lại báo cáo đó nếu cùng model và cùng cài đặt, không phải chấm lại.
+run(f"python -m local_ai.evaluation --model {MODEL} --max-new-tokens {MAX_NEW_TOKENS} --no-thinking --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/truoc --hub-repo {HUB_REPO} --hub-path eval/truoc", "Bước 7 (chấm trước)")
+"""),
+        code("buoc-8-train", """
+# Bước 8: train QLoRA (nén 4bit, fp16 vì T4 không có bf16). Checkpoint được đẩy lên repo riêng tư HUB_REPO sau mỗi vài chục bước.
+# Phiên Kaggle bị ngắt (hết 12 giờ, hết giờ GPU của tuần, hoặc phiên tự tắt)? Chạy lại notebook với cùng model: /kaggle/working lúc đó trống,
+# nên lệnh train tự tải last-checkpoint từ HUB_REPO về rồi train tiếp. Báo hết bộ nhớ (CUDA out of memory)? Chọn smoke.
+run(f"python -m local_ai.training.finetune --config configs/training/colab_{MODEL}.json --push-to-hub --hub-model-id {HUB_REPO}", "Bước 8 (train)")
+"""),
+        code("buoc-9-cham-sau", """
+# Bước 9: chấm lại model sau khi train (model gốc + adapter vừa train: mục smoke-colab hoặc light-colab trong configs/models/platform.json).
+# Cùng cài đặt với Bước 7. Luôn chấm lại (--no-reuse) vì adapter có thể đã đổi; báo cáo được lưu vào repo riêng tư ở eval/sau.
+run(f"python -m local_ai.evaluation --model {MODEL}-colab --max-new-tokens {MAX_NEW_TOKENS} --no-thinking --train-data data/processed/hf_sft/sft.jsonl --output .runs/eval/{MODEL}/sau --hub-repo {HUB_REPO} --hub-path eval/sau --no-reuse", "Bước 9 (chấm sau)")
+"""),
+        code("buoc-10-so-sanh", """
+# Bước 10: in bảng so sánh điểm trước và sau khi train (theo nhóm câu và theo ngôn ngữ).
+run(f"python -m local_ai.evaluation.compare .runs/eval/{MODEL}/truoc/report.json .runs/eval/{MODEL}/sau/report.json", "Bước 10 (so sánh)")
+"""),
+        code("buoc-11-day-adapter", """
+# Bước 11: đẩy adapter lên repo riêng tư trên Hugging Face để dùng lại sau (ví dụ với notebook agent_trained_colab).
+run(f"python -m local_ai.training.hub push-adapter --repo {HUB_REPO} --adapter-dir .runs/colab_{MODEL}/adapter", "Bước 11 (đẩy adapter)")
+print("Xong! Adapter nằm ở https://huggingface.co/" + HUB_REPO + " (chỉ tài khoản của bạn xem được).")
+"""),
+        code("buoc-12-so-do", """
+# Bước 12: số đo thật (thời gian train, VRAM, tốc độ chấm) so với ước tính ở Bước 6. Hãy chụp màn hình bảng này gửi lại để sửa ước tính.
+# Số đo trên Kaggle lưu riêng ở so_do/kaggle-<model>.json trong repo riêng tư, không ghi đè số đo trên Colab (so_do/<model>.json).
+run(f"python -m local_ai.training.calibrate --config configs/training/colab_{MODEL}.json --max-new-tokens {MAX_NEW_TOKENS} --eval-before .runs/eval/{MODEL}/truoc/report.json --eval-after .runs/eval/{MODEL}/sau/report.json --output .runs/so_do/kaggle-{MODEL}.json --push-to-hub --hub-model-id {HUB_REPO} --hub-path so_do/kaggle-{MODEL}.json", "Bước 12 (số đo)")
+"""),
+        code("buoc-13-gom-ket-qua", """
+# Bước 13: chép kết quả chính vào /kaggle/working/ket_qua/<model> (thư mục không ẩn), để xem và tải về ở tab Output của Kaggle.
+import shutil
+from pathlib import Path
+
+KET_QUA = Path("/kaggle/working/ket_qua") / MODEL
+for source, name in ((f".runs/colab_{MODEL}/adapter", "adapter"), (f".runs/eval/{MODEL}", "eval"), (f".runs/colab_{MODEL}/measurements.json", "measurements.json"), (f".runs/so_do/kaggle-{MODEL}.json", "so_do.json")):
+    source, target = Path(source), KET_QUA / name
+    if source.is_dir():
+        shutil.copytree(source, target, dirs_exist_ok=True)
+    elif source.is_file():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    else:
+        print("Chưa có", source, "- bỏ qua")
+print("Kết quả nằm ở", KET_QUA, ":", sorted(path.name for path in KET_QUA.iterdir()) if KET_QUA.is_dir() else "chưa có gì")
+"""),
+        markdown("ket-qua", """
+## Kết quả nằm ở đâu
+- **Trên Kaggle:** thư mục `/kaggle/working/ket_qua/<model>` (adapter, báo cáo chấm trước và sau, số đo). Chạy bằng Save Version thì xem và tải ở tab **Output** của phiên bản đó. Chạy bằng Run All thì các file mất khi phiên tắt, nên hãy chụp màn hình Bước 10 và 12.
+- **Adapter và checkpoint:** repo riêng tư `https://huggingface.co/<tên-bạn>/huyen-<model>-qlora`, dùng chung với `train_colab`. Thư mục `last-checkpoint` dùng để train tiếp.
+- **Số đo thật:** bảng ở Bước 12, lưu thêm ở `so_do/kaggle-<model>.json` trong repo riêng tư.
+
+## Lỗi hay gặp
+- **Bước 3 báo "Tải code thất bại":** chưa bật Internet (Session options → Internet), hoặc tài khoản chưa xác minh số điện thoại.
+- **"Chưa có GPU":** chọn GPU T4 x2 ở Session options → Accelerator. Hết giờ GPU của tuần thì đợi tuần sau.
+- **"Chưa đọc được HF_TOKEN":** thêm secret `HF_TOKEN` (Add-ons → Secrets) và đánh dấu chọn nó cho notebook.
+- **`No module named 'kaggle_secrets'`:** đang mở notebook này trên Colab; trên Colab hãy dùng `train_colab.ipynb`.
+- **Ô báo đỏ "Bước N lỗi (mã thoát ...)":** lệnh của bước đó lỗi nên notebook dừng lại. Đọc thông báo ngay phía trên dòng đỏ, sửa xong thì chạy lại.
+- **401 / 403 khi đẩy lên Hugging Face:** token chưa có quyền Write.
+- **CUDA out of memory:** chọn smoke, hoặc giảm `max_length` / `per_device_batch_size` trong `configs/training/colab_<model>.json`.
+- **Phiên bị ngắt khi đang train:** chạy lại với cùng model. Bước 6 cho biết đã train được bao nhiêu bước; Bước 7 dùng lại báo cáo chấm trước đã lưu, không chấm lại.
+"""),
+    ])
+
+
+NOTEBOOKS = {"train_colab.ipynb": train_colab, "agent_colab.ipynb": agent_colab, "agent_trained_colab.ipynb": agent_trained_colab, "train_kaggle.ipynb": train_kaggle}
 
 
 def render(builder) -> str:

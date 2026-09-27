@@ -26,7 +26,7 @@ Cập nhật 27/9/2026 (tổng kết tuần 3, M21): đã chạy thật trên Co
 | Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả |
 | Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 6 nhiệm vụ mẫu với calculator và TerminalTool (M19 thêm nhiệm vụ phải thử lại sau khi TerminalTool từ chối lệnh; lỗi từ chối kèm gợi ý lệnh được phép) | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút (trước khi có nhiệm vụ thứ 6). Test bằng model giả và server OpenAI giả (6/6 nhiệm vụ) |
 | Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm; trên Colab, TerminalTool chạy thật với agent |
-| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); `agent_trained_colab` (M18: agent với model đã train, so với model gốc); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
+| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); `agent_trained_colab` (M18: agent với model đã train, so với model gốc); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật. **M24:** `train_kaggle` (Kaggle, token từ Kaggle Secrets, kết quả trong `/kaggle/working`, train tiếp từ checkpoint trên Hub; chưa chạy trên Kaggle thật) | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
@@ -39,7 +39,7 @@ Cập nhật 27/9/2026 (tổng kết tuần 3, M21): đã chạy thật trên Co
 - `local_ai/check.py`: lệnh kiểm tra chung `python -m local_ai.check` (test, compileall, secret-scan).
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc. `docs/TRAIN_COLAB.md`: train trên Colab bằng iPhone.
-- `notebooks/`: notebook Colab, sinh từ `notebooks/build.py` (lưu không kèm output).
+- `notebooks/`: notebook Colab và notebook Kaggle (`train_kaggle.ipynb`, M24), sinh từ `notebooks/build.py` (lưu không kèm output).
 - `archive/`: phần đã cất (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent), kế hoạch tuần 1–2 (`tasks-tuan-1-2.md`) và nhật ký chi tiết tuần 1–3 (`memory-tuan-*.md`).
 
 ## Cài đặt và kiểm tra
@@ -427,6 +427,48 @@ python -m local_ai.training.calibrate --config configs/training/colab_light.json
 ```
 
 Muốn sửa notebook thì sửa nội dung ô trong `notebooks/build.py`, rồi chạy `python notebooks/build.py`; test báo lỗi nếu file `.ipynb` không khớp.
+
+## Train trên Kaggle miễn phí
+[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/hytmk2912/Huyen/blob/main/notebooks/train_kaggle.ipynb)
+
+Notebook `notebooks/train_kaggle.ipynb` (M24) làm đúng 12 bước của `train_colab`, cùng lệnh và cùng cấu hình train `configs/training/colab_<model>.json`, nhưng chạy trên GPU miễn phí của Kaggle. Theo Kaggle lúc viết (27/9/2026, có thể đổi): khoảng 30 giờ GPU mỗi tuần, mỗi phiên tối đa 12 giờ. Khác với Colab:
+- chạy được ở nền: **Save Version → Save & Run All (Commit)**. Khóa iPhone hay đóng Safari thì notebook vẫn chạy;
+- token đọc từ **Kaggle Secrets** (`UserSecretsClient().get_secret("HF_TOKEN")`), không nằm trong notebook hay repo;
+- mọi kết quả nằm trong `/kaggle/working`: code ở `/kaggle/working/Huyen`, còn Bước 13 chép adapter, báo cáo chấm và số đo vào `/kaggle/working/ket_qua/<model>` để tải ở tab Output;
+- chỉ dùng 1 GPU (`CUDA_VISIBLE_DEVICES=0`), giống GPU T4 của Colab;
+- dùng chung repo Hugging Face riêng tư với `train_colab` (`<tên>/huyen-<model>-qlora`): train dở trên Colab thì chạy tiếp trên Kaggle được, và ngược lại. Số đo thật lưu riêng ở `so_do/kaggle-<model>.json` (`calibrate --hub-path`), không ghi đè số đo trên Colab.
+
+Notebook **chưa chạy thử trên Kaggle thật**. Test `tests/test_m24_kaggle.py` chỉ kiểm tra notebook hợp lệ (nbformat), không kèm output, thư viện ghim phiên bản, và chạy mọi lệnh của nó bằng `--dry-run` với cả `smoke` lẫn `light`.
+
+### Hướng dẫn chạy trên iPhone
+**Chuẩn bị (làm một lần):**
+1. Mở Safari, vào [kaggle.com](https://www.kaggle.com), đăng ký hoặc đăng nhập.
+2. Xác minh số điện thoại: bấm ảnh đại diện → Settings → Phone Verification. Chưa xác minh thì Kaggle không cho bật Internet và GPU.
+3. Tạo token Hugging Face quyền **Write** (huggingface.co → Settings → Access Tokens), giống khi chạy Colab.
+
+**Mỗi lần chạy:**
+1. Mở README này trên Safari, bấm nút **Open In Kaggle** ở trên. Kaggle tạo một notebook mới từ file trên GitHub.
+2. Kaggle trên điện thoại ẩn bớt menu: bấm nút `aA` trên thanh địa chỉ → **Yêu cầu trang web cho máy tính**.
+3. Cột bên phải, mục **Session options**: **Accelerator → GPU T4 x2**, **Internet → On**.
+4. Menu **Add-ons → Secrets → Add Secret**: tên `HF_TOKEN`, dán token, bấm Save, rồi đánh dấu chọn `HF_TOKEN` để notebook đọc được. Các lần sau secret vẫn còn, chỉ cần kiểm tra đã được chọn.
+5. Ô Bước 1: muốn train `light` thì sửa `MODEL = "smoke"` thành `MODEL = "light"`.
+6. Bấm **Save Version** (góc trên bên phải) → chọn **Save & Run All (Commit)** → **Save**. Notebook chạy ở nền; xem tiến độ ở trang notebook (mục Versions / Logs). Chạy xong, tab **Output** có thư mục `ket_qua/<model>`. Cách khác: **Run All** như Colab, nhưng phải giữ trang mở vì phiên tự tắt khi lâu không thao tác.
+7. Chụp màn hình bảng ở Bước 10 (so sánh điểm) và Bước 12 (số đo thật) gửi lại.
+
+**Khi phiên bị ngắt** (hết 12 giờ, hết giờ GPU của tuần, hoặc phiên tự tắt): chạy lại như bước 6, giữ nguyên model. `/kaggle/working` của phiên mới trống, nên lệnh train (`--push-to-hub`) tự tải `last-checkpoint` từ repo riêng tư về `/kaggle/working/Huyen/.runs/colab_<model>/_hub/last-checkpoint` rồi train tiếp. Bước 7 dùng lại báo cáo chấm trước đã lưu trên Hub, không chấm lại.
+
+**Lỗi hay gặp trên Kaggle:**
+- Bước 3 báo "Tải code thất bại": chưa bật Internet, hoặc chưa xác minh số điện thoại.
+- "Chưa có GPU": chưa chọn GPU T4 x2, hoặc đã hết giờ GPU của tuần.
+- "Chưa đọc được HF_TOKEN": chưa thêm secret, hoặc chưa đánh dấu chọn nó cho notebook.
+- `No module named 'kaggle_secrets'`: đang mở notebook này trên Colab; trên Colab hãy dùng `train_colab.ipynb`.
+
+Ví dụ lệnh của notebook chạy bằng `--dry-run` (không mạng, không GPU):
+
+```bash
+python -m local_ai.training.finetune --config configs/training/colab_light.json --push-to-hub --hub-model-id ten-ban/huyen-light-qlora --dry-run
+python -m local_ai.training.calibrate --config configs/training/colab_light.json --max-new-tokens 512 --output .runs/so_do/kaggle-light.json --push-to-hub --hub-model-id ten-ban/huyen-light-qlora --hub-path so_do/kaggle-light.json --dry-run
+```
 
 ## Agent chạy model thật trên Colab
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb)

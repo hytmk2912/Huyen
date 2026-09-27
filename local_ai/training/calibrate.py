@@ -130,17 +130,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", help="Nơi lưu số đo và so sánh (mặc định .runs/so_do/<model>.json)")
     parser.add_argument("--push-to-hub", action="store_true", help="Đẩy file số đo lên repo Hugging Face riêng tư (token lấy từ biến môi trường HF_TOKEN)")
     parser.add_argument("--hub-model-id", help="Repo nhận file số đo, dạng tên-người-dùng/tên-repo")
+    parser.add_argument("--hub-path", help="Đường dẫn file số đo trong repo (mặc định so_do/<model>.json). Notebook Kaggle dùng so_do/kaggle-<model>.json để không ghi đè số đo của Colab (M24)")
     parser.add_argument("--dry-run", action="store_true", help="Chỉ kiểm tra tham số và các file số đo có hay chưa, không đẩy lên Hub")
     args = parser.parse_args(argv)
+    if args.hub_path is not None and (not args.hub_path.endswith(".json") or args.hub_path.startswith("/") or ".." in args.hub_path.split("/")):
+        parser.error(f"--hub-path phải là đường dẫn tương đối trong repo, kết thúc bằng .json (ví dụ so_do/kaggle-smoke.json), nhận được: {args.hub_path}")
     config = load_finetune_config(args.config)
     if args.push_to_hub:
         from local_ai.training.hub import check_repo_id
         check_repo_id(args.hub_model_id)
     measurements_path = Path(args.measurements or Path(config.output_dir) / MEASUREMENTS)
     output = Path(args.output or Path(".runs") / "so_do" / f"{config.base_model}.json")
+    hub_path = args.hub_path or f"so_do/{config.base_model}.json"
     files = {"measurements": measurements_path, "eval_before": args.eval_before, "eval_after": args.eval_after, "agent_report": args.agent_report}
     if args.dry_run:
-        print(json.dumps({"status": "dry-run", "files": {name: {"path": str(path), "exists": Path(path).is_file()} for name, path in files.items() if path}, "output": str(output), "push_to_hub": args.hub_model_id if args.push_to_hub else None}, ensure_ascii=False, indent=2))
+        print(json.dumps({"status": "dry-run", "files": {name: {"path": str(path), "exists": Path(path).is_file()} for name, path in files.items() if path}, "output": str(output), "push_to_hub": args.hub_model_id if args.push_to_hub else None, "hub_path": hub_path if args.push_to_hub else None}, ensure_ascii=False, indent=2))
         return 0
     measurements = read_json(measurements_path)
     if measurements is None:
@@ -151,7 +155,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\nĐã lưu số đo vào {output}")
     if args.push_to_hub:
         from local_ai.training.hub import upload_file
-        print("Đã đẩy số đo lên", upload_file(args.hub_model_id, output, f"so_do/{config.base_model}.json"))
+        print("Đã đẩy số đo lên", upload_file(args.hub_model_id, output, hub_path))
     return 0
 
 
