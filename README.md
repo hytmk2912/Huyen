@@ -289,7 +289,7 @@ Chấm lặp lại được (M19): model transformers sinh chữ greedy (`do_sam
 
 Với `--hub-repo <tên>/<repo> --hub-path <thư mục>`, chấm xong thì báo cáo được đẩy lên repo Hugging Face riêng tư. Lần chạy sau, nếu repo đã có báo cáo cùng cài đặt như trên thì báo cáo được dùng lại, không nạp model. `--no-reuse` luôn chấm lại (vẫn đẩy báo cáo mới lên); notebook dùng cho bước chấm sau khi train (`eval/sau`), vì adapter có thể đã đổi.
 
-So sánh 2 lần chấm (ví dụ trước và sau khi train): `python -m local_ai.evaluation.compare <trước>/report.json <sau>/report.json`. Lệnh in bảng tỉ lệ đạt theo nhóm và theo ngôn ngữ, mức thay đổi (điểm %), cùng các câu mới đạt và mới trượt. `--max-new-tokens` ghi đè độ dài câu trả lời tối đa để chấm nhanh hơn; `--dry-run` chỉ in kế hoạch, không nạp model.
+So sánh 2 lần chấm (ví dụ trước và sau khi train): `python -m local_ai.evaluation.compare <trước>/report.json <sau>/report.json`. Lệnh in bảng tỉ lệ đạt theo nhóm và theo ngôn ngữ, mức thay đổi (điểm %), cùng các câu mới đạt và mới trượt. Lệnh in thêm p-value (kiểm định McNemar chính xác, chỉ dùng thư viện chuẩn) cho tổng, từng nhóm và từng ngôn ngữ: p < 0,05 mới coi là thật, không phải ngẫu nhiên. Ví dụ tool_use 7/8 → 3/8 (4 câu mới trượt, 0 câu mới đạt) có p = 0,125, chưa đủ chắc. `--output <thư mục>` ghi bảng đó vào `report.md`. `--max-new-tokens` ghi đè độ dài câu trả lời tối đa để chấm nhanh hơn; `--dry-run` chỉ in kế hoạch, không nạp model.
 
 Nhóm câu eval (`code`, `reasoning`, `tool_use`) là cách chia riêng của bộ eval, khác với `domain` của dữ liệu train (`coding`, `math_logic`, `chat`...).
 
