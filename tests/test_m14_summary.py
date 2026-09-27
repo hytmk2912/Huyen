@@ -11,6 +11,7 @@ README = (ROOT / "README.md").read_text(encoding="utf-8")
 # Từ lượt rà soát tuần 3 (26/9), kế hoạch tuần 1–2 được chép nguyên văn từ TASKS.md sang archive/tasks-tuan-1-2.md (chủ repo cho phép đổi chỗ đọc).
 TASKS = (ROOT / "archive" / "tasks-tuan-1-2.md").read_text(encoding="utf-8")
 COLAB = "https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/"
+KAGGLE = "https://www.kaggle.com/kernels/welcome?src=https://github.com/hytmk2912/Huyen/blob/main/"  # M24: notebook Kaggle mở bằng nút Kaggle
 
 
 def command_modules() -> list[str]:
@@ -32,10 +33,13 @@ class ReadmeMatchesCodeTests(unittest.TestCase):
 
     def test_every_notebook_has_a_colab_button(self):
         notebooks = sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "notebooks").glob("*.ipynb"))
-        self.assertEqual(notebooks, ["notebooks/agent_colab.ipynb", "notebooks/agent_trained_colab.ipynb", "notebooks/train_colab.ipynb"])  # M18 thêm agent_trained_colab
+        # M18 thêm agent_trained_colab; M24 (chủ repo đặt 27/9) thêm train_kaggle: notebook chạy trên Kaggle nên có nút Kaggle thay cho nút Colab.
+        self.assertEqual(notebooks, ["notebooks/agent_colab.ipynb", "notebooks/agent_trained_colab.ipynb", "notebooks/train_colab.ipynb", "notebooks/train_kaggle.ipynb"])
         for notebook in notebooks:
-            with self.subTest(notebook): self.assertIn(f"[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]({COLAB}{notebook})", README)
-        for link in re.findall(re.escape(COLAB) + r"([^)\s]+)", README):  # mọi nút Colab trỏ tới file có thật
+            with self.subTest(notebook):
+                if notebook.endswith("_kaggle.ipynb"): self.assertIn(f"[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)]({KAGGLE}{notebook})", README)
+                else: self.assertIn(f"[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]({COLAB}{notebook})", README)
+        for link in re.findall(re.escape(COLAB) + r"([^)\s]+)", README) + re.findall(re.escape(KAGGLE) + r"([^)\s]+)", README):  # mọi nút Colab, Kaggle trỏ tới file có thật
             with self.subTest(link): self.assertTrue((ROOT / link).is_file())
 
     def test_configs_docs_and_data_are_mentioned(self):

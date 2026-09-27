@@ -121,7 +121,7 @@ Viết lại bằng thư viện chuẩn từ repo Agent (commit `78a3e25`; xem `
 
 Import không mở cổng mạng, không tạo thư mục.
 
-### Notebook Colab (`notebooks/`)
+### Notebook Colab và Kaggle (`notebooks/`)
 `notebooks/build.py` sinh các notebook (không kèm output, thư viện ghim phiên bản, mỗi ô có chú thích tiếng Việt). Từ M16:
 - mọi lệnh chạy qua `local_ai/colab.py` (`run`): lệnh dạng list, không qua shell, in output ngay khi có; mã thoát khác 0 thì ném `StepFailed`, nên Run all dừng ở đúng ô lỗi;
 - bước chấm trước khi train lưu và dùng lại báo cáo trên Hub (`--hub-repo`, `--hub-path` của lệnh eval, so khớp cài đặt model, revision, `max_new_tokens`, cách sinh chữ, mã băm bộ câu hỏi); từ M19, bước chấm sau khi train cũng đẩy báo cáo lên (`eval/sau`) nhưng luôn chấm lại (`--no-reuse`), và cả hai bước dùng `--no-thinking`.
@@ -139,6 +139,8 @@ Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test c
   8. đẩy adapter.
 
   Hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`.
+- `train_kaggle.ipynb` (M24): đúng các lệnh của `train_colab` trên Kaggle, chưa chạy trên Kaggle thật. Token đọc từ Kaggle Secrets (`kaggle_secrets.UserSecretsClient`); code ở `/kaggle/working/Huyen` nên mọi kết quả nằm trong `/kaggle/working`, Bước 13 chép kết quả chính vào `/kaggle/working/ket_qua/<model>`; chỉ dùng 1 GPU (`CUDA_VISIBLE_DEVICES=0`).
+  Dùng chung repo Hub với `train_colab`, nên phiên bị ngắt (hoặc train dở trên Colab) thì lệnh train tải `last-checkpoint` về rồi train tiếp. Số đo lưu ở `so_do/kaggle-<model>.json` (`calibrate --hub-path`), không ghi đè số đo trên Colab. Hướng dẫn trên iPhone: mục "Train trên Kaggle miễn phí" trong README.
 - `agent_colab.ipynb`: cài Ollama (ghim bản 0.34.4) → tải `qwen3:4b` → chạy máy chủ ở `localhost:11434` → agent làm 6 nhiệm vụ mẫu qua adapter kiểu OpenAI (mục `ollama-colab`).
 - `agent_trained_colab.ipynb` (M18): chọn `smoke` hoặc `light` → tải adapter đã train (`pull-adapter`) → xuất 2 file GGUF cùng một đường (model gốc `--no-adapter`, model đã train) → `ollama create huyen-<model>-goc`, `huyen-<model>-da-train` → agent làm 6 nhiệm vụ với từng model (mục `ollama-<model>-goc`, `ollama-<model>-da-train`) → bảng so sánh (`python -m local_ai.agents.compare`).
 
@@ -174,6 +176,7 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
   - mọi lệnh của notebook chạy được bằng `--dry-run`, với cả model `smoke` lẫn `light`;
   - Hugging Face Hub và thư viện train là module giả;
   - số phút ghi trong tài liệu khớp với ước tính.
+- `tests/test_m24_kaggle.py`: notebook Kaggle hợp lệ, không kèm output, ghim phiên bản; mọi lệnh chạy được bằng `--dry-run` và giống lệnh của `train_colab`; ô đọc token (Kaggle Secrets giả) và ô gom kết quả chạy thật trong thư mục tạm; lệnh train của notebook với thư viện giả tải `last-checkpoint` từ Hub giả khi phiên mới không còn checkpoint.
 - `tests/test_m15_measurements.py`: số đo khi train (có một lượt train thật trên CPU) và lệnh `calibrate` với số đo mẫu. `tests/test_m16_notebook_resilience.py`: hàm `run` với tiến trình thật, notebook không còn `!python`, dùng lại báo cáo chấm trước với Hub giả.
 - `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
 - `tests/test_m13_agent_colab.py`:

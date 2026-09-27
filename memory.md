@@ -8,11 +8,11 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 - Không có mốc tồn: tuần 3 xong 8/8 mốc (M15–M22). Phần M18–M20 chưa chạy lại trên Colab (việc chủ repo 8, 9).
 
 ## Checklist tuần 4
-- [x] M23 Gửi max_tokens · [ ] M24 Notebook Kaggle · [ ] M25 Model 14B abliterated
+- [x] M23 Gửi max_tokens · [x] M24 Notebook Kaggle · [ ] M25 Model 14B abliterated
 - [ ] M26 Preset tiếng Việt thứ 2 · [ ] M27 Tổng kết tuần 4
 
 ## Mốc đang làm
-- M23 xong 27/9. Mốc kế tiếp: **M24** (Notebook Kaggle), chờ chủ repo gọi.
+- M24 xong 27/9. Mốc kế tiếp: **M25** (Model 14B abliterated), chờ chủ repo gọi.
 - Tự gộp PR khi `python -m local_ai.check` (không `--allow-skip`) xanh; không hỏi chủ repo (chủ repo cho phép 26/9).
 - Số đo thật (M15): `tests/fixtures/measurements/that_*.json`; T4 `train_tflops` 5,2; VRAM QLoRA cộng `KBIT_OVERHEAD_GB` × √(tỷ tham số); agent 4/5.
 
@@ -29,6 +29,7 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Việc dở
 - Nhánh: `claude/nhiem-vu-tuan-jixv6i`, dựng lại từ `main` sau mỗi lần gộp PR.
+- `train_kaggle` (M24) chưa chạy trên Kaggle thật; cách chạy trên iPhone ở README mục "Train trên Kaggle miễn phí". Chạy rồi thì gửi ảnh Bước 10 và 12.
 - Từ M19 bộ chấm 38 câu, greedy, notebook tắt suy nghĩ: điểm cũ (30 câu, lấy mẫu) không so trực tiếp với điểm mới. Revision model đã ghim (26/9).
 
 ## Lỗi còn tồn
@@ -44,3 +45,4 @@ Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-4.md`.
 | --- | --- | --- |
 | 27/9 | Mở tuần 4 | `TASKS.md` tuần 3 chép nguyên văn sang `archive/tasks-tuan-3.md`; `TASKS.md` mới M23–M27; nhật ký tuần 3 sang `archive/memory-tuan-3.md`. |
 | 27/9 | M23 | Adapter server gửi `max_tokens` = `max_new_tokens`; 4 test mới với server giả (mặc định 512, tự đặt, `--max-new-tokens` của lệnh chấm). 342 test, KẾT QUẢ: XANH. Tiếp theo: M24. |
+| 27/9 | M24 | Notebook `train_kaggle` (Kaggle Secrets, kết quả trong `/kaggle/working`, train tiếp từ checkpoint trên Hub, chung repo với Colab); README hướng dẫn iPhone; `calibrate --hub-path`. 17 test mới; 359 test, KẾT QUẢ: XANH. Tiếp theo: M25. |
