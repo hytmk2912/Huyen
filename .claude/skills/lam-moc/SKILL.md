@@ -26,6 +26,7 @@ Mỗi lần dùng skill này chỉ làm **một** mốc. Làm xong thì dừng, 
    - không thêm tính năng nằm ngoài `TASKS.md`;
    - việc phát sinh ngoài mốc thì ghi vào "Việc dở" trong `memory.md`.
 4. Mỗi tiêu chí phải có test hoặc lệnh kiểm tra chứng minh.
+   Đạt tiêu chí nào thì ghi ngay vào `TASKS.md` và "Việc dở" của `memory.md`, không đợi bước 4, để nén ngữ cảnh giữa chừng không mất tiến độ.
 5. Tuân thủ `CLAUDE.md`:
    - viết tiếng Việt;
    - không dùng API trả phí;
@@ -33,6 +34,7 @@ Mỗi lần dùng skill này chỉ làm **một** mốc. Làm xong thì dừng, 
    - không ghi khóa hay mật khẩu vào repo; `HF_TOKEN` chỉ đọc từ biến môi trường;
    - code bỏ đi thì cất vào `archive/`, không xoá hẳn; không sửa test cũ chỉ để cho xanh;
    - notebook: lưu không kèm output, ghim phiên bản thư viện, mỗi ô có chú thích tiếng Việt; không chạy notebook ở đây, chỉ kiểm tra hợp lệ và chạy thử lệnh bằng `--dry-run`; token chỉ đọc từ biến môi trường hoặc Colab Secrets.
+   - chỉ dừng hỏi chủ repo ở các việc trong mục "Khi nào phải dừng hỏi chủ repo"; dùng subagent thì theo mục "Chia việc cho subagent".
 
 ## 3. Kiểm tra
 ```bash
@@ -66,5 +68,6 @@ Lệnh chạy toàn bộ test, `compileall` và `secret-scan`, rồi in "KẾT Q
    - đã làm mốc nào;
    - tiêu chí nào đạt, tiêu chí nào chưa;
    - % mới;
+   - bằng chứng: số test và dòng `KẾT QUẢ:` của `python -m local_ai.check`;
    - việc chủ repo cần làm, nếu có.
 4. Dừng. Không tự làm mốc tiếp theo, không tự hẹn giờ chạy lặp.

@@ -1,5 +1,16 @@
 # Quy ước cho repo này
 
+> Giữ file này dưới 200 dòng và chỉ ghi quy tắc. Trạng thái công việc ghi ở `memory.md` và `TASKS.md`.
+
+## 5 nguyên tắc làm việc
+1. **Không thúc "nghĩ kỹ":** không viết "think hard", "ultrathink" hay "suy nghĩ thật kỹ" vào CLAUDE.md, skill hay lời giao việc cho subagent. Độ sâu suy nghĩ do chủ repo chỉnh bằng `/effort`. (Không liên quan tùy chọn `<think>`/`--no-thinking` của model trong repo.)
+2. **"Xong" phải đo được:** chỉ xong khi `python -m local_ai.check` xanh (không `--allow-skip`) và đạt đủ tiêu chí của mốc trong `TASKS.md`. Không dùng tiêu chí chung chung kiểu "sửa cho tốt"; mỗi tiêu chí phải có test hoặc lệnh kiểm tra chứng minh.
+3. **Tự làm việc thường, chỉ dừng hỏi trước việc phá huỷ** (mục "Khi nào phải dừng hỏi chủ repo"). File này luôn dưới 200 dòng.
+4. **Có bằng chứng mới tính là xong:** số test, `git diff --stat`, dòng `KẾT QUẢ:`; subagent cũng vậy (mục "Chia việc cho subagent").
+5. **Chống quên khi nén ngữ cảnh:** trạng thái luôn ghi trong `memory.md` và `TASKS.md` (mục "Chống quên khi nén ngữ cảnh").
+
+Cốt lõi: không bắt AI nghĩ nhiều hơn, mà cho nó thước đo cụ thể để tự biết mình làm đúng hay chưa.
+
 ## Nhiệm vụ tuần
 **Đọc `memory.md` trước khi làm việc.**
 
@@ -13,6 +24,30 @@ Kế hoạch tuần 3 (chủ repo chọn từng mốc trong M15–M21) nằm tro
 - Code bỏ đi thì cất vào `archive/`. Không sửa test cũ chỉ để cho xanh.
 - Chỉ làm việc có trong `TASKS.md`. Việc khác thì ghi vào "Việc dở" trong `memory.md` và hỏi chủ repo trước. Không tự hẹn giờ chạy lặp.
 
+## Khi nào phải dừng hỏi chủ repo
+Việc trong phạm vi mốc (sửa code, chạy test, commit, mở PR, tự gộp PR khi check xanh) thì cứ làm, không xin xác nhận từng bước. Chỉ dừng và hỏi trước khi:
+- xoá hẳn file, thư mục hay nhánh (code bỏ đi vẫn cất vào `archive/`);
+- `git push --force`, `git reset --hard`, viết lại lịch sử commit;
+- ghi đè dữ liệu đã có: số đo thật `tests/fixtures/measurements/that_*.json`, dữ liệu trên Hugging Face Hub;
+- nới lỏng sandbox hay TerminalTool (cho chạy thêm lệnh, lộ thêm biến môi trường).
+
+Khi hỏi: một dòng nói định làm gì, hậu quả, cách hoàn tác. Chủ repo đã yêu cầu rõ việc đó thì coi như đã duyệt. Lượt chạy tự động không có ai trả lời: không làm, ghi vào "Việc dở" trong `memory.md`.
+
+## Chống quên khi nén ngữ cảnh
+- Sau mỗi lần nén ngữ cảnh (`/compact` hoặc tự động): đọc lại `memory.md`, `TASKS.md`, chạy `git status` rồi mới làm tiếp.
+- Đạt tiêu chí nào thì đánh `[x]` trong `TASKS.md` (kèm tên test) và ghi bước kế tiếp vào "Việc dở" của `memory.md` **ngay lúc đó**, không đợi cuối lượt.
+
+## Chia việc cho subagent
+- Chỉ chia nhỏ việc của mốc đang làm, không dùng để làm song song nhiều mốc.
+- Chỉ giao việc độc lập: mỗi subagent một nhóm file riêng, không để hai subagent sửa cùng một file.
+- Giao việc phải ghi rõ: tiêu chí cần đạt, file được sửa, test phải chạy.
+- Subagent phải báo lại đủ bằng chứng, thiếu thì coi như chưa xong:
+  - `git diff --stat` các file mình sửa (file nào, bao nhiêu dòng);
+  - lệnh test đã chạy và dòng tổng kết (số test đạt, số lỗi);
+  - việc chưa làm hoặc rủi ro.
+- Số dòng chỉ cho biết phạm vi thay đổi; đúng hay sai dựa vào kết quả test.
+- Gộp xong, agent chính tự chạy `python -m local_ai.check`, không tin báo cáo suông.
+
 ## Ngôn ngữ
 Chủ repo không đọc được tiếng Anh. Mọi nội dung đẩy lên GitHub phải viết bằng **tiếng Việt**:
 - commit message, tiêu đề và mô tả pull request, bình luận trên GitHub;
@@ -25,3 +60,4 @@ Giữ nguyên tiếng Anh cho: tên hàm/biến/lớp, khóa JSON, giá trị tr
 ```bash
 python -m local_ai.check    # test + compileall + secret-scan; test bị bỏ qua vì thiếu thư viện thì không xanh
 ```
+Báo xong (với chủ repo hay trong `memory.md`) phải kèm số test và dòng `KẾT QUẢ:` mà lệnh in ra.

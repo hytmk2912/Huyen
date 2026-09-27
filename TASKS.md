@@ -14,7 +14,8 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M18 | Dùng model đã train trong agent | **Xong** | 5/5 (100%) | `tests/test_m18_agent_model_da_train.py` (16 test) |
 | M19 | Chấm công bằng hơn | **Xong** | 8/8 (100%) | `tests/test_m19_cham_cong_bang.py` (23 test) |
 | M20 | Dữ liệu giữ khả năng gọi công cụ | **Xong** | 4/4 (100%) | `tests/test_m20_du_lieu_goi_cong_cu.py` (15 test) |
-| **Tổng** | 6 mốc đã chọn (M21 chưa chọn) | 6 **Xong** | 6/6 mốc (100%) | `python -m local_ai.check`: 325 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (27/9) |
+| M22 | Kiểm định ý nghĩa cho so sánh eval trước/sau | **Xong** | 3/3 (100%) | `tests/test_m22_kiem_dinh_y_nghia.py` (8 test) |
+| **Tổng** | 7 mốc đã chọn (M21 chưa chọn) | 7 **Xong** | 7/7 mốc (100%) | `python -m local_ai.check`: 333 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (27/9) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
@@ -77,7 +78,7 @@ Chủ repo chọn ngày 27/9 (gọi "M18"); tiêu chí viết theo đề xuất 
 - [x] 4. Notebook mới `notebooks/agent_trained_colab.ipynb` (chọn smoke hoặc light): tải adapter, xuất 2 GGUF (gốc, đã train), tạo 2 model Ollama, cho agent làm 6 nhiệm vụ với từng model, in bảng so sánh. Notebook hợp lệ, không kèm output, ghim phiên bản, mỗi ô có chú thích tiếng Việt; mọi lệnh `python -m local_ai...` chạy được bằng `--dry-run`. README có nút mở Colab.
 
   Bằng chứng: `NotebookTests` (3 test: hợp lệ, khớp `notebooks/build.py`, không kèm output, mỗi ô bắt đầu `# Bước N:` tiếng Việt, thư viện ghim, llama.cpp `b11205`, Ollama `0.34.4`, `HF_TOKEN` từ Colab Secrets và không in ra; 6 lệnh chạy bằng `--dry-run` với cả `smoke` và `light`), `PlatformEntriesTests` (mục `ollama-<model>-goc`, `ollama-<model>-da-train`). Test M14 liệt kê notebook sửa thành 3 notebook (thêm `agent_trained_colab`, README có nút Colab).
-- [x] 5. `python -m local_ai.check` xanh: 325 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
+- [x] 5. `python -m local_ai.check` xanh: 325 test chạy qua; sau khi gộp `main` (có M22) là 333 test, không test nào bị bỏ qua; compileall và secret-scan sạch.
 
 ## M19: Chấm công bằng hơn
 Chủ repo chọn ngày 26/9; làm trước M20 (chủ repo gọi `/lam-moc`). Mục tiêu: sửa các điểm chấm chưa công bằng thấy khi chạy thật trên Colab (M15): Qwen3 "suy nghĩ" hết 512 token trước khi viết code; báo cáo chấm sau khi train không được lưu; chỉ 8 câu tool_use; agent không thử lại khi TerminalTool từ chối lệnh.
@@ -116,6 +117,16 @@ Chủ repo chọn ngày 26/9; làm sau M19. Mục tiêu: sau khi train, `light` 
 
   Đã làm: khóa `assistant_only_loss` trong cấu hình train (4 file trong `configs/training/` đặt `true`; cấu hình không có khóa thì `false` như cũ); `check_assistant_only_loss` kiểm tra template trước khi nạp model. Chat template thật của `smoke`, `light`, model chính ở revision đã ghim trùng template TRL biết (kiểm tra 26/9 bằng file `tokenizer_config.json` nhỏ, mã băm trong `tests/fixtures/chat_templates/ghim_2026-09-26.json`). Bằng chứng: `AssistantOnlyLossConfigTests` (2 test), `AssistantOnlyLossTrainingTests` (4 test: train thật trên CPU với template Qwen2.5, Qwen3, Qwen3.8, phần câu hỏi có nhãn -100; tắt thì học cả câu hỏi như cũ; template tự viết báo lỗi tiếng Việt trước khi nạp model).
 - [x] 4. `python -m local_ai.check` xanh: 309 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
+
+## M22: Kiểm định ý nghĩa cho so sánh eval trước/sau
+Chủ repo chọn ngày 27/9. Mục tiêu: `local_ai/evaluation/compare.py` chỉ in chênh lệch điểm %, không cho biết chênh lệch là thật hay do may rủi (ví dụ tool_use tụt 7/8 → 3/8 trông rõ nhưng chưa đủ chắc). Thêm p-value của kiểm định McNemar chính xác, chỉ dùng thư viện chuẩn (`math.comb`), không dùng scipy/numpy: b = số câu mới trượt, c = số câu mới đạt, n = b + c, k = min(b, c), p = min(1, 2 · Σ_{i=0..k} C(n, i) · 0,5^n); n = 0 thì p = 1.
+- [x] 1. Hàm `mcnemar_exact_p`: p(b=0, c=4) = 0,125; p(0, 2) = 0,5; p(0, 6) ≈ 0,0312; p(3, 3) = 1,0; n = 0 → 1,0.
+
+  Bằng chứng: `McNemarExactTests` (3 test: các giá trị trên, đối xứng và nằm trong (0, 1], file chỉ import thư viện chuẩn).
+- [x] 2. `compare_reports` in thêm bảng p-value cho tổng, từng nhóm (code, reasoning, tool_use), từng ngôn ngữ, kèm chú thích "p < 0,05 mới coi là thật, không phải ngẫu nhiên"; bảng cũ giữ nguyên. Lệnh compare có `--output` ghi `report.md` có các dòng p-value; `--dry-run` vẫn chạy.
+
+  Đã làm: ghép cặp câu theo id của câu trượt (câu trượt ghi nhóm và ngôn ngữ); 2 báo cáo khác số câu thì ghi "không ghép cặp được câu hỏi", không tính p. Với số đo `light` 26/9, tool_use 7/8 → 3/8 cho p = 0,125: chưa chắc. Bằng chứng: `CompareSignificanceTests` (3 test), `CompareCommandTests` (2 test: in p-value và ghi `report.md`; `--dry-run`). Test cũ `CompareTests` (M10) không sửa, vẫn xanh.
+- [x] 3. `python -m local_ai.check` xanh: 317 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
 
 ## M16: Notebook bền hơn
 Mục tiêu: Colab (chạy từ điện thoại) không chạy tiếp các ô sau khi một lệnh đã lỗi; chạy lại sau khi Colab ngắt thì không phải chấm lại model gốc.

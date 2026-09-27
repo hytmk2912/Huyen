@@ -103,7 +103,7 @@ Số đo thật (M15):
   - báo cáo theo nhóm và theo ngôn ngữ.
 - Lệnh: `python -m local_ai.evaluation --model <tên> | --scripted`. Tùy chọn `--train-data` từ chối chạy nếu dữ liệu train chứa câu eval.
 - `--max-new-tokens` ghi đè độ dài câu trả lời; `--dry-run` chỉ in kế hoạch, không nạp model.
-- `compare.py` (`python -m local_ai.evaluation.compare TRUOC SAU`): bảng so sánh 2 báo cáo theo nhóm và ngôn ngữ, kèm câu mới đạt và câu mới trượt.
+- `compare.py` (`python -m local_ai.evaluation.compare TRUOC SAU`): bảng so sánh 2 báo cáo theo nhóm và ngôn ngữ, kèm câu mới đạt và câu mới trượt, và p-value của kiểm định McNemar chính xác (`mcnemar_exact_p`, chỉ dùng `math.comb`) cho tổng, từng nhóm, từng ngôn ngữ; `--output` ghi `report.md`.
 - Bộ đề `data/eval/eval_v1.jsonl`: 38 câu Việt + Anh (16 câu tool_use), mỗi câu có đáp án mẫu. Chấm greedy nên chạy lại ra cùng kết quả; cài đặt chấm (model, revision, cách sinh chữ, mã băm bộ đề) ghi trong báo cáo.
 - `benchmarks.py` là phần chấm khớp đúng cũ, vẫn giữ lại.
 
