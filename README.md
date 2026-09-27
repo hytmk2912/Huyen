@@ -83,6 +83,7 @@ Model có `backend: "openai_compatible"` được gọi qua `POST {base_url}/cha
 - `source` là tên model trên server;
 - `timeout_s` là số giây chờ tối đa;
 - `api_key_env` (tùy chọn) là **tên** biến môi trường chứa khóa, dùng khi server yêu cầu khóa. Không ghi khóa vào file cấu hình.
+- `max_new_tokens` (mặc định 512) được gửi thành `max_tokens` (M23), nên giới hạn độ dài câu trả lời có tác dụng như với model transformers; lệnh chấm ghi đè bằng `--max-new-tokens`.
 
 `base_url` chỉ được là máy này hoặc mạng nội bộ (localhost, 192.168.x.x, 10.x.x.x...). Địa chỉ Internet bị từ chối, để không vô tình gọi API trả phí.
 
