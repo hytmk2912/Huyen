@@ -32,7 +32,7 @@ class ReadmeMatchesCodeTests(unittest.TestCase):
 
     def test_every_notebook_has_a_colab_button(self):
         notebooks = sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "notebooks").glob("*.ipynb"))
-        self.assertEqual(notebooks, ["notebooks/agent_colab.ipynb", "notebooks/train_colab.ipynb"])
+        self.assertEqual(notebooks, ["notebooks/agent_colab.ipynb", "notebooks/agent_trained_colab.ipynb", "notebooks/train_colab.ipynb"])  # M18 thêm agent_trained_colab
         for notebook in notebooks:
             with self.subTest(notebook): self.assertIn(f"[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]({COLAB}{notebook})", README)
         for link in re.findall(re.escape(COLAB) + r"([^)\s]+)", README):  # mọi nút Colab trỏ tới file có thật

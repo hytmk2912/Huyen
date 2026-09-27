@@ -1,4 +1,5 @@
-"""Làm việc với Hugging Face Hub khi train (dùng trên Colab): tải checkpoint để train tiếp, đẩy adapter lên repo riêng tư.
+"""Làm việc với Hugging Face Hub khi train (dùng trên Colab): tải checkpoint để train tiếp, đẩy adapter lên repo riêng tư
+và tải adapter về để gộp vào model gốc (M18).
 
 Token chỉ đọc từ biến môi trường `HF_TOKEN` (trên Colab: lấy từ Colab Secrets rồi đặt vào biến môi trường).
 Thư viện `huggingface_hub` chỉ được import khi thật sự gọi tới Hub.
@@ -78,6 +79,28 @@ def push_adapter(repo_id: str, adapter_dir: str | Path, private: bool = True, dr
     return {"status": "pushed", **plan}
 
 
+ADAPTER_FILES = ("adapter_config.json", "adapter_model.safetensors", "adapter_model.bin")
+
+
+def pull_adapter(repo_id: str, adapter_dir: str | Path, dry_run: bool = False) -> dict[str, object]:
+    """Tải adapter đã đẩy bằng `push-adapter` (các file adapter ở thư mục gốc của repo) về `adapter_dir` (M18).
+    Chỉ tải file adapter, không tải checkpoint hay báo cáo. Repo chưa có adapter thì báo lỗi tiếng Việt."""
+    check_repo_id(repo_id)
+    folder = Path(adapter_dir)
+    plan = {"repo_id": repo_id, "adapter_dir": str(folder), "files": list(ADAPTER_FILES)}
+    if dry_run: return {"status": "dry-run", **plan}
+    from huggingface_hub import snapshot_download
+    from huggingface_hub.errors import RepositoryNotFoundError
+
+    try:
+        snapshot_download(repo_id=repo_id, allow_patterns=list(ADAPTER_FILES), local_dir=str(folder))
+    except RepositoryNotFoundError as error:
+        raise FileNotFoundError(f"Không thấy repo {repo_id} (hoặc token không có quyền đọc). Hãy chạy notebook train_colab tới Bước 11 (đẩy adapter) trước.") from error
+    if not (folder / "adapter_config.json").is_file():
+        raise FileNotFoundError(f"Repo {repo_id} chưa có adapter (thiếu adapter_config.json). Hãy chạy notebook train_colab tới Bước 11 (đẩy adapter) trước.")
+    return {"status": "pulled", **plan, "files": sorted(path.name for path in folder.iterdir() if path.name in ADAPTER_FILES)}
+
+
 def upload_file(repo_id: str, path: str | Path, path_in_repo: str, private: bool = True) -> str:
     """Đẩy một file nhỏ (ví dụ số đo) lên repo; tạo repo riêng tư nếu chưa có. Trả về đường dẫn xem file trên Hub."""
     check_repo_id(repo_id)
@@ -90,15 +113,21 @@ def upload_file(repo_id: str, path: str | Path, path_in_repo: str, private: bool
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="python -m local_ai.training.hub", description="Đẩy adapter đã train lên Hugging Face Hub (token đọc từ biến môi trường HF_TOKEN).")
+    parser = argparse.ArgumentParser(prog="python -m local_ai.training.hub", description="Đẩy adapter đã train lên Hugging Face Hub hoặc tải về (token đọc từ biến môi trường HF_TOKEN).")
     commands = parser.add_subparsers(dest="command", required=True)
     push = commands.add_parser("push-adapter", help="Đẩy thư mục adapter lên repo Hugging Face (mặc định riêng tư)")
     push.add_argument("--repo", required=True, help="Tên repo dạng tên-người-dùng/tên-repo")
     push.add_argument("--adapter-dir", required=True, help="Thư mục adapter (có adapter_config.json)")
     push.add_argument("--public", action="store_true", help="Tạo repo công khai thay vì riêng tư")
     push.add_argument("--dry-run", action="store_true", help="Chỉ kiểm tra tham số và in kế hoạch, không gọi mạng")
+    pull = commands.add_parser("pull-adapter", help="Tải adapter đã train (đẩy bằng push-adapter) từ repo riêng tư về máy")
+    pull.add_argument("--repo", required=True, help="Tên repo dạng tên-người-dùng/tên-repo")
+    pull.add_argument("--adapter-dir", required=True, help="Thư mục lưu adapter, ví dụ .runs/colab_light/adapter (adapter_path của mục light-colab)")
+    pull.add_argument("--dry-run", action="store_true", help="Chỉ kiểm tra tham số và in kế hoạch, không gọi mạng")
     args = parser.parse_args(argv)
-    print(json.dumps(push_adapter(args.repo, args.adapter_dir, private=not args.public, dry_run=args.dry_run), ensure_ascii=False, indent=2))
+    if args.command == "pull-adapter": result = pull_adapter(args.repo, args.adapter_dir, dry_run=args.dry_run)
+    else: result = push_adapter(args.repo, args.adapter_dir, private=not args.public, dry_run=args.dry_run)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 

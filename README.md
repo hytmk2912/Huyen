@@ -12,7 +12,8 @@ Kế hoạch tuần 1–3 và bằng chứng từng mốc: `TASKS.md` (tuần 3)
 
 Chạy trên Colab miễn phí, không cần máy có GPU:
 - train model nhỏ: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`);
-- agent với model thật (Ollama): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb).
+- agent với model thật (Ollama): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb);
+- agent với model bạn vừa train, so với model gốc (M18): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_trained_colab.ipynb).
 
 ## Trạng thái hiện tại
 Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
@@ -25,7 +26,7 @@ Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
 | Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả |
 | Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 6 nhiệm vụ mẫu với calculator và TerminalTool (M19 thêm nhiệm vụ phải thử lại sau khi TerminalTool từ chối lệnh; lỗi từ chối kèm gợi ý lệnh được phép) | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút (trước khi có nhiệm vụ thứ 6). Test bằng model giả và server OpenAI giả (6/6 nhiệm vụ) |
 | Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm; trên Colab, TerminalTool chạy thật với agent |
-| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
+| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); `agent_trained_colab` (M18: agent với model đã train, so với model gốc); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
@@ -465,6 +466,24 @@ Test `tests/test_m13_agent_colab.py` (chạy không cần Ollama) gồm:
 - kiểm tra notebook hợp lệ và chạy lệnh của nó bằng `--dry-run`;
 - chạy 6 nhiệm vụ với công cụ thật, qua một server HTTP giả nói chuẩn OpenAI.
 
+## Agent dùng model đã train (M18)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_trained_colab.ipynb)
+
+Sau khi train bằng `train_colab` (tới Bước 11: đẩy adapter lên repo riêng tư `<tên>/huyen-<model>-qlora`), notebook `notebooks/agent_trained_colab.ipynb` cho agent làm 6 nhiệm vụ mẫu với **model gốc** và **model đã train**, rồi in bảng so sánh. Chọn `smoke` hoặc `light`; cần GPU T4 và `HF_TOKEN` trong Colab Secrets. Các bước:
+1. tải adapter về đúng `adapter_path` của mục `<model>-colab` (`.runs/colab_<model>/adapter`) bằng lệnh con `pull-adapter` của `local_ai.training.hub` (chỉ tải các file adapter; repo chưa có adapter thì báo cần chạy `train_colab` tới Bước 11);
+2. xuất 2 file GGUF theo đúng cùng một đường: `python -m local_ai.training.export --model <model>-colab --no-adapter --output .runs/gguf/<model>-goc` (model gốc) và `python -m local_ai.training.export --model <model>-colab --output .runs/gguf/<model>-da-train` (gộp adapter);
+3. `ollama create huyen-<model>-goc` và `huyen-<model>-da-train` từ Modelfile vừa viết (mục `ollama-<model>-goc`, `ollama-<model>-da-train` trong danh sách model);
+4. `python -m local_ai.agents.tasks` với từng model, rồi `python -m local_ai.agents.compare <gốc>.json <đã train>.json --labels 'model gốc' 'model đã train'`: bảng từng nhiệm vụ, tỉ lệ thành công, thời gian, nhiệm vụ mới đạt / mới trượt.
+
+Lệnh `python -m local_ai.training.export` (`--dry-run` để xem kế hoạch):
+- nạp model gốc **không nén** theo revision đã ghim (không gộp được LoRA vào trọng số 4bit), gộp adapter bằng `merge_and_unload`, lưu safetensors + tokenizer có chat template;
+- chuyển sang GGUF bằng `convert_hf_to_gguf.py` của llama.cpp bản ghim `b11205` (cần gói `sentencepiece`), mặc định `q8_0` (8 bit; Ollama không tự lượng tử hóa file GGUF khi nhập);
+- viết Modelfile với chat template, lời hệ thống, tham số của họ model đó trong thư viện Ollama (`configs/ollama/qwen2.json` chép từ `qwen2.5:0.5b`, `configs/ollama/qwen3.json` từ `qwen3:4b`, có mã băm), nên cách hỏi giống hệt model cùng họ;
+- `--no-adapter` xuất model gốc theo cùng cách (cùng revision, dtype, kiểu lượng tử), để chênh lệch giữa 2 model là do train chứ không do cách xuất;
+- mặc định xóa thư mục safetensors trung gian sau khi có GGUF (`--keep-hf` để giữ). Chỉ hỗ trợ model chữ (`smoke`, `light`); model chính 27B cần GPU lớn.
+
+Đã thử thật trên máy phát triển (27/9, không GPU): model tí hon Qwen2 và Qwen3 dùng tokenizer thật của Qwen2.5 và Qwen3 → gộp adapter → GGUF bằng llama.cpp `b11205` → `llama-simple` sinh đúng chuỗi token như model Hugging Face đã gộp (GGUF f32); Ollama `0.34.4` nhập được file GGUF với Modelfile này, trả lời lặp lại được với `temperature` 0 và `seed`, và model đã train trả lời khác model gốc. **Chưa chạy trên Colab với `smoke`, `light` thật** (chủ repo chạy).
+
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
 Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU và thử Ollama (notebook Colab train và agent); tuần 3 đã chạy thật trên Colab T4 (M15). Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
 1. **M15 – Số đo thật trên Colab** (xong 26/9: đủ số đo `smoke`, `light` và agent; bảng số đo ở mục "Train trên Colab miễn phí"). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
@@ -472,7 +491,7 @@ Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU v�
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ)** (xong 26/9): chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.) Train thật model 27B trên GPU 40–48 GB vẫn chờ chủ repo.
-4. **M18 – Dùng model đã train trong agent:** gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 6 nhiệm vụ mẫu với model vừa train, so với model gốc.
+4. **M18 – Dùng model đã train trong agent** (chủ repo chọn 27/9; tiêu chí trong `TASKS.md`): gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 6 nhiệm vụ mẫu với model vừa train, so với model gốc (notebook `agent_trained_colab`, mục "Agent dùng model đã train").
 5. **M19 – Chấm công bằng hơn** (xong 26/9; tiêu chí và bằng chứng trong `TASKS.md`):
    - tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False`), ghi vào cài đặt chấm để không dùng lại nhầm báo cáo cũ; chấm trước và sau dùng cùng cài đặt;
    - chấm sau khi train (Bước 9) đẩy báo cáo lên Hub ở `eval/sau`, luôn chấm lại (`--no-reuse`);

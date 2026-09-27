@@ -11,9 +11,10 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M15 | Số đo thật trên Colab | **Xong** | 4/4 (100%) | `tests/test_m15_measurements.py` (21 test) |
 | M16 | Notebook bền hơn | **Xong** | 4/4 (100%) | `tests/test_m16_notebook_resilience.py` (13 test, 2 test thêm ở lượt rà soát tuần 3) |
 | M17 | Model chính (ảnh + chữ): LoRA chỉ gắn vào phần ngôn ngữ | **Xong** | 4/4 (100%) | `tests/test_m17_multimodal_lora.py` (5 test) |
+| M18 | Dùng model đã train trong agent | **Xong** | 5/5 (100%) | `tests/test_m18_agent_model_da_train.py` (16 test) |
 | M19 | Chấm công bằng hơn | **Xong** | 8/8 (100%) | `tests/test_m19_cham_cong_bang.py` (23 test) |
 | M20 | Dữ liệu giữ khả năng gọi công cụ | **Xong** | 4/4 (100%) | `tests/test_m20_du_lieu_goi_cong_cu.py` (15 test) |
-| **Tổng** | 5 mốc đã chọn (M18, M21 chưa chọn) | 5 **Xong** | 5/5 mốc (100%) | `python -m local_ai.check`: 309 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (26/9) |
+| **Tổng** | 6 mốc đã chọn (M21 chưa chọn) | 6 **Xong** | 6/6 mốc (100%) | `python -m local_ai.check`: 325 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (27/9) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
@@ -61,6 +62,22 @@ Chủ repo chọn ngày 26/9. Mục tiêu: model chính (`huihui-ai/Huihui-Qwen3
 - [x] 3. Train thật 2 bước trên CPU bằng lệnh train của repo với model tí hon đó và dữ liệu chữ: xong, lưu adapter; `adapter_config.json` ghi phần loại trừ; nạp lại adapter vào model gốc được và không có LoRA trong phần xử lý ảnh.
   Bằng chứng: `TinyQwen35Tests.test_real_cpu_training_keeps_vision_without_lora` (nạp bằng `AutoModelForMultimodalLM`, đúng lớp `Qwen3_5ForConditionalGeneration` của model chính; chạy khoảng 2 giây).
 - [x] 4. README (mục train trên GPU, lộ trình), `docs/ARCHITECTURE.md` cập nhật. 254 test chạy qua; compileall và secret-scan sạch.
+
+## M18: Dùng model đã train trong agent
+Chủ repo chọn ngày 27/9 (gọi "M18"); tiêu chí viết theo đề xuất M18 trong README. Mục tiêu: gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 6 nhiệm vụ mẫu với model vừa train, so với model gốc. Làm cho `smoke` và `light`; model chính 27B (ảnh + chữ) cần GPU lớn nên không thuộc mốc này. Chạy thật trên Colab do chủ repo làm sau mốc này (như M15).
+- [x] 1. Lệnh `python -m local_ai.training.export --model <tên>`: nạp model gốc không nén theo revision đã ghim, gộp LoRA adapter (`merge_and_unload`; `--no-adapter` thì giữ nguyên model gốc để so sánh), lưu safetensors + tokenizer (có chat template); `--dry-run` in kế hoạch. Test trên CPU với model tí hon Qwen2 và Qwen3: model đã gộp cho kết quả giống model gốc + adapter, không còn lớp LoRA.
+
+  Bằng chứng: `ExportTests.test_merged_model_matches_base_plus_adapter_for_qwen2_and_qwen3` (logits của model đã gộp bằng model gốc + adapter, khác model gốc; tokenizer có chat template; `export_info.json` ghi mã băm adapter), `test_base_model_goes_through_the_same_path_without_adapter`, `ExportPlanTests` (dry-run của `smoke-colab`, `light-colab`: revision đã ghim, dtype float16, không nén; model server và model ảnh + chữ bị từ chối).
+- [x] 2. Cùng lệnh xuất GGUF bằng `convert_hf_to_gguf.py` của llama.cpp (ghim bản), mặc định `q8_0`; model gốc và model đã train đi qua cùng một đường (cùng revision, dtype, kiểu lượng tử) để so sánh công bằng. Tạo Modelfile cho Ollama với chat template và tham số của họ model đó (lưu trong repo, lấy từ thư viện Ollama, có mã băm). Test bằng llama.cpp giả (không mạng); thử thật một lần trên máy phát triển.
+
+  Bằng chứng: `ExportTests.test_modelfile_uses_the_ollama_template_of_the_family`, `test_errors_are_reported_in_vietnamese` (thiếu llama.cpp báo trước khi nạp model; thiếu sentencepiece; thiếu adapter), `ExportPlanTests.test_ollama_templates_are_verbatim_copies` (`configs/ollama/qwen2.json` từ `qwen2.5:0.5b`, `qwen3.json` từ `qwen3:4b`; mã băm khớp lớp template/params trong thư viện Ollama). Thử thật ngày 27/9 trên máy phát triển (CPU): model tí hon Qwen2, Qwen3 dùng tokenizer thật của Qwen2.5, Qwen3 (chỉ tải file tokenizer) → lệnh `export` với llama.cpp `b11205` thật → GGUF nhận đúng kiến trúc, tokenizer `qwen2`, có chat template; `llama-simple` (GGUF f32) sinh đúng chuỗi token như model Hugging Face đã gộp, bản `--no-adapter` sinh đúng như model gốc; Ollama `0.34.4` `ollama create` từ Modelfile này được, trả lời lặp lại được với `temperature` 0 và `seed`, model đã train trả lời khác model gốc.
+- [x] 3. Lệnh tải adapter đã train từ repo riêng tư (`python -m local_ai.training.hub pull-adapter`) và lệnh so sánh 2 báo cáo agent (`python -m local_ai.agents.compare`): bảng từng nhiệm vụ, tỉ lệ thành công, thời gian, nhiệm vụ mới đạt / mới trượt. Test bằng huggingface_hub giả và báo cáo giả.
+
+  Bằng chứng: `PullAdapterTests` (2 test: chỉ tải file adapter, repo chưa có adapter thì chỉ cách chạy `train_colab` tới Bước 11), `AgentCompareTests` (3 test, gồm so 2 báo cáo thật của `--scripted`).
+- [x] 4. Notebook mới `notebooks/agent_trained_colab.ipynb` (chọn smoke hoặc light): tải adapter, xuất 2 GGUF (gốc, đã train), tạo 2 model Ollama, cho agent làm 6 nhiệm vụ với từng model, in bảng so sánh. Notebook hợp lệ, không kèm output, ghim phiên bản, mỗi ô có chú thích tiếng Việt; mọi lệnh `python -m local_ai...` chạy được bằng `--dry-run`. README có nút mở Colab.
+
+  Bằng chứng: `NotebookTests` (3 test: hợp lệ, khớp `notebooks/build.py`, không kèm output, mỗi ô bắt đầu `# Bước N:` tiếng Việt, thư viện ghim, llama.cpp `b11205`, Ollama `0.34.4`, `HF_TOKEN` từ Colab Secrets và không in ra; 6 lệnh chạy bằng `--dry-run` với cả `smoke` và `light`), `PlatformEntriesTests` (mục `ollama-<model>-goc`, `ollama-<model>-da-train`). Test M14 liệt kê notebook sửa thành 3 notebook (thêm `agent_trained_colab`, README có nút Colab).
+- [x] 5. `python -m local_ai.check` xanh: 325 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
 
 ## M19: Chấm công bằng hơn
 Chủ repo chọn ngày 26/9; làm trước M20 (chủ repo gọi `/lam-moc`). Mục tiêu: sửa các điểm chấm chưa công bằng thấy khi chạy thật trên Colab (M15): Qwen3 "suy nghĩ" hết 512 token trước khi viết code; báo cáo chấm sau khi train không được lưu; chỉ 8 câu tool_use; agent không thử lại khi TerminalTool từ chối lệnh.
