@@ -2,6 +2,15 @@
 
 > Giữ file này dưới 200 dòng và chỉ ghi quy tắc. Trạng thái công việc ghi ở `memory.md` và `TASKS.md`.
 
+## 5 nguyên tắc làm việc
+1. **Không thúc "nghĩ kỹ":** không viết "think hard", "ultrathink" hay "suy nghĩ thật kỹ" vào CLAUDE.md, skill hay lời giao việc cho subagent. Độ sâu suy nghĩ do chủ repo chỉnh bằng `/effort`. (Không liên quan tùy chọn `<think>`/`--no-thinking` của model trong repo.)
+2. **"Xong" phải đo được:** chỉ xong khi `python -m local_ai.check` xanh (không `--allow-skip`) và đạt đủ tiêu chí của mốc trong `TASKS.md`. Không dùng tiêu chí chung chung kiểu "sửa cho tốt"; mỗi tiêu chí phải có test hoặc lệnh kiểm tra chứng minh.
+3. **Tự làm việc thường, chỉ dừng hỏi trước việc phá huỷ** (mục "Khi nào phải dừng hỏi chủ repo"). File này luôn dưới 200 dòng.
+4. **Có bằng chứng mới tính là xong:** số test, `git diff --stat`, dòng `KẾT QUẢ:`; subagent cũng vậy (mục "Chia việc cho subagent").
+5. **Chống quên khi nén ngữ cảnh:** trạng thái luôn ghi trong `memory.md` và `TASKS.md` (mục "Chống quên khi nén ngữ cảnh").
+
+Cốt lõi: không bắt AI nghĩ nhiều hơn, mà cho nó thước đo cụ thể để tự biết mình làm đúng hay chưa.
+
 ## Nhiệm vụ tuần
 **Đọc `memory.md` trước khi làm việc.**
 

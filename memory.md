@@ -19,7 +19,7 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Việc chủ repo tự làm
 1. Đổi mật khẩu rsync (user `huyen`) lộ trong lịch sử commit `e6bc723`. Không chép mật khẩu vào đâu.
-2. Đóng PR #4 (đề nghị đóng: xung đột khoảng 65 file, xóa agent; phần sửa dữ liệu đã có trong `main`).
+2. Xoá nhánh `claude/expand-model-training-repo-v2yzyr` (PR #4 đã đóng 27/9; Claude không có quyền xoá).
 3. Xóa nhánh `codex/build-autonomous-ai-system-architecture` (đã gộp hết vào `main`; Claude không có quyền xóa).
 4. Archive repo `huyenytmk2912/agent`; `hytmk2912/Agent` chỉ cấp quyền nếu có code mới hơn.
 5. Sửa mô tả repo (trang repo → About → ⚙️), hiện là "Train Từ Số 0"; cân nhắc chuyển Private (khi đó `git clone` trong notebook cần token).
@@ -30,6 +30,7 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 ## Việc dở
 - Nhánh: `claude/nhiem-vu-tuan-jixv6i`, dựng lại từ `main` sau mỗi lần gộp PR.
 - Từ M19 bộ chấm 38 câu, greedy, notebook tắt suy nghĩ: điểm cũ (30 câu, lấy mẫu) không so trực tiếp với điểm mới. Revision model đã ghim (26/9); muốn dùng bản mới của repo model thì sửa `platform.json`.
+- README còn ghi PR #4 "đề nghị đóng… Chủ repo tự đóng" (test `test_measured_facts_match_code` kiểm tra câu này); PR #4 đã đóng 27/9. Hỏi chủ repo trước khi sửa README và test.
 
 ## Lỗi còn tồn
 | Lỗi | Nơi |
@@ -50,3 +51,4 @@ Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-3.md`.
 | 26/9 | Sửa 2 lỗi bảo mật | TerminalTool: git chỉ thấy repo trong thư mục làm việc (`GIT_CEILING_DIRECTORIES`); sandbox và TerminalTool dùng môi trường tối thiểu, không lộ `HF_TOKEN`. Ghi thêm tiêu chí M19 (8) và M20 (4). 271 test, check xanh. Tiếp theo: M19. |
 | 26/9 | M19 | Tắt suy nghĩ (`--no-thinking`), chấm sau đẩy `eval/sau` (`--no-reuse`), 16 câu tool_use (38 câu), gợi ý khi TerminalTool từ chối + nhiệm vụ thử lại, chấm greedy lặp lại được, so số theo giá trị, ghim revision. 294 test, check xanh. Tiếp theo: M20. |
 | 26/9 | M20 | `--tool-calls 0.1` (200/2000 dòng gọi công cụ tự sinh, notebook bật), chặn gần trùng với bộ chấm bằng MinHash (`eval_near_duplicate` trong manifest), `assistant_only_loss` (template Qwen thật TRL thay được; không hỗ trợ thì báo lỗi trước khi nạp model). 309 test, check xanh. Xong 5/5 mốc đã chọn. |
+| 27/9 | Quy ước làm việc (chủ repo yêu cầu, không phải mốc) | `CLAUDE.md` thêm "5 nguyên tắc làm việc", dừng hỏi, chống quên khi nén ngữ cảnh, chia việc cho subagent; skill `lam-moc` thêm 3 dòng. 309 test, check xanh. PR #20 gộp; PR #4 đóng, chưa xoá được nhánh (403). |
