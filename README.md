@@ -16,7 +16,7 @@ Chạy trên Colab miễn phí, không cần máy có GPU:
 - agent với model bạn vừa train, so với model gốc (M18): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_trained_colab.ipynb).
 
 ## Trạng thái hiện tại
-Cập nhật 26/9/2026, sau khi chạy thật trên Colab T4 (M15).
+Cập nhật 27/9/2026 (tổng kết tuần 3, M21): đã chạy thật trên Colab T4 (M15); M16–M20, M22 và M18 xong, phần M18–M20 chưa chạy lại trên Colab.
 
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
 | --- | --- | --- |
@@ -491,7 +491,7 @@ Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU v�
    - dừng Run all khi một lệnh `!python` lỗi;
    - lưu báo cáo chấm trước lên repo Hugging Face, để chạy lại sau khi Colab ngắt không phải chấm lại.
 3. **M17 – Model chính (ảnh + chữ)** (xong 26/9): chỉ gắn LoRA vào phần ngôn ngữ, không gắn vào phần xử lý ảnh. (Việc đổi `torch_dtype` sang `dtype` theo transformers 5.x đã làm sớm trong lượt rà soát M1–M16.) Train thật model 27B trên GPU 40–48 GB vẫn chờ chủ repo.
-4. **M18 – Dùng model đã train trong agent** (chủ repo chọn 27/9; tiêu chí trong `TASKS.md`): gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 6 nhiệm vụ mẫu với model vừa train, so với model gốc (notebook `agent_trained_colab`, mục "Agent dùng model đã train").
+4. **M18 – Dùng model đã train trong agent** (xong 27/9; tiêu chí và bằng chứng trong `TASKS.md`): gộp adapter vào model gốc, xuất GGUF để chạy bằng Ollama, rồi cho agent làm 6 nhiệm vụ mẫu với model vừa train, so với model gốc (notebook `agent_trained_colab`, mục "Agent dùng model đã train").
 5. **M19 – Chấm công bằng hơn** (xong 26/9; tiêu chí và bằng chứng trong `TASKS.md`):
    - tùy chọn tắt chế độ suy nghĩ của Qwen3 khi chấm (`enable_thinking=False`), ghi vào cài đặt chấm để không dùng lại nhầm báo cáo cũ; chấm trước và sau dùng cùng cài đặt;
    - chấm sau khi train (Bước 9) đẩy báo cáo lên Hub ở `eval/sau`, luôn chấm lại (`--no-reuse`);
@@ -505,8 +505,16 @@ Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU v�
    - chặn gần trùng giữa dữ liệu train và bộ chấm bằng MinHash của M12, `manifest.json` ghi số dòng bị loại;
    - chỉ tính loss trên câu trả lời (`assistant_only_loss=True`), báo lỗi rõ ràng nếu chat template không hỗ trợ;
    - (chưa chọn) thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép.
-7. **M21 – Tổng kết tuần 3.**
+7. **M21 – Tổng kết tuần 3** (xong 27/9): README, `docs/ARCHITECTURE.md`, `memory.md` khớp thực tế; đề xuất tuần 4 bên dưới.
 
-PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B): **đề nghị đóng**, vì xung đột khoảng 65 file và xóa phần agent; phần sửa dữ liệu hữu ích của nó đã có trong `main`. Chủ repo tự đóng.
+Ngoài 7 mốc trên, chủ repo chọn thêm **M22 – Kiểm định ý nghĩa cho so sánh eval trước/sau** (xong 27/9): lệnh `python -m local_ai.evaluation.compare` in p-value McNemar chính xác cho tổng, nhóm, ngôn ngữ (tool_use 7/8 → 3/8 của `light` cho p = 0,125, chưa đủ chắc là thật).
+
+**Tuần 3 đã xong mọi mốc chủ repo chọn.** Đề xuất tuần 4 (chưa làm; chủ repo chọn việc nào thì mới đưa vào `TASKS.md`):
+- Chạy lại `train_colab` (smoke, rồi light) để có điểm mới sau M19, M20; rồi chạy `agent_trained_colab` (M18) để so agent trước/sau khi train.
+- Adapter server gửi `max_tokens` = `max_new_tokens`, để giới hạn độ dài câu trả lời có tác dụng với model qua Ollama (phát hiện khi làm M18).
+- Thêm một preset tiếng Việt nữa, sau khi đọc kỹ giấy phép.
+- Train thật model chính 27B trên GPU 40–48 GB (chủ repo thuê GPU).
+
+PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B): **đề nghị đóng**, vì xung đột khoảng 65 file và xóa phần agent; phần sửa dữ liệu hữu ích của nó đã có trong `main`. Chủ repo đã đóng ngày 27/9.
 
 Kế hoạch tuần 1–3 và bằng chứng từng mốc: tuần 3 trong `TASKS.md`, tuần 1–2 trong `archive/tasks-tuan-1-2.md`.

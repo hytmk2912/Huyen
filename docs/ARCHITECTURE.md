@@ -192,11 +192,11 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
 - Chỉ gọi model cục bộ hoặc server trong mạng nội bộ, không gọi API trả phí. Khóa chỉ đọc từ biến môi trường.
 - `PythonSandbox` chỉ tách code ra một tiến trình riêng, có giới hạn thời gian và môi trường tối thiểu (`minimal_env` trong `local_ai/runtime/executor.py`: không có `HF_TOKEN` hay khóa). Lệnh của `TerminalTool` cũng chạy với môi trường đó và `GIT_CEILING_DIRECTORIES`, nên git không đọc được repo bên ngoài thư mục làm việc. Sandbox không cách ly an toàn trước code độc hại (vẫn đọc được file trên máy); khi chấm code của model lạ, hãy chạy trong container.
 - `TerminalTool` và gateway tắt mặc định. Lệnh `local_ai.agents.tasks` chỉ bật `TerminalTool` trong thư mục làm việc riêng của từng nhiệm vụ.
-- Chưa kiểm chứng trên GPU hay model thật:
-  - QLoRA và model ảnh + chữ;
-  - số VRAM và thời gian ước tính;
-  - 2 notebook Colab;
-  - agent với Ollama + `qwen3:4b`.
+- Đã chạy thật trên Colab T4 (25–26/9, M15): QLoRA `smoke` và `light`, số VRAM và thời gian (ước tính đã sửa theo số đo), 2 notebook `train_colab` và `agent_colab`, agent với Ollama + `qwen3:4b`.
+- Chưa kiểm chứng trên GPU hay model thật (cập nhật 27/9, tổng kết tuần 3):
+  - model chính 27B (QLoRA, ảnh + chữ) cần GPU 40–48 GB;
+  - điểm chấm và agent sau các thay đổi M19, M20 (bộ chấm 38 câu, dòng gọi công cụ, loss chỉ trên câu trả lời): cần chạy lại `train_colab`;
+  - notebook `agent_trained_colab` (M18) với `smoke`, `light` thật (mới thử trên máy phát triển với model tí hon, llama.cpp và Ollama thật).
 
-  Chi tiết trong `memory.md`; lộ trình tuần 3 (đề xuất) ở cuối `README.md`.
+  Chi tiết trong `memory.md`; lộ trình tuần 3 và đề xuất tuần 4 ở cuối `README.md`.
 - Interface giao dịch (`TradingAnalysisTool`) chỉ để phân tích, không đặt lệnh.
