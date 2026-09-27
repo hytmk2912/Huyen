@@ -14,8 +14,9 @@ Cách làm giống tuần 2: mỗi lượt **tối đa 1 mốc** bằng skill `l
 | M18 | Dùng model đã train trong agent | **Xong** | 5/5 (100%) | `tests/test_m18_agent_model_da_train.py` (16 test) |
 | M19 | Chấm công bằng hơn | **Xong** | 8/8 (100%) | `tests/test_m19_cham_cong_bang.py` (23 test) |
 | M20 | Dữ liệu giữ khả năng gọi công cụ | **Xong** | 4/4 (100%) | `tests/test_m20_du_lieu_goi_cong_cu.py` (15 test) |
+| M21 | Tổng kết tuần 3 | **Xong** | 5/5 (100%) | `tests/test_m21_tong_ket_tuan_3.py` (5 test) |
 | M22 | Kiểm định ý nghĩa cho so sánh eval trước/sau | **Xong** | 3/3 (100%) | `tests/test_m22_kiem_dinh_y_nghia.py` (8 test) |
-| **Tổng** | 7 mốc đã chọn (M21 chưa chọn) | 7 **Xong** | 7/7 mốc (100%) | `python -m local_ai.check`: 333 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (27/9) |
+| **Tổng** | 8 mốc đã chọn | 8 **Xong** | 8/8 mốc (100%) | `python -m local_ai.check`: 338 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch (27/9) |
 
 Rà soát M1–M16 (25/9, chủ repo yêu cầu, không phải mốc): sửa `torch_dtype` → `dtype`, secret-scan bắt thêm kiểu mật khẩu shell từng lộ, `.gitignore` thêm `*.bin` và `.ruff_cache/`, ghi giấy phép dataset vào `docs/GIAY_PHEP_DATASET.md`. Bằng chứng: `tests/test_ra_soat_m1_m16.py` (6 test); 232 test chạy qua. Việc chỉ chủ repo làm được: mục "Việc chủ repo tự làm" trong `memory.md`.
 
@@ -117,6 +118,18 @@ Chủ repo chọn ngày 26/9; làm sau M19. Mục tiêu: sau khi train, `light` 
 
   Đã làm: khóa `assistant_only_loss` trong cấu hình train (4 file trong `configs/training/` đặt `true`; cấu hình không có khóa thì `false` như cũ); `check_assistant_only_loss` kiểm tra template trước khi nạp model. Chat template thật của `smoke`, `light`, model chính ở revision đã ghim trùng template TRL biết (kiểm tra 26/9 bằng file `tokenizer_config.json` nhỏ, mã băm trong `tests/fixtures/chat_templates/ghim_2026-09-26.json`). Bằng chứng: `AssistantOnlyLossConfigTests` (2 test), `AssistantOnlyLossTrainingTests` (4 test: train thật trên CPU với template Qwen2.5, Qwen3, Qwen3.8, phần câu hỏi có nhãn -100; tắt thì học cả câu hỏi như cũ; template tự viết báo lỗi tiếng Việt trước khi nạp model).
 - [x] 4. `python -m local_ai.check` xanh: 309 test chạy qua, không test nào bị bỏ qua; compileall và secret-scan sạch.
+
+## M21: Tổng kết tuần 3
+Chủ repo chọn ngày 27/9 ("làm phần trong ảnh, xong thì làm tiếp M15–M21"); tiêu chí theo mẫu M14 (tổng kết tuần 2).
+- [x] 1. README khớp thực tế: mục "Trạng thái hiện tại" cập nhật 27/9 (có M18, M22); lộ trình ghi trạng thái cả 8 mốc tuần 3 (M15–M22) kèm ngày xong; PR #4 ghi đã đóng; thêm đề xuất tuần 4 (chưa làm, chủ repo chọn).
+  Bằng chứng: `test_readme_roadmap_marks_every_milestone_done`; test cũ M7, M14 (lộ trình M15–M21, nút Colab, lệnh có trong README) vẫn chạy qua, không sửa.
+- [x] 2. `docs/ARCHITECTURE.md`: danh sách phần chưa kiểm chứng cập nhật theo tuần 3 (phần đã chạy thật, phần còn chờ chạy trên Colab).
+  Bằng chứng: `test_architecture_lists_what_is_still_unverified`.
+- [x] 3. `memory.md`: tiến độ tuần 3, việc chủ repo tự làm, đề xuất tuần 4 giống README.
+  Bằng chứng: `test_week_four_proposals_match_between_readme_and_memory` (và `memory.md` dưới 5.000 ký tự).
+- [x] 4. Test `tests/test_m21_tong_ket_tuan_3.py`: mọi mốc trong bảng tuần 3 Xong và mọi tiêu chí đã `[x]`; số test ghi trong bảng khớp số test thật của file; lộ trình README ghi xong cho mọi mốc; đề xuất tuần 4 giống nhau giữa README và `memory.md`.
+  Bằng chứng: 5 test trong file.
+- [x] 5. `python -m local_ai.check` xanh: 338 test, 0 sai, 0 lỗi, 0 bị bỏ qua; compileall và secret-scan sạch.
 
 ## M22: Kiểm định ý nghĩa cho so sánh eval trước/sau
 Chủ repo chọn ngày 27/9. Mục tiêu: `local_ai/evaluation/compare.py` chỉ in chênh lệch điểm %, không cho biết chênh lệch là thật hay do may rủi (ví dụ tool_use tụt 7/8 → 3/8 trông rõ nhưng chưa đủ chắc). Thêm p-value của kiểm định McNemar chính xác, chỉ dùng thư viện chuẩn (`math.comb`), không dùng scipy/numpy: b = số câu mới trượt, c = số câu mới đạt, n = b + c, k = min(b, c), p = min(1, 2 · Σ_{i=0..k} C(n, i) · 0,5^n); n = 0 thì p = 1.
