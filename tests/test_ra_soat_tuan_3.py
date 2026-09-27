@@ -80,7 +80,8 @@ class ShorterDocsTests(unittest.TestCase):
         self.assertLessEqual(len(MEMORY), 5000)
         self.assertIn("archive/memory-tuan-3.md", MEMORY)
         sections = re.findall(r"(?m)^## (.+)$", MEMORY)
-        for name in ("Lỗi còn tồn", "Nhật ký tuần 3", "Việc dở", "Mốc đang làm"):
+        week = re.search(r"(?m)^TUẦN (\d+)$", MEMORY).group(1)  # từ tuần 4 (27/9) nhật ký mang số tuần hiện tại
+        for name in ("Lỗi còn tồn", f"Nhật ký tuần {week}", "Việc dở", "Mốc đang làm"):
             with self.subTest(name):
                 self.assertIn(name, sections); self.assertIn(f'"{name}"', SKILL)
         self.assertNotIn('"Lỗi gặp"', SKILL); self.assertNotIn('"Nhật ký các lượt"', SKILL)
@@ -88,7 +89,8 @@ class ShorterDocsTests(unittest.TestCase):
             with self.subTest(text[:30]): self.assertIn("5.000 ký tự", text); self.assertNotIn("80 dòng", text)
 
     def test_week_three_table_has_total_row(self):
-        table = TASKS.split("## Bảng tiến độ tuần 3", 1)[1].split("\n\n", 2)[1]
+        week_three = (ROOT / "archive" / "tasks-tuan-3.md").read_text(encoding="utf-8")  # từ tuần 4 (27/9) kế hoạch tuần 3 chép nguyên văn sang archive
+        table = week_three.split("## Bảng tiến độ tuần 3", 1)[1].split("\n\n", 2)[1]
         rows = re.findall(r"(?m)^\| (M\d+) \| [^|]+ \| ([^|]+) \|", table)
         done = [milestone for milestone, status in rows if status.strip() == "**Xong**"]
         self.assertRegex(table, rf"(?m)^\| \*\*Tổng\*\* \| .*{len(done)}/{len(rows)} mốc")

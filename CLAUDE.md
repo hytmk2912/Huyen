@@ -14,7 +14,7 @@ Cốt lõi: không bắt AI nghĩ nhiều hơn, mà cho nó thước đo cụ th
 ## Nhiệm vụ tuần
 **Đọc `memory.md` trước khi làm việc.**
 
-Kế hoạch tuần 3 (chủ repo chọn từng mốc trong M15–M21) nằm trong `TASKS.md`; tuần 1–2 (M1–M14, đều đã xong) chép nguyên văn ở `archive/tasks-tuan-1-2.md`. Mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi còn tồn nằm trong `memory.md` (tối đa 5.000 ký tự; nhật ký chi tiết trong `archive/`). Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
+Kế hoạch tuần 4 (M23–M27, tiêu chí do chủ repo đặt) nằm trong `TASKS.md`; tuần 1–2 (M1–M14) và tuần 3 (M15–M22), đều đã xong, chép nguyên văn ở `archive/tasks-tuan-1-2.md` và `archive/tasks-tuan-3.md`. Mỗi mốc có tiêu chí xong. Mốc đang làm, việc dở và lỗi còn tồn nằm trong `memory.md` (tối đa 5.000 ký tự; nhật ký chi tiết trong `archive/`). Làm mốc bằng skill `lam-moc` (`.claude/skills/lam-moc/SKILL.md`).
 - Mỗi lượt làm tối đa **1 mốc**: mốc chủ repo gọi tên, hoặc mốc đầu tiên chưa xong trong `TASKS.md`.
 - Chỉ đánh dấu một mốc là xong, và chỉ tự gộp PR, khi `python -m local_ai.check` (không có `--allow-skip`) xanh và mọi tiêu chí của mốc đã đạt. Lệnh này chạy test, `compileall` và `secret-scan`; test bị bỏ qua vì thiếu thư viện cũng tính là chưa xanh. Thiếu thư viện thì cài theo README (torch bản CPU) rồi chạy lại.
 - Không dùng API trả phí (OpenAI, Anthropic, Gemini...). Chỉ chạy model cục bộ hoặc qua server local.

@@ -1,6 +1,6 @@
 ---
 name: lam-moc
-description: Làm mốc kế tiếp của nhiệm vụ tuần trong TASKS.md (tuần 3: các mốc chủ repo chọn trong M15–M21). Dùng khi chủ repo gõ /lam-moc, bảo "làm tiếp nhiệm vụ tuần" hoặc "làm mốc tiếp theo", và khi lượt chạy tự động hằng đêm bắt đầu. Đọc memory.md và TASKS.md, làm đúng một mốc, chạy python -m local_ai.check, cập nhật memory.md, commit bằng tiếng Việt rồi tự gộp PR.
+description: Làm mốc kế tiếp của nhiệm vụ tuần trong TASKS.md (tuần 4: M23–M27; tuần trước chép trong archive/). Dùng khi chủ repo gõ /lam-moc, bảo "làm tiếp nhiệm vụ tuần" hoặc "làm mốc tiếp theo", và khi lượt chạy tự động hằng đêm bắt đầu. Đọc memory.md và TASKS.md, làm đúng một mốc, chạy python -m local_ai.check, cập nhật memory.md, commit bằng tiếng Việt rồi tự gộp PR.
 ---
 
 # Làm mốc kế tiếp
@@ -8,15 +8,15 @@ description: Làm mốc kế tiếp của nhiệm vụ tuần trong TASKS.md (tu
 Mỗi lần dùng skill này chỉ làm **một** mốc. Làm xong thì dừng, không tự làm tiếp mốc sau.
 
 ## 1. Đọc trạng thái
-1. Nhánh làm việc tuần 3 là `claude/nhiem-vu-tuan-jixv6i`: remote có nhánh này thì checkout. Nếu PR của nhánh đã được gộp thì dựng lại nhánh từ `main` mới nhất, giữ nguyên tên. Không đẩy lên `main`.
+1. Nhánh làm việc tuần 4 là `claude/nhiem-vu-tuan-jixv6i`: remote có nhánh này thì checkout. Nếu PR của nhánh đã được gộp thì dựng lại nhánh từ `main` mới nhất, giữ nguyên tên. Không đẩy lên `main`.
 2. Chạy `git status` và `git log --oneline -5`. Nếu có thay đổi dở dang không rõ nguồn gốc thì dừng lại và hỏi chủ repo.
 3. Đọc `CLAUDE.md`, `memory.md` và `TASKS.md`.
 4. Chọn mốc:
    - nếu `memory.md` ghi đang làm dở một mốc thì làm tiếp mốc đó;
-   - nếu không, làm mốc tồn của tuần trước (mục "Tồn tuần trước" trong `memory.md`) trước, rồi mốc chủ repo vừa gọi tên. Chủ repo không gọi tên mốc nào thì làm mốc đầu tiên chưa **Xong** trong bảng tiến độ tuần 3;
+   - nếu không, làm mốc tồn của tuần trước (mục "Tồn tuần trước" trong `memory.md`) trước, rồi mốc chủ repo vừa gọi tên. Chủ repo không gọi tên mốc nào thì làm mốc đầu tiên chưa **Xong** trong bảng tiến độ tuần 4;
    - mốc chưa được chủ repo chọn (chưa có tiêu chí trong `TASKS.md`) thì không tự làm;
    - mốc bị chặn 2 lượt liền (mạng, quyền, môi trường): ghi "bị chặn" kèm lý do vào `memory.md` rồi chuyển sang mốc sau. Không đoán mò.
-5. Nếu mọi mốc đã chọn đều xong hoặc bị chặn: ghi "XONG TUẦN 3 – chờ merge" vào `memory.md`, báo chủ repo rồi dừng. Không tự đặt thêm mốc mới.
+5. Nếu mọi mốc đã chọn đều xong hoặc bị chặn: ghi "XONG TUẦN 4 – chờ merge" vào `memory.md`, báo chủ repo rồi dừng. Không tự đặt thêm mốc mới.
 
 ## 2. Làm mốc
 1. Ghi vào `memory.md`, mục "Mốc đang làm": `Mx — bắt đầu <ngày>`.
@@ -50,19 +50,19 @@ Lệnh chạy toàn bộ test, `compileall` và `secret-scan`, rồi in "KẾT Q
   - đánh `[x]` cho từng tiêu chí đã đạt, ghi kèm tên test làm bằng chứng;
   - cập nhật cột "Tiến độ" và dòng "Tổng";
   - chỉ ghi **Xong** khi đạt 100% tiêu chí và `python -m local_ai.check` xanh, còn lại thì ghi **Đang làm**.
-- `memory.md` (tối đa 5.000 ký tự; nhật ký chi tiết chuyển sang `archive/memory-tuan-3.md`):
-  - dòng "TUẦN 3", mục "Tồn tuần trước", mục "Checklist tuần 3";
+- `memory.md` (tối đa 5.000 ký tự; nhật ký chi tiết chuyển sang `archive/memory-tuan-4.md`):
+  - dòng "TUẦN 4", mục "Tồn tuần trước", mục "Checklist tuần 4";
   - mục "Mốc đang làm": ghi mốc còn dở, hoặc mốc kế tiếp nếu mốc này đã xong;
   - mục "Việc dở";
   - mục "Lỗi còn tồn": thêm lỗi mới, xoá dòng của lỗi đã sửa;
-  - thêm một dòng ngắn vào "Nhật ký tuần 3": ngày, đã làm gì, lỗi gặp và cách xử lý, mốc tiếp theo. Chi tiết dài ghi vào `archive/memory-tuan-3.md`.
-  - Quá 5.000 ký tự thì chuyển dòng nhật ký cũ sang `archive/memory-tuan-3.md`.
+  - thêm một dòng ngắn vào "Nhật ký tuần 4": ngày, đã làm gì, lỗi gặp và cách xử lý, mốc tiếp theo. Chi tiết dài ghi vào `archive/memory-tuan-4.md`.
+  - Quá 5.000 ký tự thì chuyển dòng nhật ký cũ sang `archive/memory-tuan-4.md`.
 
 ## 5. Commit và báo lại
 1. Commit bằng tiếng Việt:
    - dòng đầu dạng `Mx: <tóm tắt>`, hoặc `Mx (dở): <tóm tắt>` nếu mốc chưa xong;
    - phần thân liệt kê các tiêu chí đã đạt và kết quả test.
-2. Đẩy lên `claude/nhiem-vu-tuan-jixv6i` (`git push -u origin claude/nhiem-vu-tuan-jixv6i`), không đẩy thẳng lên `main`. Chưa có PR mở từ nhánh này vào `main` thì mở một PR; có rồi thì cập nhật checklist tuần 3 trong mô tả PR. Viết bằng tiếng Việt.
+2. Đẩy lên `claude/nhiem-vu-tuan-jixv6i` (`git push -u origin claude/nhiem-vu-tuan-jixv6i`), không đẩy thẳng lên `main`. Chưa có PR mở từ nhánh này vào `main` thì mở một PR; có rồi thì cập nhật checklist tuần 4 trong mô tả PR. Viết bằng tiếng Việt.
    - Chủ repo cho phép (26/9): khi `python -m local_ai.check` (không có `--allow-skip`) xanh thì **tự gộp PR** vào `main`, không nhắc hay hỏi chủ repo xác nhận. Chưa xanh thì không gộp. Gộp xong thì dựng lại nhánh từ `main` cho lượt sau.
 3. Báo lại chủ repo ngắn gọn bằng tiếng Việt:
    - đã làm mốc nào;

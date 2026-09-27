@@ -5,9 +5,11 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TASKS = (ROOT / "TASKS.md").read_text(encoding="utf-8")
+# Từ khi mở tuần 4 (27/9), kế hoạch tuần 3 chép nguyên văn sang archive/tasks-tuan-3.md và bản cuối memory.md tuần 3 nằm cuối archive/memory-tuan-3.md
+# (chủ repo yêu cầu chuyển; chỉ đổi chỗ đọc, giữ nguyên ý kiểm tra).
+TASKS = (ROOT / "archive" / "tasks-tuan-3.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
-MEMORY = (ROOT / "memory.md").read_text(encoding="utf-8")
+MEMORY = (ROOT / "archive" / "memory-tuan-3.md").read_text(encoding="utf-8").split("## Bản cuối `memory.md` tuần 3", 1)[1].split("````markdown\n", 1)[1].split("\n````", 1)[0] + "\n"
 ARCHITECTURE = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
 ROW = re.compile(r"(?m)^\| (M\d+) \| ([^|]+) \| ([^|]+) \| (\d+)/(\d+) \(100%\) \| `(tests/[^`]+)` \((\d+) test")
 
