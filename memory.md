@@ -10,10 +10,10 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 ## Checklist tuần 3
 - [x] M15 Số đo thật trên Colab · [x] M16 Notebook bền hơn · [x] M17 LoRA chỉ phần ngôn ngữ
 - [x] M19 Chấm công bằng hơn · [x] M20 Dữ liệu giữ khả năng gọi công cụ · [x] M22 Kiểm định ý nghĩa cho so sánh eval
-- Chưa chọn: M18 Agent dùng model đã train (GGUF) · M21 Tổng kết tuần 3
+- [x] M18 Agent dùng model đã train (GGUF) · Chưa chọn: M21 Tổng kết tuần 3
 
 ## Mốc đang làm
-- **XONG TUẦN 3** (6/6 mốc đã chọn: M15, M16, M17, M19, M20, M22; M22 xong 27/9). M18, M21 chưa có tiêu chí trong `TASKS.md`: chờ chủ repo chọn, không tự làm.
+- **XONG TUẦN 3** (7/7 mốc đã chọn: M15–M20, M22; M18 xong 27/9). M21 chưa có tiêu chí trong `TASKS.md`: chờ chủ repo chọn, không tự làm.
 - Tự gộp PR khi `python -m local_ai.check` (không `--allow-skip`) xanh; không hỏi chủ repo (chủ repo cho phép 26/9).
 - Số đo thật (M15): `tests/fixtures/measurements/that_*.json`; T4 `train_tflops` 5,2; VRAM QLoRA cộng `KBIT_OVERHEAD_GB` × √(tỷ tham số); agent 4/5.
 
@@ -26,10 +26,12 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 6. Đọc `docs/GIAY_PHEP_DATASET.md` (`vietnamese` chỉ dùng cá nhân, không thương mại).
 7. Model chính 27B: cần GPU 40–48 GB để train thật; thuê GPU rồi báo.
 8. Chạy lại `train_colab` (smoke, rồi light) để có điểm mới sau M19, M20: 38 câu, greedy, tắt suy nghĩ, 10% dòng gọi công cụ, loss chỉ trên câu trả lời. Gửi ảnh Bước 10 và 12.
+9. Sau mục 8: chạy `agent_trained_colab` (M18) cùng model; gửi ảnh Bước 11 (bảng so sánh model gốc và model đã train).
 
 ## Việc dở
 - Nhánh: `claude/nhiem-vu-tuan-jixv6i`, dựng lại từ `main` sau mỗi lần gộp PR.
 - Từ M19 bộ chấm 38 câu, greedy, notebook tắt suy nghĩ: điểm cũ (30 câu, lấy mẫu) không so trực tiếp với điểm mới. Revision model đã ghim (26/9); muốn dùng bản mới của repo model thì sửa `platform.json`.
+- Phát hiện khi làm M18 (ngoài mốc, hỏi chủ repo): adapter server (`openai_compatible.py`) chưa gửi `max_tokens`, nên `max_new_tokens` không giới hạn câu trả lời qua Ollama (chấm, agent). Đề xuất gửi `max_tokens` = `max_new_tokens`.
 - README còn ghi PR #4 "đề nghị đóng… Chủ repo tự đóng" (test `test_measured_facts_match_code` kiểm tra câu này); PR #4 đã đóng 27/9. Hỏi chủ repo trước khi sửa README và test.
 
 ## Lỗi còn tồn
@@ -44,10 +46,8 @@ Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-3.md`.
 | Ngày | Lượt | Kết quả |
 | --- | --- | --- |
 | 25–26/9 | M15 | Số đo thật `smoke`, `light`, agent; sửa ước tính thời gian và VRAM; xong 26/9 (PR #11–#14). |
-| 26/9 | M17 | LoRA chỉ gắn phần ngôn ngữ của model ảnh + chữ; xong (PR #15). |
-| 26/9 | Rà soát tuần 3 | README khớp thực tế; tuần 1–2 của `TASKS.md` sang `archive/tasks-tuan-1-2.md`; `memory.md` ≤ 5.000 ký tự; lệnh `python -m local_ai.check`; `run` đóng pipe; ghi tiêu chí M19, M20. 266 test, check xanh. Tiếp theo: M19. |
-| 26/9 | Sửa 2 lỗi bảo mật | TerminalTool: git chỉ thấy repo trong thư mục làm việc (`GIT_CEILING_DIRECTORIES`); sandbox và TerminalTool dùng môi trường tối thiểu, không lộ `HF_TOKEN`. Ghi thêm tiêu chí M19 (8) và M20 (4). 271 test, check xanh. Tiếp theo: M19. |
 | 26/9 | M19 | Tắt suy nghĩ (`--no-thinking`), chấm sau đẩy `eval/sau` (`--no-reuse`), 16 câu tool_use (38 câu), gợi ý khi TerminalTool từ chối + nhiệm vụ thử lại, chấm greedy lặp lại được, so số theo giá trị, ghim revision. 294 test, check xanh. Tiếp theo: M20. |
 | 26/9 | M20 | `--tool-calls 0.1` (200/2000 dòng gọi công cụ tự sinh, notebook bật), chặn gần trùng với bộ chấm bằng MinHash (`eval_near_duplicate` trong manifest), `assistant_only_loss` (template Qwen thật TRL thay được; không hỗ trợ thì báo lỗi trước khi nạp model). 309 test, check xanh. Xong 5/5 mốc đã chọn. |
 | 27/9 | Quy ước làm việc (chủ repo yêu cầu, không phải mốc) | `CLAUDE.md` thêm "5 nguyên tắc làm việc", dừng hỏi, chống quên khi nén ngữ cảnh, chia việc cho subagent; skill `lam-moc` thêm 3 dòng. 309 test, check xanh. PR #20 gộp; PR #4 đóng, chưa xoá được nhánh (403). |
 | 27/9 | M22 | `compare` in p-value McNemar chính xác (chỉ `math.comb`) cho tổng, nhóm, ngôn ngữ; `--output` ghi `report.md`. tool_use 7/8 → 3/8: p = 0,125. 317 test, check xanh. Xong 6/6 mốc đã chọn. |
+| 27/9 | M18 | Lệnh `export` (gộp adapter, GGUF bằng llama.cpp `b11205`, Modelfile theo template Ollama), `pull-adapter`, `agents.compare`, notebook `agent_trained_colab`. Thử thật trên máy phát triển với llama.cpp và Ollama 0.34.4 (model tí hon). 333 test (sau khi gộp M22), check xanh. Xong 7/7 mốc đã chọn. |

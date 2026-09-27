@@ -11,6 +11,7 @@ Luồng chính:
 preset / dataset Hugging Face (+ dòng gọi công cụ tự sinh) ──► local_ai.data (kiểm tra, loại trùng, lọc chất lượng, chặn trùng và gần trùng với eval) ──► sft.jsonl
 sft.jsonl ──► local_ai.training.finetune (full | LoRA | QLoRA) ──► adapter (.runs/<tên>/adapter)
 model gốc + adapter_path ──► local_ai.evaluation (38 câu, 4 cách chấm) ──► .runs/eval/<model>-<thời điểm>/report.{json,md}
+model gốc + adapter_path ──► local_ai.training.export (gộp, GGUF bằng llama.cpp, Modelfile) ──► ollama create ──► agent (M18)
 ```
 
 Trên Colab (tuần 2), `notebooks/train_colab.ipynb` gọi đúng các lệnh trên. Trong lúc train, checkpoint được đẩy lên repo Hugging Face riêng tư để chạy tiếp khi Colab ngắt. `notebooks/agent_colab.ipynb` chạy Ollama ở `localhost` rồi cho agent làm các nhiệm vụ mẫu:
@@ -76,7 +77,9 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 - thiếu GPU hoặc thư viện thì trả `"status": "skipped"`;
 - từ chối model chạy qua server và từ chối full fine-tune trên model đã nén.
 
-`hub.py`: kiểm tra tên repo, tải `last-checkpoint`, đọc `trainer_state.json` trên repo để biết đã train tới bước nào, đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`). Token chỉ đọc từ biến môi trường `HF_TOKEN`; `huggingface_hub` chỉ được import khi gọi Hub.
+`hub.py`: kiểm tra tên repo, tải `last-checkpoint`, đọc `trainer_state.json` trên repo để biết đã train tới bước nào, đẩy adapter lên repo riêng tư (`python -m local_ai.training.hub push-adapter`) và tải adapter về (`pull-adapter`, M18: chỉ các file adapter). Token chỉ đọc từ biến môi trường `HF_TOKEN`; `huggingface_hub` chỉ được import khi gọi Hub.
+
+`export.py` (M18, `python -m local_ai.training.export`): nạp model gốc không nén theo revision đã ghim, gộp LoRA (`merge_and_unload`; `--no-adapter` giữ nguyên model gốc), lưu safetensors + tokenizer, chuyển sang GGUF bằng `convert_hf_to_gguf.py` của llama.cpp (bản ghim `b11205`, mặc định `q8_0`), viết Modelfile với chat template, lời hệ thống, tham số của họ model trong thư viện Ollama (`configs/ollama/<model_type>.json`, kiểm tra mã băm), ghi `export_info.json` (nguồn, revision, mã băm adapter). Chỉ model chữ.
 
 `estimate.py` (`python -m local_ai.training.estimate`) ước tính thời gian train và chấm trên T4, không tải model:
 - số token mỗi dòng đếm từ `sft.jsonl` (kể cả phần đệm khi batch lớn hơn 1);
@@ -136,7 +139,8 @@ Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test c
   8. đẩy adapter.
 
   Hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`.
-- `agent_colab.ipynb`: cài Ollama (ghim bản 0.34.4) → tải `qwen3:4b` → chạy máy chủ ở `localhost:11434` → agent làm 5 nhiệm vụ mẫu qua adapter kiểu OpenAI (mục `ollama-colab`).
+- `agent_colab.ipynb`: cài Ollama (ghim bản 0.34.4) → tải `qwen3:4b` → chạy máy chủ ở `localhost:11434` → agent làm 6 nhiệm vụ mẫu qua adapter kiểu OpenAI (mục `ollama-colab`).
+- `agent_trained_colab.ipynb` (M18): chọn `smoke` hoặc `light` → tải adapter đã train (`pull-adapter`) → xuất 2 file GGUF cùng một đường (model gốc `--no-adapter`, model đã train) → `ollama create huyen-<model>-goc`, `huyen-<model>-da-train` → agent làm 6 nhiệm vụ với từng model (mục `ollama-<model>-goc`, `ollama-<model>-da-train`) → bảng so sánh (`python -m local_ai.agents.compare`).
 
 ### Agent và công cụ (`local_ai/agents`, `local_ai/tools`)
 `AutonomousAgent` là vòng lặp có giới hạn số lần: lập kế hoạch → chọn công cụ → thực thi → đánh giá → sửa hoặc thử lại. Agent dùng để thử model:
@@ -148,11 +152,13 @@ Notebook chỉ gọi các lệnh `python -m local_ai...` của repo, nên test c
 
 Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham số nào (`ToolRegistry.register(name, tool, description)`). Agent gửi danh sách này, lịch sử quan sát và mẫu JSON cần trả về trong prompt, để model thật biết gọi công cụ thế nào.
 
-`agents/tasks.py` (`python -m local_ai.agents.tasks`) chạy 5 nhiệm vụ mẫu trong `data/eval/agent_tasks_v1.jsonl` với `calculator` và `TerminalTool`:
+`agents/tasks.py` (`python -m local_ai.agents.tasks`) chạy 6 nhiệm vụ mẫu trong `data/eval/agent_tasks_v1.jsonl` với `calculator` và `TerminalTool`:
 - `TerminalTool` chỉ bật trong thư mục làm việc riêng của từng nhiệm vụ;
 - nhiệm vụ đạt khi câu trả lời đúng và agent đã gọi mọi công cụ cần dùng;
 - lệnh in trace và tỉ lệ thành công;
 - model là server kiểu OpenAI (`--model`, ví dụ `ollama-colab`) hoặc câu trả lời mẫu (`--scripted`).
+
+`agents/compare.py` (M18, `python -m local_ai.agents.compare <lần 1>.json <lần 2>.json`) so sánh 2 báo cáo của `agents.tasks --output`: bảng từng nhiệm vụ, tỉ lệ thành công, thời gian, nhiệm vụ mới đạt / mới trượt.
 
 ## Kiểm thử
 - `tests/test_m1_…` đến `tests/test_m7_…` tương ứng 7 mốc tuần 1; `tests/test_m8_…` đến `tests/test_m14_…` là các mốc tuần 2 (kế hoạch ở `archive/tasks-tuan-1-2.md`); `tests/test_m15_…` trở đi là các mốc tuần 3 trong `TASKS.md`. Test không cần mạng hay GPU.
