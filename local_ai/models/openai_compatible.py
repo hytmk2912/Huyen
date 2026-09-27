@@ -65,7 +65,8 @@ class OpenAICompatibleAdapter:
         if any(message.images for message in messages): raise ValueError(f"Adapter server local chưa hỗ trợ gửi ảnh (model '{self.name}'); hãy dùng backend transformers cho model multimodal")
         if not self._checked: check_local_url(self.config.base_url); self._checked = True
         payload = {"model": self.config.source, "messages": [{"role": message.role, "content": message.content} for message in messages], "stream": False,
-                   "temperature": self.config.temperature, "seed": self.config.seed}  # temperature 0 và seed cố định: chấm lại ra cùng kết quả
+                   "temperature": self.config.temperature, "seed": self.config.seed,  # temperature 0 và seed cố định: chấm lại ra cùng kết quả
+                   "max_tokens": self.config.max_new_tokens}  # M23: giới hạn độ dài câu trả lời như max_new_tokens của model transformers
         if self.config.enable_thinking is not None: payload["chat_template_kwargs"] = {"enable_thinking": self.config.enable_thinking}  # vLLM, llama.cpp server hiểu khóa này
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         key = os.environ.get(self.config.api_key_env) if self.config.api_key_env else None

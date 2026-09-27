@@ -10,17 +10,21 @@ Cách làm như tuần 3: mỗi lượt **tối đa 1 mốc** bằng skill `lam-
 
 | Mốc | Nội dung | Trạng thái | Tiến độ | Bằng chứng |
 | --- | --- | --- | --- | --- |
-| M23 | Gửi `max_tokens` cho model qua server | **Chưa làm** | 0/2 (0%) | — |
+| M23 | Gửi `max_tokens` cho model qua server | **Xong** | 2/2 (100%) | `tests/test_m23_max_tokens.py` (4 test) |
 | M24 | Notebook Kaggle | **Chưa làm** | 0/5 (0%) | — |
 | M25 | Model trung gian 14B abliterated | **Chưa làm** | 0/4 (0%) | — |
 | M26 | Preset tiếng Việt thứ 2 | **Chưa làm** | 0/4 (0%) | — |
 | M27 | Tổng kết tuần 4 | **Chưa làm** | 0/3 (0%) | — |
-| **Tổng** | 5 mốc | 0 **Xong** | 0/5 mốc (0%) | `python -m local_ai.check` lúc bắt đầu: 338 test chạy qua (27/9) |
+| **Tổng** | 5 mốc | 1 **Xong** | 1/5 mốc (20%) | `python -m local_ai.check`: 342 test chạy qua, không test nào bị bỏ qua (27/9, sau M23) |
 
 ## M23: Gửi max_tokens
 Mục tiêu: `max_new_tokens` hiện không giới hạn được độ dài câu trả lời của model qua server (Ollama, llama.cpp, vLLM), vì adapter không gửi `max_tokens` (phát hiện khi làm M18).
-- [ ] 1. `openai_compatible` gửi `"max_tokens"` = `config.max_new_tokens` trong payload.
-- [ ] 2. Test dùng server giả, kiểm tra payload nhận được có `max_tokens` đúng giá trị, cả giá trị mặc định 512 và giá trị tự đặt. `python -m local_ai.check` xanh.
+- [x] 1. `openai_compatible` gửi `"max_tokens"` = `config.max_new_tokens` trong payload.
+
+  Đã làm: `local_ai/models/openai_compatible.py` thêm `max_tokens` vào payload. README (mục chạy model qua server) ghi rõ.
+- [x] 2. Test dùng server giả, kiểm tra payload nhận được có `max_tokens` đúng giá trị, cả giá trị mặc định 512 và giá trị tự đặt. `python -m local_ai.check` xanh.
+
+  Bằng chứng: `tests/test_m23_max_tokens.py` (4 test: mặc định 512; tự đặt 1, 64, 300, 4096; lệnh chấm dùng giá trị trong danh sách model rồi `--max-new-tokens 32`; các mục server trong `platform.json`). Chạy trên code cũ thì cả 4 test lỗi. Test M3 so nguyên payload thêm `"max_tokens": 512`. `python -m local_ai.check`: 342 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
 
 ## M24: Notebook Kaggle
 - [ ] 1. `notebooks/train_kaggle.ipynb` sinh bằng `notebooks/build.py`.

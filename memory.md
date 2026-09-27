@@ -8,11 +8,11 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 - Không có mốc tồn: tuần 3 xong 8/8 mốc (M15–M22). Phần M18–M20 chưa chạy lại trên Colab (việc chủ repo 8, 9).
 
 ## Checklist tuần 4
-- [ ] M23 Gửi max_tokens · [ ] M24 Notebook Kaggle · [ ] M25 Model 14B abliterated
+- [x] M23 Gửi max_tokens · [ ] M24 Notebook Kaggle · [ ] M25 Model 14B abliterated
 - [ ] M26 Preset tiếng Việt thứ 2 · [ ] M27 Tổng kết tuần 4
 
 ## Mốc đang làm
-- Tuần 4 mở ngày 27/9 (tiêu chí do chủ repo đặt). Mốc kế tiếp: M23.
+- M23 xong 27/9. Mốc kế tiếp: **M24** (Notebook Kaggle), chờ chủ repo gọi.
 - Tự gộp PR khi `python -m local_ai.check` (không `--allow-skip`) xanh; không hỏi chủ repo (chủ repo cho phép 26/9).
 - Số đo thật (M15): `tests/fixtures/measurements/that_*.json`; T4 `train_tflops` 5,2; VRAM QLoRA cộng `KBIT_OVERHEAD_GB` × √(tỷ tham số); agent 4/5.
 
@@ -36,7 +36,6 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 | --- | --- |
 | Model chính 27B chưa train thật trên GPU; QLoRA 4bit với model ảnh + chữ chưa chạy trên GPU. | `finetune.py`, `configs/training/qlora_primary.json` |
 | Sau khi train, tool_use của `light` tụt 7/8 → 3/8 (đo 26/9; p = 0,125 theo M22, chưa chắc là tụt thật). M19, M20 đã sửa bộ chấm và dữ liệu train; chưa chạy lại trên Colab. | Colab (chủ repo) |
-| `max_new_tokens` không giới hạn câu trả lời của model qua server (adapter chưa gửi `max_tokens`). | `local_ai/models/openai_compatible.py` (M23) |
 
 ## Nhật ký tuần 4
 Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-4.md`.
@@ -44,3 +43,4 @@ Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-4.md`.
 | Ngày | Lượt | Kết quả |
 | --- | --- | --- |
 | 27/9 | Mở tuần 4 | `TASKS.md` tuần 3 chép nguyên văn sang `archive/tasks-tuan-3.md`; `TASKS.md` mới M23–M27; nhật ký tuần 3 sang `archive/memory-tuan-3.md`. |
+| 27/9 | M23 | Adapter server gửi `max_tokens` = `max_new_tokens`; 4 test mới với server giả (mặc định 512, tự đặt, `--max-new-tokens` của lệnh chấm). 342 test, KẾT QUẢ: XANH. Tiếp theo: M24. |
