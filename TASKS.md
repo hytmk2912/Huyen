@@ -13,9 +13,9 @@ Cách làm như tuần 3: mỗi lượt **tối đa 1 mốc** bằng skill `lam-
 | M23 | Gửi `max_tokens` cho model qua server | **Xong** | 2/2 (100%) | `tests/test_m23_max_tokens.py` (4 test) |
 | M24 | Notebook Kaggle | **Xong** | 5/5 (100%) | `tests/test_m24_kaggle.py` (17 test) |
 | M25 | Model trung gian 14B abliterated | **Xong** | 4/4 (100%) | `tests/test_m25_model_14b.py` (9 test) |
-| M26 | Preset tiếng Việt thứ 2 | **Chưa làm** | 0/4 (0%) | — |
+| M26 | Preset tiếng Việt thứ 2 | **Xong** | 4/4 (100%) | `tests/test_m26_preset_tieng_viet_2.py` (8 test) |
 | M27 | Tổng kết tuần 4 | **Chưa làm** | 0/3 (0%) | — |
-| **Tổng** | 5 mốc | 3 **Xong** | 3/5 mốc (60%) | `python -m local_ai.check`: 368 test chạy qua, không test nào bị bỏ qua (30/9, sau M25) |
+| **Tổng** | 5 mốc | 4 **Xong** | 4/5 mốc (80%) | `python -m local_ai.check`: 376 test chạy qua, không test nào bị bỏ qua (30/9, sau M26) |
 
 ## M23: Gửi max_tokens
 Mục tiêu: `max_new_tokens` hiện không giới hạn được độ dài câu trả lời của model qua server (Ollama, llama.cpp, vLLM), vì adapter không gửi `max_tokens` (phát hiện khi làm M18).
@@ -64,10 +64,19 @@ Model đã chọn: `huihui-ai/Huihui-Qwen3-14B-abliterated-v2`, mục `medium`. 
   Bằng chứng: 368 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
 
 ## M26: Preset tiếng Việt thứ 2
-- [ ] 1. Chỉ chọn dataset có giấy phép cho phép dùng.
-- [ ] 2. Ghi giấy phép vào `docs/GIAY_PHEP_DATASET.md`.
-- [ ] 3. Có fixture và test giống các preset cũ.
-- [ ] 4. `python -m local_ai.check` xanh.
+Preset mới: `vietnamese_aya` (`configs/datasets/presets/vietnamese_aya.json`), lấy câu hỏi và câu trả lời tiếng Việt do người viết mới hoàn toàn trong `CohereLabs/aya_dataset`.
+- [x] 1. Chỉ chọn dataset có giấy phép cho phép dùng.
+
+  Bằng chứng: card ghi Apache-2.0, "can be used for any purpose, whether academic or commercial"; dữ liệu do người tình nguyện của Aya Open Science Initiative viết, không bị khóa. Preset chỉ lấy dòng `language_code` `vie` và `annotation_type` `original-annotations` (4.853 dòng ở commit `f9ea0458…`), bỏ `re-annotations` vì phần gốc đến từ dataset khác. Các ứng viên bị loại: bản dịch từ dữ liệu sinh bằng ChatGPT hoặc Alpaca (cấm thương mại), dataset không ghi nguồn gốc, dataset bị khóa. Test `test_preset_points_to_a_pinned_dataset_with_a_license_that_allows_use`.
+- [x] 2. Ghi giấy phép vào `docs/GIAY_PHEP_DATASET.md`.
+
+  Bằng chứng: dòng `vietnamese_aya` trong bảng tóm tắt và mục riêng (giấy phép, nguồn gốc, cảnh báo của card, cách ghi nguồn). Test `test_license_is_written_in_the_license_doc`.
+- [x] 3. Có fixture và test giống các preset cũ.
+
+  Bằng chứng: fixture `tests/fixtures/presets/vietnamese_aya.jsonl` (6 dòng: tiếng Anh, `re-annotations`, dòng thiếu câu trả lời, và 3 dòng hợp lệ, một dòng lấy thật từ Aya). Test `tests/test_m26_preset_tieng_viet_2.py` (8 test): map cột, chỉ giữ dòng tiếng Việt do người viết, trộn thay preset `vietnamese`, lệnh `--dry-run`, bộ lọc `where` và `scan_limit` mới trong `hub.py`. Test M4 thêm preset mới vào danh sách preset (yêu cầu mới của M26). `where` ghi dạng cặp `[cột, giá trị]`, vì test M1 coi mọi khóa trong cấu hình là khóa code phải đọc (như tham số Ollama ở M18). Đã đọc thật 20 dòng bằng streaming (30/9): 20/20 dòng tiếng Việt, không dòng nào bị loại.
+- [x] 4. `python -m local_ai.check` xanh.
+
+  Bằng chứng: 376 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
 
 ## M27: Tổng kết tuần 4
 - [ ] 1. README, `docs/ARCHITECTURE.md`, `memory.md` khớp thực tế.

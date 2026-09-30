@@ -145,25 +145,27 @@ Gateway hàng đợi job (`python -m local_ai.runtime.gateway`) cũng **tắt s�
 ## Bước 1: chuẩn bị dữ liệu
 
 ### Dùng preset có sẵn
-`configs/datasets/presets/` có 3 preset trỏ tới dataset công khai trên Hugging Face. Mỗi preset:
+`configs/datasets/presets/` có 4 preset trỏ tới dataset công khai trên Hugging Face. Mỗi preset:
 - khóa cố định một commit (`revision`);
-- đọc kiểu streaming, tối đa 1000 dòng, nên không tải cả dataset.
+- đọc kiểu streaming, tối đa 1000 dòng, nên không tải cả dataset. Preset lấy một phần dataset (`where`, M26) còn có `scan_limit`: số dòng tối đa được đọc, kể cả dòng bị bỏ qua.
 
 | Preset | Dataset | Nội dung | Giấy phép ghi trên Hugging Face |
 | --- | --- | --- | --- |
 | `code` | `bigcode/self-oss-instruct-sc2-exec-filter-50k` | Bài lập trình Python kèm lời giải đã chạy thử (tiếng Anh) | ODC-By |
 | `reasoning` | `open-r1/OpenR1-Math-220k` | Bài toán + lời giải (đưa vào khối `<think>`) + đáp án (tiếng Anh) | Apache-2.0 |
 | `vietnamese` | `5CD-AI/Vietnamese-Multi-turn-Chat-Alpaca` | Hội thoại tiếng Việt nhiều lượt, giữ nguyên mọi lượt | Apache-2.0 |
+| `vietnamese_aya` (M26) | `CohereLabs/aya_dataset` | Hỏi đáp tiếng Việt do người viết mới hoàn toàn (chỉ dòng `language_code` `vie`, `annotation_type` `original-annotations`; đọc tối đa 45.000 dòng đầu để lấy tối đa 1000 dòng) | Apache-2.0 |
 
 **Trước khi dùng, hãy đọc lại giấy phép trên dataset card** (trang giới thiệu dataset). Giấy phép trong preset được ghi kèm trạng thái "cần kiểm tra lại trên dataset card", vì dữ liệu có thể được dịch hoặc sinh từ model khác, và giấy phép gốc có thể chặt hơn.
 
-Kết quả đọc giấy phép và nguồn gốc của 3 dataset (ngày 25/9) nằm trong [`docs/GIAY_PHEP_DATASET.md`](docs/GIAY_PHEP_DATASET.md). Tóm tắt: `code` phải ghi nguồn; `vietnamese` được dịch từ dữ liệu gốc có giấy phép **cấm dùng thương mại**, nên chỉ dùng cá nhân hoặc nghiên cứu.
+Kết quả đọc giấy phép và nguồn gốc của các dataset (3 preset đầu ngày 25/9, `vietnamese_aya` ngày 30/9) nằm trong [`docs/GIAY_PHEP_DATASET.md`](docs/GIAY_PHEP_DATASET.md). Tóm tắt: `code` phải ghi nguồn; `vietnamese` được dịch từ dữ liệu gốc có giấy phép **cấm dùng thương mại**, nên chỉ dùng cá nhân hoặc nghiên cứu; `vietnamese_aya` do người viết, dùng được cả thương mại (nên ghi nguồn). Muốn dùng thương mại thì thay `vietnamese` bằng `vietnamese_aya`:
 
 ```bash
 python -m local_ai.data list-presets                                          # xem các preset
 python -m local_ai.data hf-sft --config configs/datasets/presets/code.json    # một preset
 python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --output data/processed/hf_sft
 python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese:0.3 --total 2000 --tool-calls 0.1 --output data/processed/hf_sft   # như notebook: 1800 dòng preset + 200 dòng gọi công cụ
+python -m local_ai.data hf-sft --preset code:0.4 --preset reasoning:0.3 --preset vietnamese_aya:0.3 --total 2000 --tool-calls 0.1 --output data/processed/hf_sft   # M26: preset tiếng Việt dùng được cả thương mại
 ```
 
 Trộn nhiều preset (lặp lại `--preset tên:tỉ_lệ`) thì kết quả chung vào một `sft.jsonl`, mặc định ở `data/processed/hf_sft/`, đúng chỗ các cấu hình train đọc:

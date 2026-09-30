@@ -40,7 +40,7 @@ def run_preset(name, directory, calls):
 class PresetFileTests(unittest.TestCase):
     def test_three_presets_point_to_real_datasets(self):
         presets = {item["name"]: item for item in list_presets()}
-        self.assertEqual(set(presets), set(PRESETS))
+        self.assertEqual(set(presets), {*PRESETS, "vietnamese_aya"})  # M26 (chủ repo đặt 27/9) thêm preset tiếng Việt thứ 2, test trong test_m26_preset_tieng_viet_2.py
         self.assertEqual((presets["code"]["domain"], presets["reasoning"]["domain"], presets["vietnamese"]["language"]), ("coding", "math_logic", "vi"))
         for name, item in presets.items():
             with self.subTest(name):
@@ -144,7 +144,7 @@ class CommandTests(unittest.TestCase):
         result = subprocess.run([sys.executable, "-m", "local_ai.data", "list-presets"], cwd=ROOT, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         for name in PRESETS: self.assertRegex(result.stdout, rf"(?m)^{name}: ")
-        self.assertEqual(result.stdout.count("cần kiểm tra lại trên dataset card"), len(PRESETS))
+        self.assertEqual(result.stdout.count("cần kiểm tra lại trên dataset card"), len(PRESETS) + 1)  # M26 thêm preset vietnamese_aya
 
     def test_hf_sft_accepts_config_or_several_presets(self):
         with tempfile.TemporaryDirectory() as directory:

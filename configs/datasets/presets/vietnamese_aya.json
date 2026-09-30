@@ -1,0 +1,35 @@
+{
+  "_comment": "Preset tiếng Việt thứ 2 (M26): câu hỏi và câu trả lời tiếng Việt do người viết mới hoàn toàn trong Aya Dataset của Cohere Labs (annotation_type original-annotations; bỏ re-annotations là bản người sửa từ dữ liệu sinh tự động của dataset khác). Giấy phép Apache-2.0: card ghi dùng được cho mọi mục đích, kể cả thương mại; nên ghi nguồn khi công khai model. Dataset có 65 ngôn ngữ trong một file, nên where giữ dòng tiếng Việt và scan_limit chặn số dòng đọc: đọc tối đa 45.000 dòng đầu để lấy tối đa 1000 dòng (dòng thứ 1000 hợp lệ nằm ở khoảng dòng 42.900). Chi tiết: docs/GIAY_PHEP_DATASET.md.",
+  "description": "Hỏi đáp tiếng Việt do người viết (Aya Dataset)",
+  "dataset_version": "preset-vietnamese-aya-v1",
+  "seed": 17,
+  "output_dir": "data/processed/presets/vietnamese_aya",
+  "formats": [
+    "sft"
+  ],
+  "eval_sources": [
+    "data/eval/seed_eval.jsonl", "data/eval/eval_v1.jsonl"
+  ],
+  "hf_dataset": {
+    "name": "CohereLabs/aya_dataset",
+    "subset": null,
+    "split": "train",
+    "revision": "f9ea04583f02a8f86404ff6c58bf75fe637df8a2",
+    "streaming": true,
+    "limit": 1000,
+    "scan_limit": 45000,
+    "where": [["language_code", "vie"], ["annotation_type", "original-annotations"]],
+    "domain": "chat",
+    "language": "vi",
+    "task": "sft",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://huggingface.co/datasets/CohereLabs/aya_dataset",
+      "status": "cần kiểm tra lại trên dataset card"
+    },
+    "mapping": {
+      "input": "inputs",
+      "expected_output": "targets"
+    }
+  }
+}

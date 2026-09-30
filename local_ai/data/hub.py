@@ -37,6 +37,11 @@ def validate_spec(spec: dict[str, Any]) -> None:
     mapping = spec.get("mapping", {})
     if not spec.get("messages_field") and not (mapping.get("input") and mapping.get("expected_output")):
         raise ValueError("Hãy đặt hf_dataset.messages_field, hoặc hf_dataset.mapping.input và mapping.expected_output")
+    where, scan_limit = spec.get("where"), spec.get("scan_limit")
+    if where is not None and (not isinstance(where, list) or not where or not all(isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], str) and isinstance(pair[1], (str, int, float, bool)) for pair in where)):
+        raise ValueError("hf_dataset.where phải là danh sách cặp [tên cột, giá trị], ví dụ [[\"language_code\", \"vie\"]]")
+    if where and not (isinstance(scan_limit, int) and scan_limit > 0):
+        raise ValueError("Có hf_dataset.where thì phải đặt hf_dataset.scan_limit (số dòng tối đa được đọc, kể cả dòng bị bỏ qua) để không đọc cả dataset")
 
 
 def load_hf_rows(spec: dict[str, Any], loader: RowLoader | None = None) -> list[dict[str, Any]]:
@@ -48,6 +53,10 @@ def load_hf_rows(spec: dict[str, Any], loader: RowLoader | None = None) -> list[
         loader = load_dataset
         _state["real_stream"] = _state["real_stream"] or bool(spec.get("streaming"))
     rows = loader(spec["name"], spec.get("subset"), split=spec.get("split", "train"), revision=spec.get("revision", "main"), streaming=spec.get("streaming", False), token=hf_token())
+    # M26: `where` (danh sách cặp [cột, giá trị]) chỉ giữ dòng có đúng giá trị ở các cột đã chọn (ví dụ dòng tiếng Việt trong dataset nhiều ngôn ngữ);
+    # `scan_limit` chặn số dòng được đọc, kể cả dòng bị bỏ qua, nên không bao giờ đọc hết dataset.
+    if spec.get("scan_limit"): rows = islice(rows, spec["scan_limit"])
+    if spec.get("where"): rows = (row for row in rows if all(row.get(column) == value for column, value in spec["where"]))
     limit = spec.get("limit")
     return [dict(row) for row in (islice(rows, limit) if limit else rows)]
 
