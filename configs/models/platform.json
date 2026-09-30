@@ -1,5 +1,5 @@
 {
-  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. revision: mã commit (40 ký tự) của repo trên Hugging Face, ghim để model không đổi âm thầm khi repo cập nhật (M19; mục -lora, -colab dùng cùng revision với model gốc); bỏ trống thì dùng main. Tùy chọn: tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp). backend: transformers (mặc định, nạp model bằng thư viện transformers) hoặc openai_compatible (gọi server local kiểu OpenAI: Ollama, llama.cpp, vLLM). Với openai_compatible: source là tên model trên server, base_url là địa chỉ server (chỉ cho phép máy này hoặc mạng nội bộ), timeout_s là số giây chờ tối đa, api_key_env (tùy chọn) là tên biến môi trường chứa khóa nếu server yêu cầu; dtype, device_map, quantization không dùng tới. Mục ollama-<smoke|light>-<goc|da-train> (M18) là model GGUF tự xuất bằng python -m local_ai.training.export rồi ollama create huyen-<model>-<goc|da-train> trong notebook agent_trained_colab: model gốc và model đã train đi qua cùng một đường để so sánh agent. adapter_path (tùy chọn): thư mục LoRA adapter đã train, nạp chồng lên model gốc khi chạy hoặc chấm (ví dụ smoke-lora, light-lora, primary-qlora dùng sau khi train theo README); max_new_tokens (tùy chọn, mặc định 512). temperature (mặc định 0: greedy, chấm lại ra cùng kết quả), seed (mặc định 0, dùng khi temperature lớn hơn 0), enable_thinking (false: tắt chế độ suy nghĩ của Qwen3; bỏ trống: theo chat template).",
+  "_comment": "Danh sách model. Model đầu tiên là model chính. Muốn thêm model thì thêm một mục có ít nhất name, source (tên repo trên Hugging Face), dtype, kind, params_b và capabilities; name không được trùng. kind: text (nạp bằng AutoTokenizer + AutoModelForCausalLM) hoặc multimodal (ảnh + chữ, nạp bằng AutoProcessor + AutoModelForMultimodalLM). params_b: số tỷ tham số theo trang model trên Hugging Face, dùng để ước tính VRAM. revision: mã commit (40 ký tự) của repo trên Hugging Face, ghim để model không đổi âm thầm khi repo cập nhật (M19; mục -lora, -colab dùng cùng revision với model gốc); bỏ trống thì dùng main. Tùy chọn: tokenizer_source, tokenizer_revision, device_map, offline, quantization (4bit hoặc 8bit, nén bằng bitsandbytes khi nạp). backend: transformers (mặc định, nạp model bằng thư viện transformers) hoặc openai_compatible (gọi server local kiểu OpenAI: Ollama, llama.cpp, vLLM). Với openai_compatible: source là tên model trên server, base_url là địa chỉ server (chỉ cho phép máy này hoặc mạng nội bộ), timeout_s là số giây chờ tối đa, api_key_env (tùy chọn) là tên biến môi trường chứa khóa nếu server yêu cầu; dtype, device_map, quantization không dùng tới. Mục medium (M25): model trung gian Huihui Qwen3 14B abliterated (chỉ có chữ, cùng chat template với Qwen3-4B), revision và params_b lấy từ API Hugging Face ngày 29/9/2026 (sha và safetensors.total, không tải trọng số); train bằng configs/training/colab_14b.json. Mục ollama-<smoke|light>-<goc|da-train> (M18) là model GGUF tự xuất bằng python -m local_ai.training.export rồi ollama create huyen-<model>-<goc|da-train> trong notebook agent_trained_colab: model gốc và model đã train đi qua cùng một đường để so sánh agent. adapter_path (tùy chọn): thư mục LoRA adapter đã train, nạp chồng lên model gốc khi chạy hoặc chấm (ví dụ smoke-lora, light-lora, primary-qlora dùng sau khi train theo README); max_new_tokens (tùy chọn, mặc định 512). temperature (mặc định 0: greedy, chấm lại ra cùng kết quả), seed (mặc định 0, dùng khi temperature lớn hơn 0), enable_thinking (false: tắt chế độ suy nghĩ của Qwen3; bỏ trống: theo chat template).",
   "models": [
     {
       "name": "primary",
@@ -23,6 +23,17 @@
       "dtype": "bfloat16",
       "device_map": "auto",
       "capabilities": ["coding", "tool_calling"],
+      "offline": false
+    },
+    {
+      "name": "medium",
+      "source": "huihui-ai/Huihui-Qwen3-14B-abliterated-v2",
+      "kind": "text",
+      "params_b": 14.77,
+      "revision": "3b79629fdd65004d3b9cdf5beb0739e8c7e1becd",
+      "dtype": "bfloat16",
+      "device_map": "auto",
+      "capabilities": ["chat", "reasoning"],
       "offline": false
     },
     {

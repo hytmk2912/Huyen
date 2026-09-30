@@ -12,10 +12,10 @@ Cách làm như tuần 3: mỗi lượt **tối đa 1 mốc** bằng skill `lam-
 | --- | --- | --- | --- | --- |
 | M23 | Gửi `max_tokens` cho model qua server | **Xong** | 2/2 (100%) | `tests/test_m23_max_tokens.py` (4 test) |
 | M24 | Notebook Kaggle | **Xong** | 5/5 (100%) | `tests/test_m24_kaggle.py` (17 test) |
-| M25 | Model trung gian 14B abliterated | **Chưa làm** | 0/4 (0%) | — |
+| M25 | Model trung gian 14B abliterated | **Xong** | 4/4 (100%) | `tests/test_m25_model_14b.py` (9 test) |
 | M26 | Preset tiếng Việt thứ 2 | **Chưa làm** | 0/4 (0%) | — |
 | M27 | Tổng kết tuần 4 | **Chưa làm** | 0/3 (0%) | — |
-| **Tổng** | 5 mốc | 2 **Xong** | 2/5 mốc (40%) | `python -m local_ai.check`: 359 test chạy qua, không test nào bị bỏ qua (27/9, sau M24) |
+| **Tổng** | 5 mốc | 3 **Xong** | 3/5 mốc (60%) | `python -m local_ai.check`: 368 test chạy qua, không test nào bị bỏ qua (30/9, sau M25) |
 
 ## M23: Gửi max_tokens
 Mục tiêu: `max_new_tokens` hiện không giới hạn được độ dài câu trả lời của model qua server (Ollama, llama.cpp, vLLM), vì adapter không gửi `max_tokens` (phát hiện khi làm M18).
@@ -49,10 +49,19 @@ Làm đúng các bước của `train_colab` trên GPU miễn phí của Kaggle;
   Bằng chứng: 359 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
 
 ## M25: Model trung gian 14B abliterated
-- [ ] 1. `configs/models/platform.json` thêm bản Huihui Qwen3 14B abliterated, ghim revision 40 ký tự lấy từ API Hugging Face (chỉ đọc metadata, không tải trọng số). Không có mạng thì dừng lại và ghi vào "Việc dở".
-- [ ] 2. Thêm `configs/training/colab_14b.json` (QLoRA, fp16).
-- [ ] 3. Test chứng minh `vram.py` ước tính vừa 16 GB với seq len đã chọn; nếu không vừa thì ghi seq len lớn nhất còn vừa.
-- [ ] 4. `python -m local_ai.check` xanh.
+Model đã chọn: `huihui-ai/Huihui-Qwen3-14B-abliterated-v2`, mục `medium`. Có 2 bản 14B của huihui-ai trên Hugging Face; bản v2 mới hơn, nhiều lượt tải hơn và không bị khóa (bản cũ `Qwen3-14B-abliterated` phải chấp nhận điều khoản trước khi tải).
+- [x] 1. `configs/models/platform.json` thêm bản Huihui Qwen3 14B abliterated, ghim revision 40 ký tự lấy từ API Hugging Face (chỉ đọc metadata, không tải trọng số). Không có mạng thì dừng lại và ghi vào "Việc dở".
+
+  Bằng chứng: có mạng. API `https://huggingface.co/api/models/huihui-ai/Huihui-Qwen3-14B-abliterated-v2` ngày 29/9/2026 trả `sha` `3b79629fdd65004d3b9cdf5beb0739e8c7e1becd` và `safetensors.total` 14.768.307.200 (14,77 tỷ). Bản chụp metadata (kèm `config.json` và mã băm `chat_template.jinja` ở đúng revision) nằm ở `tests/fixtures/hf_api/huihui_qwen3_14b_abliterated_v2_2026-09-29.json`. Test: `test_platform_entry_matches_hugging_face_metadata`, `test_chat_template_lets_trl_train_on_answers_only`. Test M19 thêm model 14B vào danh sách model đã ghim revision (yêu cầu mới của M25).
+- [x] 2. Thêm `configs/training/colab_14b.json` (QLoRA, fp16).
+
+  Bằng chứng: QLoRA 4bit, fp16, batch 1, tích lũy 16, `max_length` 1024, chỉ tính loss trên câu trả lời. Test `test_colab_14b_is_qlora_fp16_on_medium`.
+- [x] 3. Test chứng minh `vram.py` ước tính vừa 16 GB với seq len đã chọn; nếu không vừa thì ghi seq len lớn nhất còn vừa.
+
+  Kết quả: **không vừa**. Ở seq len đã chọn (1024), `vram.py` ước tính 18,6 GB; seq len lớn nhất còn vừa 16 GB là **128 token**, quá ngắn để train có ích. Cần GPU 24 GB (ví dụ L4). `vram.py` thêm tham số `seq_len` (giả định một nửa phần thêm khi train tăng theo số token, chưa đo; ở 2048 token giữ nguyên số cũ), hàm `max_seq_len` và tùy chọn `--seq-len`, `--budget-gb`. Lệnh `estimate` dùng độ dài của cấu hình. Test: `test_chosen_length_does_not_fit_16gb_and_longest_fitting_is_recorded`, `test_seq_len_keeps_calibrated_values_at_2048`, `test_longest_length_for_other_models`, `test_vram_command_prints_length_and_longest_fitting`, `test_estimate_uses_the_length_in_the_config`, `test_readme_explains_the_14b_model_and_its_vram`.
+- [x] 4. `python -m local_ai.check` xanh.
+
+  Bằng chứng: 368 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
 
 ## M26: Preset tiếng Việt thứ 2
 - [ ] 1. Chỉ chọn dataset có giấy phép cho phép dùng.

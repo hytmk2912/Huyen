@@ -1,0 +1,30 @@
+{
+  "_comment": "Bản chụp metadata của model trung gian (M25), lấy ngày 29/9/2026, chỉ đọc metadata, không tải trọng số: API https://huggingface.co/api/models/huihui-ai/Huihui-Qwen3-14B-abliterated-v2 (id, sha, lastModified, gated, license, base_model, safetensors.total) và 2 file nhỏ ở đúng revision: config.json (kiến trúc) và chat_template.jinja (mã băm SHA-256).",
+  "api": {
+    "id": "huihui-ai/Huihui-Qwen3-14B-abliterated-v2",
+    "sha": "3b79629fdd65004d3b9cdf5beb0739e8c7e1becd",
+    "lastModified": "2025-06-19T15:40:01.000Z",
+    "gated": false,
+    "license": "apache-2.0",
+    "base_model": [
+      "Qwen/Qwen3-14B"
+    ],
+    "safetensors_total": 14768307200
+  },
+  "config": {
+    "architectures": [
+      "Qwen3ForCausalLM"
+    ],
+    "model_type": "qwen3",
+    "hidden_size": 5120,
+    "num_hidden_layers": 40,
+    "intermediate_size": 17408,
+    "vocab_size": 151936,
+    "tie_word_embeddings": false,
+    "torch_dtype": "bfloat16"
+  },
+  "chat_template": {
+    "file": "chat_template.jinja",
+    "sha256": "a55ee1b1660128b7098723e0abcd92caa0788061051c62d51cbe87d9cf1974d8"
+  }
+}

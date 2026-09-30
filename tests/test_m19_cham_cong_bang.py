@@ -332,7 +332,8 @@ class PinnedRevisionTests(unittest.TestCase):
     def test_transformers_models_pin_commit_and_variants_share_it(self):
         configs = {config.name: config for config in load_model_configs(PLATFORM)}
         bases = {config.source: config.revision for name, config in configs.items() if config.backend == "transformers" and not config.adapter_path and not name.endswith(("-lora", "-colab"))}
-        self.assertEqual(set(bases), {"huihui-ai/Huihui-Qwen3.8-27B-abliterated", "Qwen/Qwen2.5-Coder-7B-Instruct", "Qwen/Qwen3-4B", "Qwen/Qwen2.5-0.5B-Instruct"})
+        # M25 (chủ repo đặt 27/9) thêm model trung gian Huihui Qwen3 14B abliterated.
+        self.assertEqual(set(bases), {"huihui-ai/Huihui-Qwen3.8-27B-abliterated", "huihui-ai/Huihui-Qwen3-14B-abliterated-v2", "Qwen/Qwen2.5-Coder-7B-Instruct", "Qwen/Qwen3-4B", "Qwen/Qwen2.5-0.5B-Instruct"})
         for name, config in configs.items():
             if config.backend != "transformers": continue
             with self.subTest(name):
