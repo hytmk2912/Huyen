@@ -9,10 +9,10 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 
 ## Checklist tuần 4
 - [x] M23 Gửi max_tokens · [x] M24 Notebook Kaggle · [x] M25 Model 14B abliterated
-- [ ] M26 Preset tiếng Việt thứ 2 · [ ] M27 Tổng kết tuần 4
+- [x] M26 Preset tiếng Việt thứ 2 · [ ] M27 Tổng kết tuần 4
 
 ## Mốc đang làm
-- M25 xong 30/9. Mốc kế tiếp: **M26** (Preset tiếng Việt thứ 2), chờ chủ repo gọi.
+- M26 xong 30/9. Mốc kế tiếp: **M27** (Tổng kết tuần 4), chờ chủ repo gọi.
 - Tự gộp PR khi `python -m local_ai.check` (không `--allow-skip`) xanh; không hỏi chủ repo (chủ repo cho phép 26/9).
 - Số đo thật (M15): `tests/fixtures/measurements/that_*.json`; T4 `train_tflops` 5,2; VRAM QLoRA cộng `KBIT_OVERHEAD_GB` × √(tỷ tham số); agent 4/5.
 
@@ -31,6 +31,7 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 - Nhánh: `claude/nhiem-vu-tuan-jixv6i`, dựng lại từ `main` sau mỗi lần gộp PR.
 - M25: model 14B (`medium`) không vừa 16 GB theo `vram.py` (1024 token ≈ 18,6 GB; dài nhất còn vừa 128 token); cần GPU 24 GB hoặc đo thật. Giả định `SEQ_SHARE` 0,5 chưa đo. Đề xuất tuần 5: giữ embedding/lm_head ở fp16 khi train QLoRA để giảm khoảng 3 GB.
 - `train_kaggle` (M24) chưa chạy trên Kaggle thật; cách chạy trên iPhone ở README mục "Train trên Kaggle miễn phí". Chạy rồi thì gửi ảnh Bước 10 và 12.
+- M26: preset `vietnamese_aya` (Aya Dataset, Apache-2.0, dùng được thương mại) chưa bật trong notebook; notebook vẫn dùng `vietnamese` (cấm thương mại). Đổi hay không: chủ repo quyết định (việc chủ repo 6).
 - Từ M19 bộ chấm 38 câu, greedy, notebook tắt suy nghĩ: điểm cũ (30 câu, lấy mẫu) không so trực tiếp với điểm mới. Revision model đã ghim (26/9).
 
 ## Lỗi còn tồn
@@ -48,3 +49,4 @@ Mỗi lượt một dòng ngắn; chi tiết trong `archive/memory-tuan-4.md`.
 | 27/9 | M23 | Adapter server gửi `max_tokens` = `max_new_tokens`; 4 test mới với server giả (mặc định 512, tự đặt, `--max-new-tokens` của lệnh chấm). 342 test, KẾT QUẢ: XANH. Tiếp theo: M24. |
 | 27/9 | M24 | Notebook `train_kaggle` (Kaggle Secrets, kết quả trong `/kaggle/working`, train tiếp từ checkpoint trên Hub, chung repo với Colab); README hướng dẫn iPhone; `calibrate --hub-path`. 17 test mới; 359 test, KẾT QUẢ: XANH. Tiếp theo: M25. |
 | 29–30/9 | M25 | Mục `medium` (Huihui Qwen3 14B abliterated v2, revision từ API Hugging Face), `colab_14b.json`, `vram.py` theo seq len: 14B không vừa 16 GB (dài nhất 128 token). Bash lỗi kiểm tra an toàn một lúc, chạy lại sau. 9 test mới; 368 test, KẾT QUẢ: XANH. Tiếp theo: M26. |
+| 30/9 | M26 | Preset `vietnamese_aya`: dòng tiếng Việt do người viết trong `CohereLabs/aya_dataset` (Apache-2.0); `hub.py` thêm `where` + `scan_limit`; giấy phép ghi trong `docs/GIAY_PHEP_DATASET.md`. 8 test mới; 376 test, KẾT QUẢ: XANH. Tiếp theo: M27. |

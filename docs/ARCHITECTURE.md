@@ -27,7 +27,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 | File | Nội dung |
 | --- | --- |
 | `configs/models/platform.json` | Danh sách model: `backend` (`transformers` hoặc `openai_compatible`), `kind` (`text`/`multimodal`), `params_b`, `quantization`, `adapter_path`, `max_new_tokens`, `base_url`, `timeout_s`, `api_key_env`. |
-| `configs/datasets/presets/*.json` | 3 preset dataset (`code`, `reasoning`, `vietnamese`): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". |
+| `configs/datasets/presets/*.json` | 4 preset dataset (`code`, `reasoning`, `vietnamese`, `vietnamese_aya` từ M26): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". Tùy chọn `where` (danh sách cặp `[cột, giá trị]`: chỉ giữ dòng có đúng giá trị ở các cột đã chọn) phải đi kèm `scan_limit` (số dòng tối đa được đọc, kể cả dòng bị bỏ qua). |
 | `configs/datasets/hf_sft.json` | Mẫu để tự khai báo một dataset. |
 | `configs/datasets/quality.json` | Ngưỡng của 4 bộ lọc chất lượng dữ liệu (ngôn ngữ, độ dài, lặp, gần trùng). |
 | `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json`, `colab_light.json`, `colab_14b.json` (M25, model trung gian 14B) | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
@@ -39,6 +39,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
   - đọc dataset Hugging Face; đọc kiểu streaming với `limit` để không tải cả dataset;
   - ánh xạ cột sang schema của repo. Hội thoại nhiều lượt được giữ nguyên, hiểu cả dạng `role/content` lẫn ShareGPT `from/value`;
   - trộn nhiều preset theo tỉ lệ; `--tool-calls 0.1` trộn thêm khoảng 10% dòng gọi công cụ tự sinh (M20).
+  - lọc dòng theo cột (`where`, M26), ví dụ chỉ lấy dòng tiếng Việt do người viết trong Aya Dataset nhiều ngôn ngữ; `scan_limit` chặn số dòng đọc để không đọc cả dataset.
 - `tool_calls.py` (M20): sinh dòng gọi công cụ từ mẫu câu có seed (calculator, read_file, search, và câu không cần công cụ); câu trả lời là JSON `{"tool": ..., "arguments": ...}` đúng dạng câu tool_use của bộ chấm; lời dẫn, số, tên file, chủ đề khác bộ chấm. Chỉ dùng thư viện chuẩn.
 - `core.py`:
   - kiểm tra schema và loại trùng theo nội dung;
