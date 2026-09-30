@@ -30,7 +30,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
 | `configs/datasets/presets/*.json` | 3 preset dataset (`code`, `reasoning`, `vietnamese`): commit cố định, đọc kiểu streaming, `limit` nhỏ, giấy phép kèm trạng thái "cần kiểm tra lại". |
 | `configs/datasets/hf_sft.json` | Mẫu để tự khai báo một dataset. |
 | `configs/datasets/quality.json` | Ngưỡng của 4 bộ lọc chất lượng dữ liệu (ngôn ngữ, độ dài, lặp, gần trùng). |
-| `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json`, `colab_light.json` | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
+| `configs/training/sft.json`, `qlora_primary.json`, `colab_smoke.json`, `colab_light.json`, `colab_14b.json` (M25, model trung gian 14B) | Cấu hình huấn luyện: model gốc, `method`, `quantization`, `dtype`, siêu tham số, `max_steps`, `require_gpu`, đẩy checkpoint lên Hub (`push_to_hub`, `hub_model_id`, `hub_private`). |
 
 `ModelConfig` kiểm tra giá trị ngay khi nạp; giá trị sai thì báo lỗi bằng tiếng Việt. Test `test_every_config_key_is_read_by_code` bảo đảm không có khóa cấu hình nào thừa.
 
@@ -65,7 +65,7 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
   - `create_adapter` chọn adapter theo `backend`;
   - `ModelRouter` chọn model theo khả năng;
   - `ScriptedModelAdapter` là model giả dùng trong test và demo.
-- `vram.py`: ước tính VRAM từ `params_b`, không tải model. Phần QLoRA cộng thêm `KBIT_OVERHEAD_GB` × √(tỷ tham số), đo trên Qwen3-4B (M15).
+- `vram.py`: ước tính VRAM từ `params_b`, không tải model. Phần QLoRA cộng thêm `KBIT_OVERHEAD_GB` × √(tỷ tham số), đo trên Qwen3-4B (M15). Từ M25 tính theo độ dài chuỗi (`seq_len`, mặc định 2048 token là độ dài đã hiệu chỉnh), giả định một nửa phần thêm khi train tăng theo số token (chưa đo); `max_seq_len` cho độ dài lớn nhất còn vừa một mức bộ nhớ (model 14B: 128 token với 16 GB). Lệnh `estimate` dùng `max_length` × batch của cấu hình, tối đa 2048.
 
 ### Huấn luyện (`local_ai/training`)
 `finetune.py` là khung SFT dùng transformers, trl và peft:

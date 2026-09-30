@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from local_ai.evaluation.suite import load_cases
-from local_ai.models.vram import training_gb
+from local_ai.models.vram import REFERENCE_SEQ_LEN, training_gb
 from local_ai.training.finetune import FinetuneConfig, effective_quantization, load_finetune_config, resolve_base_model, resume_target
 
 CHARS_PER_TOKEN = 3.4
@@ -110,12 +110,14 @@ def estimate(config: FinetuneConfig, rows: int | None = None, max_new_tokens: in
     new_tokens = max_new_tokens or model.max_new_tokens
     eval_minutes = cases * new_tokens * seconds_per_generated_token(model.params_b, profile) / 60
     quantization = effective_quantization(config, model)
-    vram = training_gb(model.params_b, quantization or "bf16")
+    # VRAM theo số token mỗi lượt (max_length × batch), tối đa REFERENCE_SEQ_LEN (M25): vram.py hiệu chỉnh ở 2048 token, batch 1;
+    # smoke (batch 4 × 1024 token) đo thật 2,5 GB, thấp hơn ước tính ở 2048 token, nên không tính thêm khi vượt 2048.
+    vram = training_gb(model.params_b, quantization or "bf16", min(REFERENCE_SEQ_LEN, config.max_length * config.per_device_batch_size))
     return {"gpu": profile.name, "model": model.name, "source": model.source, "params_b": model.params_b, "rows": rows, "tokens_per_row": round(tokens_per_row, 1),
             "data": source, "max_length": config.max_length, "steps": steps, "tokens_per_step": round(tokens_per_step, 1), "done_steps": done, "train_minutes": round(train_minutes, 1),
             "remaining_train_minutes": round(train_minutes * (steps - done) / steps, 1), "eval_cases": cases, "max_new_tokens": new_tokens,
             "eval_minutes": round(eval_minutes, 1), "vram_gb": round(vram, 1), "gpu_memory_gb": profile.memory_gb,
-            "fits": vram <= profile.memory_gb and config.max_length <= 2048}  # ước tính VRAM của vram.py giả định khoảng 2048 token
+            "fits": vram <= profile.memory_gb and config.max_length <= REFERENCE_SEQ_LEN}  # vram.py chưa có số đo cho dòng dài hơn 2048 token
 
 
 def _number(value: float) -> str:

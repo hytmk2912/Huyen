@@ -326,6 +326,18 @@ python -m local_ai.training.finetune --config configs/training/qlora_primary.jso
 ```
 Đã chạy thật trên CPU với model Qwen3.5 ảnh + chữ tí hon (`tests/test_m17_multimodal_lora.py`): LoRA có ở mọi lớp Linear của phần ngôn ngữ (attention thường, linear attention, MLP), không có ở phần xử lý ảnh hay `lm_head`. Model 27B thật chưa train (cần GPU 40–48 GB).
 
+**Model trung gian 14B (M25).** Mục `medium` trong `configs/models/platform.json` là `huihui-ai/Huihui-Qwen3-14B-abliterated-v2` (14,77 tỷ tham số, chỉ có chữ, giấy phép apache-2.0, không phải chấp nhận điều khoản trước khi tải), nằm giữa `light` (4B) và `primary` (27B). Revision ghim `3b79629fdd65004d3b9cdf5beb0739e8c7e1becd` và số tham số lấy từ API Hugging Face ngày 29/9/2026, chỉ đọc metadata, không tải trọng số. Chat template giống Qwen3-4B, nên vẫn chỉ tính loss trên câu trả lời được. Cấu hình train: `configs/training/colab_14b.json` (QLoRA 4bit, fp16, batch 1, tích lũy 16, `max_length` 1024).
+
+**Model 14B không vừa GPU 16 GB theo ước tính.** Kiểm tra bằng:
+```bash
+python -m local_ai.models.vram --seq-len 1024 --budget-gb 16
+```
+- Ở 1024 token, train QLoRA cần khoảng 18,6 GB; ở 2048 token cần khoảng 21,6 GB.
+- Độ dài lớn nhất còn vừa 16 GB là 128 token. Con số này quá ngắn để train có ích: một dòng dữ liệu trung bình dài khoảng 490 token.
+- Lý do: bản 14B không dùng chung embedding và lm_head, nên hai lớp này (mỗi lớp khoảng 0,78 tỷ tham số) được giữ ở float32 khi train QLoRA.
+- Nên train trên GPU 24 GB (ví dụ L4): ở 1024 token còn dư khoảng 5 GB.
+- Đây là số suy ra từ số đo của model 4B, chưa đo thật. Từ M25, `vram.py` tính theo độ dài chuỗi, với giả định một nửa phần thêm khi train tăng theo số token (chưa đo). Ở 2048 token, kết quả giữ nguyên như trước.
+
 Chấm sau mỗi bước: `smoke-lora`, `light-lora`, `primary-qlora` trong `configs/models/platform.json` đã trỏ sẵn `adapter_path` tới thư mục adapter của từng bước. So với model gốc bằng cùng một bộ eval:
 ```bash
 python -m local_ai.evaluation --model smoke --train-data data/processed/hf_sft/sft.jsonl
@@ -333,7 +345,7 @@ python -m local_ai.evaluation --model smoke-lora --train-data data/processed/hf_
 python -m local_ai.evaluation --model primary-qlora
 ```
 
-Số VRAM lấy từ `python -m local_ai.models.vram` (batch 1, khoảng 2048 token, bật gradient checkpointing). Đây chỉ là ước lượng; khi chạy thật, hãy đo lại và sửa hệ số trong `local_ai/models/vram.py`. Chạy `light` sau khi xong `smoke` thì luôn ghi `--output-dir` khác, để không chạy tiếp nhầm checkpoint của model khác.
+Số VRAM lấy từ `python -m local_ai.models.vram` (batch 1, 2048 token, bật gradient checkpointing; `--seq-len` để tính ở độ dài khác). Đây chỉ là ước lượng; khi chạy thật, hãy đo lại và sửa hệ số trong `local_ai/models/vram.py`. Chạy `light` sau khi xong `smoke` thì luôn ghi `--output-dir` khác, để không chạy tiếp nhầm checkpoint của model khác.
 
 ## Train trên Colab miễn phí
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb)
