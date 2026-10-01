@@ -1,7 +1,7 @@
 # Kiến trúc
 
 ## Phạm vi
-Repo dùng để **fine-tune và đánh giá model có sẵn trên Hugging Face**, chạy cục bộ hoặc trên Colab miễn phí. Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ). Repo cũng có một agent nhỏ dùng công cụ (calculator, `TerminalTool`) để thử model. Repo không chứa trọng số model và không gọi API trả phí.
+Repo dùng để **fine-tune và đánh giá model có sẵn trên Hugging Face**, chạy cục bộ hoặc trên Colab, Kaggle miễn phí. Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ). Repo cũng có một agent nhỏ dùng công cụ (calculator, `TerminalTool`) để thử model. Repo không chứa trọng số model và không gọi API trả phí.
 
 Mọi bước đều điều khiển bằng file cấu hình JSON trong `configs/`. Các phần nằm ngoài repo được chọn qua cấu hình: trọng số model, dataset, server model và khóa truy cập (chỉ đọc từ biến môi trường).
 
@@ -61,7 +61,8 @@ Ollama (qwen3:4b, localhost:11434) ◄── adapter kiểu OpenAI ◄── Aut
   - thư viện nặng chỉ được import khi thật sự dùng tới.
 - `openai_compatible.py` — `OpenAICompatibleAdapter`:
   - gọi `POST {base_url}/chat/completions` (Ollama, llama.cpp, vLLM) bằng urllib;
-  - chỉ cho phép máy này hoặc mạng nội bộ; không dùng proxy, không đi theo redirect; có timeout và báo lỗi rõ.
+  - chỉ cho phép máy này hoặc mạng nội bộ; không dùng proxy, không đi theo redirect; có timeout và báo lỗi rõ;
+  - gửi `temperature` (mặc định 0), `seed` và `max_tokens` = `max_new_tokens` (M23), nên chấm lại ra cùng kết quả và giới hạn độ dài câu trả lời có tác dụng.
 - `router.py`:
   - `create_adapter` chọn adapter theo `backend`;
   - `ModelRouter` chọn model theo khả năng;
@@ -177,6 +178,9 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
   - mọi lệnh của notebook chạy được bằng `--dry-run`, với cả model `smoke` lẫn `light`;
   - Hugging Face Hub và thư viện train là module giả;
   - số phút ghi trong tài liệu khớp với ước tính.
+- `tests/test_m23_max_tokens.py`: server HTTP giả nhận `max_tokens` đúng giá trị (mặc định 512, tự đặt, `--max-new-tokens` của lệnh chấm).
+- `tests/test_m25_model_14b.py`: mục `medium` khớp bản chụp metadata Hugging Face trong `tests/fixtures/hf_api/`; `colab_14b.json` là QLoRA fp16; `vram.py` theo độ dài chuỗi (giữ nguyên số cũ ở 2048 token, model 14B không vừa 16 GB, dài nhất 128 token).
+- `tests/test_m26_preset_tieng_viet_2.py`: preset `vietnamese_aya` với loader giả đọc fixture; chỉ giữ dòng tiếng Việt do người viết; `where` và `scan_limit` chặn số dòng đọc; giấy phép có trong `docs/GIAY_PHEP_DATASET.md`.
 - `tests/test_m24_kaggle.py`: notebook Kaggle hợp lệ, không kèm output, ghim phiên bản; mọi lệnh chạy được bằng `--dry-run` và giống lệnh của `train_colab`; ô đọc token (Kaggle Secrets giả) và ô gom kết quả chạy thật trong thư mục tạm; lệnh train của notebook với thư viện giả tải `last-checkpoint` từ Hub giả khi phiên mới không còn checkpoint.
 - `tests/test_m15_measurements.py`: số đo khi train (có một lượt train thật trên CPU) và lệnh `calibrate` với số đo mẫu. `tests/test_m16_notebook_resilience.py`: hàm `run` với tiến trình thật, notebook không còn `!python`, dùng lại báo cáo chấm trước với Hub giả.
 - `tests/test_m12_quality.py` kiểm tra từng bộ lọc chất lượng bằng fixture trong `tests/fixtures/quality/` (mỗi dòng ghi kết quả mong đợi), cùng thống kê trước/sau lọc trong `manifest.json`.
@@ -197,10 +201,13 @@ Mỗi công cụ đăng ký kèm mô tả tiếng Anh: làm gì, nhận tham s�
 - `PythonSandbox` chỉ tách code ra một tiến trình riêng, có giới hạn thời gian và môi trường tối thiểu (`minimal_env` trong `local_ai/runtime/executor.py`: không có `HF_TOKEN` hay khóa). Lệnh của `TerminalTool` cũng chạy với môi trường đó và `GIT_CEILING_DIRECTORIES`, nên git không đọc được repo bên ngoài thư mục làm việc. Sandbox không cách ly an toàn trước code độc hại (vẫn đọc được file trên máy); khi chấm code của model lạ, hãy chạy trong container.
 - `TerminalTool` và gateway tắt mặc định. Lệnh `local_ai.agents.tasks` chỉ bật `TerminalTool` trong thư mục làm việc riêng của từng nhiệm vụ.
 - Đã chạy thật trên Colab T4 (25–26/9, M15): QLoRA `smoke` và `light`, số VRAM và thời gian (ước tính đã sửa theo số đo), 2 notebook `train_colab` và `agent_colab`, agent với Ollama + `qwen3:4b`.
-- Chưa kiểm chứng trên GPU hay model thật (cập nhật 27/9, tổng kết tuần 3):
+- Chưa kiểm chứng trên GPU hay model thật (cập nhật 1/10, tổng kết tuần 4):
   - model chính 27B (QLoRA, ảnh + chữ) cần GPU 40–48 GB;
   - điểm chấm và agent sau các thay đổi M19, M20 (bộ chấm 38 câu, dòng gọi công cụ, loss chỉ trên câu trả lời): cần chạy lại `train_colab`;
-  - notebook `agent_trained_colab` (M18) với `smoke`, `light` thật (mới thử trên máy phát triển với model tí hon, llama.cpp và Ollama thật).
+  - notebook `agent_trained_colab` (M18) với `smoke`, `light` thật (mới thử trên máy phát triển với model tí hon, llama.cpp và Ollama thật);
+  - notebook `train_kaggle` (M24): chưa chạy trên Kaggle thật;
+  - model trung gian 14B (M25): VRAM mới là ước tính của `vram.py`; phần theo độ dài chuỗi dựa trên giả định `SEQ_SHARE` 0,5, chưa đo;
+  - preset `vietnamese_aya` (M26): mới đọc thật 20 dòng, chưa dùng để train.
 
-  Chi tiết trong `memory.md`; lộ trình tuần 3 và đề xuất tuần 4 ở cuối `README.md`.
+  Chi tiết trong `memory.md`; lộ trình tuần 3–4 và đề xuất tuần 5 ở cuối `README.md`.
 - Interface giao dịch (`TradingAnalysisTool`) chỉ để phân tích, không đặt lệnh.

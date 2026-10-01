@@ -8,25 +8,26 @@ dataset Hugging Face → kiểm tra, loại trùng, lọc chất lượng, chặ
 
 Model chính là `huihui-ai/Huihui-Qwen3.8-27B-abliterated` (ảnh + chữ, 27,78 tỷ tham số); các model khác nằm trong `configs/models/platform.json`. Repo không tự tải model: test chạy được mà không cần mạng hay GPU.
 
-Kế hoạch tuần 1–3 và bằng chứng từng mốc: `TASKS.md` (tuần 3) và `archive/tasks-tuan-1-2.md` (tuần 1–2). Tiến độ, việc chủ repo tự làm và lỗi còn tồn: `memory.md`.
+Kế hoạch và bằng chứng từng mốc: `TASKS.md` (tuần 4); tuần 1–3 chép nguyên văn trong `archive/tasks-tuan-1-2.md` và `archive/tasks-tuan-3.md`. Tiến độ, việc chủ repo tự làm và lỗi còn tồn: `memory.md`.
 
-Chạy trên Colab miễn phí, không cần máy có GPU:
+Chạy trên Colab hoặc Kaggle miễn phí, không cần máy có GPU:
 - train model nhỏ: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/train_colab.ipynb) (hướng dẫn trên iPhone: `docs/TRAIN_COLAB.md`);
 - agent với model thật (Ollama): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_colab.ipynb);
+- train model nhỏ trên Kaggle, chạy ở nền nên khóa iPhone vẫn chạy (M24): [![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://www.kaggle.com/kernels/welcome?src=https://github.com/hytmk2912/Huyen/blob/main/notebooks/train_kaggle.ipynb) (hướng dẫn trên iPhone: mục "Train trên Kaggle miễn phí");
 - agent với model bạn vừa train, so với model gốc (M18): [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hytmk2912/Huyen/blob/main/notebooks/agent_trained_colab.ipynb).
 
 ## Trạng thái hiện tại
-Cập nhật 27/9/2026 (tổng kết tuần 3, M21): đã chạy thật trên Colab T4 (M15); M16–M20, M22 và M18 xong, phần M18–M20 chưa chạy lại trên Colab.
+Cập nhật 1/10/2026 (tổng kết tuần 4, M27): tuần 4 xong 5/5 mốc (M23–M27). Phần mới của tuần 4 chưa chạy trên GPU thật: notebook Kaggle (M24), model 14B (M25, mới là ước tính), preset `vietnamese_aya` (M26, mới đọc thật 20 dòng). Đã chạy thật trên Colab T4 ở tuần 3 (M15); phần M18–M20 chưa chạy lại trên Colab.
 
 | Phần | Làm được gì | Đã kiểm chứng thế nào |
 | --- | --- | --- |
-| Dữ liệu | 3 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json`. **M20:** trộn khoảng 10% dòng gọi công cụ tự sinh (`--tool-calls 0.1`); chặn cả dòng gần trùng với bộ chấm | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng. Notebook Colab lấy 2000 dòng thật mỗi lần chạy |
-| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ (LoRA chỉ gắn phần ngôn ngữ, M17); chỉ tính loss trên câu trả lời (M20); GPU không bf16 thì dùng fp16. Đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian và VRAM trên T4 theo số đo thật | **Chạy thật trên Colab T4** (25–26/9): QLoRA `smoke` và `light`, mỗi model 125 bước; `light` có một lần Colab ngắt và train tiếp được. LoRA chạy thật trên CPU với model tí hon (cả model ảnh + chữ Qwen3.5 tí hon). **Chưa chạy trên Colab thật:** model chính 27B (cần GPU 40–48 GB) |
+| Dữ liệu | 4 preset Hugging Face, trộn theo tỉ lệ; giữ hội thoại nhiều lượt, reasoning, context; loại trùng; chặn trùng với eval. **Tuần 2:** bộ lọc chất lượng (ngôn ngữ ưu tiên tiếng Việt, độ dài, lặp, gần trùng bằng MinHash), thống kê trước/sau lọc trong `manifest.json`. **M20:** trộn khoảng 10% dòng gọi công cụ tự sinh (`--tool-calls 0.1`); chặn cả dòng gần trùng với bộ chấm. **M26:** preset tiếng Việt thứ 2 `vietnamese_aya` (Aya Dataset, Apache-2.0, dùng được thương mại); lọc dòng theo cột (`where` + `scan_limit`) | Test bằng fixture. **Chạy thật** qua mạng: trộn 1000/750/750 dòng, giữ 2500/2500, khoảng 15 giây; lọc 2000 dòng thật mất khoảng 5 giây, loại 1 dòng. Notebook Colab lấy 2000 dòng thật mỗi lần chạy. `vietnamese_aya`: đọc thật 20 dòng bằng streaming (30/9), toàn tiếng Việt, không dòng nào bị loại |
+| Fine-tune | Full, LoRA, QLoRA (4bit); model chữ và model ảnh + chữ (LoRA chỉ gắn phần ngôn ngữ, M17); chỉ tính loss trên câu trả lời (M20); GPU không bf16 thì dùng fp16. Đẩy checkpoint lên Hugging Face và tự train tiếp khi Colab ngắt; ước tính thời gian và VRAM trên T4 theo số đo thật. **M25:** model trung gian 14B (`medium`, `configs/training/colab_14b.json`); `vram.py` ước tính theo độ dài chuỗi | **Chạy thật trên Colab T4** (25–26/9): QLoRA `smoke` và `light`, mỗi model 125 bước; `light` có một lần Colab ngắt và train tiếp được. LoRA chạy thật trên CPU với model tí hon (cả model ảnh + chữ Qwen3.5 tí hon). **Chưa chạy trên Colab thật:** model chính 27B (cần GPU 40–48 GB). Model 14B: theo ước tính không vừa GPU 16 GB (1024 token khoảng 18,6 GB), chưa train trên GPU |
 | Eval | 38 câu Việt + Anh (16 câu tool_use từ M19), 4 cách chấm, chấm greedy lặp lại được, báo cáo JSON + Markdown; bảng so sánh trước/sau khi train | **Chạy thật trên Colab T4**: `smoke` 16 → 14/30; `light` 17 → 19/30 nhưng tool_use 7/8 → 3/8 (sửa ở M19, M20) |
-| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`) | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả |
+| Model qua server local | Ollama, llama.cpp, vLLM (chuẩn OpenAI); mục `ollama-colab` (`qwen3:4b`). **M23:** gửi `max_tokens` = `max_new_tokens`, nên giới hạn độ dài câu trả lời có tác dụng | **Chạy thật** Ollama + `qwen3:4b` trên Colab T4 (26/9). llama.cpp và vLLM mới test bằng server HTTP giả; `max_tokens` (M23) test bằng server HTTP giả |
 | Agent | Công cụ lỗi hoặc model lỗi không làm sập agent; tách JSON từ câu trả lời lộn xộn; prompt gửi danh sách công cụ; 6 nhiệm vụ mẫu với calculator và TerminalTool (M19 thêm nhiệm vụ phải thử lại sau khi TerminalTool từ chối lệnh; lỗi từ chối kèm gợi ý lệnh được phép) | **Chạy thật** với `qwen3:4b` trên Colab T4: 4/5 nhiệm vụ trong 11,1 phút (trước khi có nhiệm vụ thứ 6). Test bằng model giả và server OpenAI giả (6/6 nhiệm vụ) |
 | Runtime gộp từ repo Agent (tuần 2) | `TerminalTool` (allowlist, tắt mặc định, không qua shell, có log); gateway hàng đợi job (tắt mặc định, chỉ `127.0.0.1`, bắt buộc token) | Test các kiểu chèn lệnh, tham số nguy hiểm, đường dẫn ra ngoài thư mục làm việc; lệnh chạy thật trong thư mục tạm; trên Colab, TerminalTool chạy thật với agent |
-| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); `agent_trained_colab` (M18: agent với model đã train, so với model gốc); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật. **M24:** `train_kaggle` (Kaggle, token từ Kaggle Secrets, kết quả trong `/kaggle/working`, train tiếp từ checkpoint trên Hub; chưa chạy trên Kaggle thật) | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run` |
+| Notebook Colab (tuần 2) | `train_colab` (smoke hoặc light, QLoRA fp16, train tiếp khi Colab ngắt); `agent_colab` (Ollama + `qwen3:4b`); `agent_trained_colab` (M18: agent với model đã train, so với model gốc); hướng dẫn trên iPhone. **Tuần 3:** lệnh lỗi thì dừng Run all, dùng lại báo cáo chấm trước, tự gỡ torchao, ghi số đo thật. **M24:** `train_kaggle` (Kaggle, token từ Kaggle Secrets, kết quả trong `/kaggle/working`, train tiếp từ checkpoint trên Hub; chưa chạy trên Kaggle thật) | **Chạy thật trên Colab T4** (25–26/9): `train_colab` với `smoke` và `light`, `agent_colab`. Hợp lệ theo nbformat; mọi lệnh của notebook chạy được bằng `--dry-run`. `train_kaggle` chưa chạy trên Kaggle thật |
 
 ## Cấu trúc
 - `local_ai/data`: đọc dữ liệu, kiểm tra schema, loại trùng, chặn rò rỉ eval, xuất `sft.jsonl`; bước tải dataset Hugging Face (`hub.py`); bộ lọc chất lượng (`quality.py`); quét khóa bí mật (`secrets.py`).
@@ -40,7 +41,7 @@ Cập nhật 27/9/2026 (tổng kết tuần 3, M21): đã chạy thật trên Co
 - `local_ai/config`, `local_ai/experiments`, `local_ai/memory`: nạp danh sách model, ghi lại lượt chạy (`RunTracker`), bộ nhớ hội thoại ngắn.
 - `configs/`: mọi file cấu hình (model, dataset, preset, huấn luyện). `data/`: dữ liệu mẫu (`data/raw/`) và bộ eval (`data/eval/`). `tests/`: test theo từng mốc. `docs/ARCHITECTURE.md`: kiến trúc. `docs/TRAIN_COLAB.md`: train trên Colab bằng iPhone.
 - `notebooks/`: notebook Colab và notebook Kaggle (`train_kaggle.ipynb`, M24), sinh từ `notebooks/build.py` (lưu không kèm output).
-- `archive/`: phần đã cất (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent), kế hoạch tuần 1–2 (`tasks-tuan-1-2.md`) và nhật ký chi tiết tuần 1–3 (`memory-tuan-*.md`).
+- `archive/`: phần đã cất (corpus 10T token, hướng dẫn nanoGPT cũ, code gốc của repo Agent), kế hoạch tuần 1–2 (`tasks-tuan-1-2.md`), tuần 3 (`tasks-tuan-3.md`) và nhật ký chi tiết tuần 1–4 (`memory-tuan-*.md`).
 
 ## Cài đặt và kiểm tra
 Chạy mọi lệnh trong README từ thư mục gốc của repo, vì các đường dẫn trong file cấu hình (`dataset_path`, `output_dir`...) tính từ đó.
@@ -542,6 +543,20 @@ Lệnh `python -m local_ai.training.export` (`--dry-run` để xem kế hoạch)
 Đã thử thật trên máy phát triển (27/9, không GPU): model tí hon Qwen2 và Qwen3 dùng tokenizer thật của Qwen2.5 và Qwen3 → gộp adapter → GGUF bằng llama.cpp `b11205` → `llama-simple` sinh đúng chuỗi token như model Hugging Face đã gộp (GGUF f32); Ollama `0.34.4` nhập được file GGUF với Modelfile này, trả lời lặp lại được với `temperature` 0 và `seed`, và model đã train trả lời khác model gốc. **Chưa chạy trên Colab với `smoke`, `light` thật** (chủ repo chạy).
 
 ## Lộ trình tiếp theo (đề xuất, chưa làm)
+**Tuần 4 (M23–M27, tiêu chí do chủ repo đặt ngày 27/9) đã xong mọi mốc** (tiêu chí và bằng chứng trong `TASKS.md`):
+- **M23 – Gửi max_tokens** (xong 27/9): model qua server (Ollama, llama.cpp, vLLM) nhận `max_tokens` = `max_new_tokens`.
+- **M24 – Notebook Kaggle** (xong 27/9): `notebooks/train_kaggle.ipynb`, token từ Kaggle Secrets, kết quả trong `/kaggle/working`, train tiếp từ checkpoint trên Hub; hướng dẫn iPhone ở mục "Train trên Kaggle miễn phí". Chưa chạy trên Kaggle thật.
+- **M25 – Model trung gian 14B abliterated** (xong 30/9): mục `medium` (`huihui-ai/Huihui-Qwen3-14B-abliterated-v2`, revision lấy từ API Hugging Face), `configs/training/colab_14b.json`; theo `vram.py`, model 14B không vừa GPU 16 GB (dài nhất 128 token), cần GPU 24 GB.
+- **M26 – Preset tiếng Việt thứ 2** (xong 30/9): `vietnamese_aya` (Aya Dataset, Apache-2.0, dùng được thương mại); giấy phép ghi trong `docs/GIAY_PHEP_DATASET.md`.
+- **M27 – Tổng kết tuần 4** (xong 1/10): README, `docs/ARCHITECTURE.md`, `memory.md` khớp thực tế; đề xuất tuần 5 bên dưới.
+
+**Đề xuất tuần 5** (chưa làm; chủ repo chọn việc nào thì mới đưa vào `TASKS.md`):
+- Chạy thật `train_kaggle` trên Kaggle (smoke, rồi light) và chạy lại `train_colab` sau M19, M20; gửi ảnh Bước 10 và 12 để có điểm và số đo mới.
+- Giảm VRAM khi train QLoRA: giữ embedding và lm_head ở fp16 thay vì float32 (bớt khoảng 3 GB với model 14B), rồi đo thật VRAM theo độ dài chuỗi để thay giả định `SEQ_SHARE` 0,5 trong `vram.py`.
+- Notebook `train_colab` và `train_kaggle` có ô chọn preset tiếng Việt (`vietnamese` hoặc `vietnamese_aya`), để train được bản dùng thương mại.
+- Train thật model trung gian 14B trên GPU 24 GB (ví dụ L4) hoặc model chính 27B trên GPU 40–48 GB (chủ repo thuê GPU).
+
+### Tuần 3 (M15–M22, đã xong)
 Tuần 1 đề xuất 6 việc. Tuần 2 chuẩn bị chạy thật trên GPU và thử Ollama (notebook Colab train và agent); tuần 3 đã chạy thật trên Colab T4 (M15). Các việc còn lại gom vào 7 mốc đề xuất cho tuần 3 dưới đây. Đây chỉ là đề xuất, chủ repo chọn việc nào thì mới đưa vào `TASKS.md`:
 1. **M15 – Số đo thật trên Colab** (xong 26/9: đủ số đo `smoke`, `light` và agent; bảng số đo ở mục "Train trên Colab miễn phí"). Dựa trên kết quả chủ repo chạy `train_colab` (smoke, light) và `agent_colab`: sửa hằng số ước tính trong `local_ai/training/estimate.py` và `local_ai/models/vram.py`, rồi ghi bảng số đo thật (thời gian, VRAM, điểm trước/sau, tỉ lệ agent) vào README.
 2. **M16 – Notebook bền hơn** (xong):
@@ -574,4 +589,4 @@ Ngoài 7 mốc trên, chủ repo chọn thêm **M22 – Kiểm định ý nghĩa
 
 PR #4 (đổi 3 model phụ sang Huihui Qwen3 4B/8B/14B): **đề nghị đóng**, vì xung đột khoảng 65 file và xóa phần agent; phần sửa dữ liệu hữu ích của nó đã có trong `main`. Chủ repo đã đóng ngày 27/9.
 
-Kế hoạch tuần 1–3 và bằng chứng từng mốc: tuần 3 trong `TASKS.md`, tuần 1–2 trong `archive/tasks-tuan-1-2.md`.
+Kế hoạch và bằng chứng từng mốc: tuần 4 trong `TASKS.md`, tuần 3 trong `archive/tasks-tuan-3.md`, tuần 1–2 trong `archive/tasks-tuan-1-2.md`.

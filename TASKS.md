@@ -14,8 +14,8 @@ Cách làm như tuần 3: mỗi lượt **tối đa 1 mốc** bằng skill `lam-
 | M24 | Notebook Kaggle | **Xong** | 5/5 (100%) | `tests/test_m24_kaggle.py` (17 test) |
 | M25 | Model trung gian 14B abliterated | **Xong** | 4/4 (100%) | `tests/test_m25_model_14b.py` (9 test) |
 | M26 | Preset tiếng Việt thứ 2 | **Xong** | 4/4 (100%) | `tests/test_m26_preset_tieng_viet_2.py` (8 test) |
-| M27 | Tổng kết tuần 4 | **Chưa làm** | 0/3 (0%) | — |
-| **Tổng** | 5 mốc | 4 **Xong** | 4/5 mốc (80%) | `python -m local_ai.check`: 376 test chạy qua, không test nào bị bỏ qua (30/9, sau M26) |
+| M27 | Tổng kết tuần 4 | **Xong** | 3/3 (100%) | `tests/test_m27_tong_ket_tuan_4.py` (7 test) |
+| **Tổng** | 5 mốc | 5 **Xong** | 5/5 mốc (100%) | `python -m local_ai.check`: 383 test chạy qua, không test nào bị bỏ qua (1/10, sau M27) |
 
 ## M23: Gửi max_tokens
 Mục tiêu: `max_new_tokens` hiện không giới hạn được độ dài câu trả lời của model qua server (Ollama, llama.cpp, vLLM), vì adapter không gửi `max_tokens` (phát hiện khi làm M18).
@@ -79,6 +79,17 @@ Preset mới: `vietnamese_aya` (`configs/datasets/presets/vietnamese_aya.json`),
   Bằng chứng: 376 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
 
 ## M27: Tổng kết tuần 4
-- [ ] 1. README, `docs/ARCHITECTURE.md`, `memory.md` khớp thực tế.
-- [ ] 2. Có đề xuất tuần 5.
-- [ ] 3. `python -m local_ai.check` xanh.
+- [x] 1. README, `docs/ARCHITECTURE.md`, `memory.md` khớp thực tế.
+
+  Bằng chứng:
+  - README: mục trạng thái cập nhật 1/10 (thêm M23–M26 và phần chưa chạy thật); nút Kaggle ở đầu trang; lộ trình đánh dấu M23–M27 xong, lộ trình tuần 3 giữ nguyên bên dưới; chỗ nhắc kế hoạch trỏ tới `TASKS.md` tuần 4 và `archive/tasks-tuan-3.md`.
+  - `docs/ARCHITECTURE.md`: phạm vi có Kaggle, adapter server gửi `max_tokens`, test M23, M25, M26, mục giới hạn cập nhật 1/10.
+  - `memory.md`: XONG TUẦN 4, checklist đủ 5 mốc, nhật ký rút gọn (chi tiết ở `archive/memory-tuan-4.md`), 4.316 ký tự; mục "Việc chủ repo tự làm" giữ nguyên.
+  - Test: `test_every_milestone_is_done_with_all_criteria`, `test_test_counts_in_table_match_test_files`, `test_roadmap_marks_week_four_done_and_status_is_updated`, `test_readme_numbers_match_code`, `test_memory_says_the_week_is_done`, `test_architecture_lists_week_four_parts_and_what_is_still_unverified`.
+  - Test M21 trước đòi mục trạng thái ghi đúng "Cập nhật 27/9/2026"; nay chỉ đòi ngày cập nhật không sớm hơn 27/9/2026 (yêu cầu mới của M27).
+- [x] 2. Có đề xuất tuần 5.
+
+  Bằng chứng: 4 đề xuất giống nhau ở README (mục "Đề xuất tuần 5") và `memory.md`. Test `test_week_five_proposals_match_between_readme_and_memory`.
+- [x] 3. `python -m local_ai.check` xanh.
+
+  Bằng chứng: 383 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
