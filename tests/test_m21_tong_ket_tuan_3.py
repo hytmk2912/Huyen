@@ -49,7 +49,9 @@ class WeekThreeTests(unittest.TestCase):
             with self.subTest(f"M{number}"):
                 self.assertRegex(roadmap, rf"\*\*M{number} – [^*]+\*\* \(xong")
         self.assertIn("Chủ repo đã đóng ngày 27/9", roadmap)
-        self.assertIn("Cập nhật 27/9/2026", README.split("## Trạng thái hiện tại", 1)[1].split("\n## ", 1)[0])
+        # M27 (tổng kết tuần 4) cập nhật lại ngày ở mục trạng thái: chỉ cần ngày cập nhật không sớm hơn lần tổng kết tuần 3 (27/9/2026).
+        day, month, year = map(int, re.search(r"Cập nhật (\d+)/(\d+)/(\d{4})", README.split("## Trạng thái hiện tại", 1)[1].split("\n## ", 1)[0]).groups())
+        self.assertGreaterEqual((year, month, day), (2026, 9, 27))
 
     def test_week_four_proposals_match_between_readme_and_memory(self):
         readme = re.findall(r"(?m)^- (.+)$", README.split("Đề xuất tuần 4", 1)[1].split("\n\n", 1)[0])
