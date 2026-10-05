@@ -1,0 +1,12 @@
+# Dependabot: mỗi tuần kiểm tra bản mới của thư viện Python (requirements*.txt) và của các GitHub Action, rồi mở PR cập nhật.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

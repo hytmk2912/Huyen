@@ -15,3 +15,13 @@ data/processed/
 *.pt
 *.bin
 .ruff_cache/
+
+# Hardening bảo mật: file khóa, ví, trọng số dạng pickle và thư mục kết quả train không bao giờ commit
+!.env.example
+*.key
+*.pem
+keystore/
+wallet*.json
+*.pkl
+checkpoints/
+outputs/

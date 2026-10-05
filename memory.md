@@ -28,6 +28,7 @@ Skill `lam-moc` đọc file này ở đầu mỗi lượt và cập nhật ở c
 9. Sau mục 8: chạy `agent_trained_colab` (M18) cùng model; gửi ảnh Bước 11 (bảng so sánh model gốc và model đã train).
 
 ## Việc dở
+- Hardening bảo mật (5/10, chủ repo yêu cầu): nhánh `security/hardening`, xem cuối `TASKS.md` và `SECURITY.md`. Chờ chủ repo duyệt `git filter-repo` xoá `cpu_hub.sh`, `gpu_8h.sh` khỏi lịch sử (mật khẩu rsync).
 - Nhánh: `claude/nhiem-vu-tuan-jixv6i`, dựng lại từ `main` sau mỗi lần gộp PR.
 - Chưa chạy thật: `train_kaggle` (M24) trên Kaggle; model 14B `medium` (M25: theo `vram.py` không vừa 16 GB, 1024 token ≈ 18,6 GB, dài nhất 128 token; giả định `SEQ_SHARE` 0,5 chưa đo).
 - Notebook vẫn dùng preset `vietnamese` (cấm thương mại); `vietnamese_aya` (M26, Apache-2.0) chưa bật. Đổi hay không: chủ repo quyết định (việc chủ repo 6).

@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from local_ai.config.settings import find_model_config
-from local_ai.models.adapters import TORCH_DTYPES, ModelConfig, resolve_torch_dtype
+from local_ai.models.adapters import TORCH_DTYPES, ModelConfig, check_adapter_files, from_pretrained_safely, resolve_torch_dtype, safe_tokenizer_kwargs
 
 ROOT = Path(__file__).resolve().parents[2]
 OLLAMA_CONFIGS = ROOT / "configs" / "ollama"
@@ -68,7 +68,7 @@ def save_hf(config: ModelConfig, target: Path) -> dict[str, Any]:
     dtype = resolve_torch_dtype(torch, config.dtype)
     kwargs = {"revision": config.revision, "dtype": dtype, "local_files_only": config.offline}
     if config.device_map is not None and torch.cuda.is_available(): kwargs["device_map"] = config.device_map  # gộp trên GPU cho nhanh; không có GPU thì trên CPU
-    model = transformers.AutoModelForCausalLM.from_pretrained(config.source, **kwargs)
+    model = from_pretrained_safely(transformers.AutoModelForCausalLM, config.source, **kwargs)
     adapter = None
     if config.adapter_path:
         if not (Path(config.adapter_path) / "adapter_config.json").is_file():
@@ -76,12 +76,14 @@ def save_hf(config: ModelConfig, target: Path) -> dict[str, Any]:
         try:
             from peft import PeftModel
         except ImportError as error: raise RuntimeError("Gộp adapter cần thư viện peft; hãy chạy `python -m pip install peft`") from error
+        check_adapter_files(config.adapter_path)
         model = PeftModel.from_pretrained(model, config.adapter_path).merge_and_unload()
         adapter = {"path": config.adapter_path, "sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(Path(config.adapter_path).glob("adapter_model.*"))}}
     if any("lora_" in name for name, _ in model.named_parameters()): raise RuntimeError("Model sau khi gộp vẫn còn lớp LoRA; không xuất tiếp")
     if target.exists(): shutil.rmtree(target)
     model.save_pretrained(target, safe_serialization=True)
-    tokenizer = transformers.AutoTokenizer.from_pretrained(config.tokenizer_source or config.source, revision=config.tokenizer_revision or config.revision, local_files_only=config.offline)
+    tokenizer_source, tokenizer_revision = config.tokenizer_source or config.source, config.tokenizer_revision or config.revision
+    tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_source, revision=tokenizer_revision, local_files_only=config.offline, **safe_tokenizer_kwargs(tokenizer_source, tokenizer_revision))
     tokenizer.save_pretrained(target)
     return {"model_type": model.config.model_type, "adapter": adapter}
 
@@ -150,7 +152,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-adapter", action="store_true", help="Không gộp adapter: xuất model gốc theo cùng cách, để so sánh với model đã train")
     parser.add_argument("--keep-hf", action="store_true", help="Giữ thư mục safetensors trung gian (mặc định xóa sau khi có GGUF để đỡ tốn chỗ)")
     parser.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch, không nạp model")
+    parser.add_argument("--allow-pickle-weights", action="store_true", help="Cho phép nạp trọng số dạng pickle (.bin/.pkl) khi repo không có safetensors. Pickle có thể chạy mã độc khi nạp: chỉ dùng với repo bạn tin tưởng")
     args = parser.parse_args(argv)
+    from local_ai.models.adapters import set_allow_pickle_weights
+    set_allow_pickle_weights(args.allow_pickle_weights)
     config = export_model_config(args.model, args.models, no_adapter=args.no_adapter, dtype=args.dtype)
     if args.dry_run:
         print(json.dumps({"status": "dry-run", **plan(config, Path(args.output), args.llama_cpp, args.outtype)}, ensure_ascii=False, indent=2)); return 0

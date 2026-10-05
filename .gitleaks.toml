@@ -1,0 +1,15 @@
+# Cấu hình gitleaks: dùng toàn bộ luật mặc định, chỉ bỏ qua 3 chỗ báo nhầm đã kiểm tra tay (5/10/2026):
+# mã commit 40 ký tự của tokenizer trên Hugging Face và tên lớp/tên file có chữ "token". Không thêm ngoại lệ cho secret thật.
+title = "gitleaks cho repo Huyen"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Báo nhầm: revision ghim của tokenizer, tên lớp AutoTokenizer, tên file test có chữ token"
+regexTarget = "match"
+regexes = [
+  '''tokenizer_revision"\s*:\s*"[0-9a-f]{40}"''',
+  '''AutoTokenizer, Qwen3_5ForConditionalGeneration''',
+  '''test_m23_max_tokens\.py", "test_m24_kaggle\.py''',
+]

@@ -1,0 +1,10 @@
+{
+  "_comment": "Kết quả kiểm tra ngày 5/10/2026 bằng API công khai https://huggingface.co/api/models/<repo> (chỉ đọc danh sách file, không tải trọng số): repo có file .safetensors hay không và có file pickle (.bin/.pkl/.pt/.pth) hay không.",
+  "models": {
+    "huihui-ai/Huihui-Qwen3.8-27B-abliterated": {"safetensors": true, "pickle": false},
+    "Qwen/Qwen2.5-Coder-7B-Instruct": {"safetensors": true, "pickle": false},
+    "huihui-ai/Huihui-Qwen3-14B-abliterated-v2": {"safetensors": true, "pickle": false},
+    "Qwen/Qwen3-4B": {"safetensors": true, "pickle": false},
+    "Qwen/Qwen2.5-0.5B-Instruct": {"safetensors": true, "pickle": false}
+  }
+}

@@ -93,3 +93,20 @@ Preset mới: `vietnamese_aya` (`configs/datasets/presets/vietnamese_aya.json`),
 - [x] 3. `python -m local_ai.check` xanh.
 
   Bằng chứng: 383 test, 0 sai, 0 lỗi, 0 bị bỏ qua; KẾT QUẢ: XANH.
+
+## Hardening bảo mật (chủ repo yêu cầu 5/10, không phải mốc)
+Nhánh `security/hardening` (tạo từ `main` tại `c2610bc`). Repo nhận diện là **Huyen** (fine-tune LLM, tải từ Hugging Face) nên làm phần 6B, bỏ phần 6A (ví ETH).
+
+- [x] 1. Quét khóa bị lộ bằng gitleaks 8.28.0 `detect --source . --log-opts="--all"` (106 commit mọi nhánh): 3 phát hiện, đều báo nhầm (`tokenizer_revision` là mã commit, `AutoTokenizer`, tên file test), đã thêm ngoại lệ hẹp trong `.gitleaks.toml` → **0 leak**. Grep thêm (hex 64, `hf_`, `sk-`, `ghp_`, `github_pat_`, `PRIVATE_KEY`, dòng mở đầu khóa riêng dạng PEM, mật khẩu): hex 64 đều là sha256 checksum. **Secret thật đã lộ:** mật khẩu rsync làm giá trị mặc định của `SYNC_PASS` trong `cpu_hub.sh`, `gpu_8h.sh` (commit `e6bc723`, 7 commit chứa 2 file). Không tự xoá lịch sử; lệnh `git filter-repo` chờ chủ repo duyệt (`SECURITY.md` mục 5).
+- [x] 2. `.gitignore` thêm `*.key`, `*.pem`, `keystore/`, `wallet*.json`, `*.pkl`, `checkpoints/`, `outputs/`, giữ `!.env.example`; `.env.example` liệt kê biến, giá trị trống. Bằng chứng: `SecretModuleTests.test_gitignore_blocks_secret_and_artifact_files`, `test_env_example_lists_every_known_secret_with_empty_values`.
+- [x] 3. Module secret duy nhất `local_ai/config/secrets.py` (`require_secret`, `optional_secret`, `hf_token`, `redact`); thiếu biến bắt buộc → `MissingSecretError` (SystemExit, chỉ báo tên biến), không có giá trị mặc định. Gateway, adapter server local, `data/hub.py` đọc qua module này. Bằng chứng: `SecretModuleTests` (8 test), `HfTokenNotPersistedTests` (4 test: token không vào `manifest.json`, kế hoạch train, lỗi gateway).
+- [x] 4. pre-commit (`gitleaks`, `detect-private-key`, `check-added-large-files`, ghim SHA): `pre-commit run --all-files` → 3/3 Passed. `.github/workflows/security.yml`: gitleaks (tải bản chính thức, kiểm tra sha256) + pip-audit trên push và pull_request.
+- [x] 5. GitHub Actions: `permissions: contents: read` cấp top-level, action ghim SHA, không `pull_request_target`, không `${{ github.event.* }}` trong `run`; `.github/dependabot.yml` (pip, github-actions, hằng tuần). Bằng chứng: `RepositorySecurityFilesTests` (4 test) và grep trong báo cáo PR.
+- [x] 6. Thư viện: `requirements.txt`, `requirements-gpu.txt`, `requirements-dev.txt` ghim `==`; `requirements.lock` (76 gói, kèm hash, sinh bằng `uv pip compile --generate-hashes`). `pip-audit` cả hai bộ: "No known vulnerabilities found".
+- [x] 7. Nạp model an toàn (6B.1): `trust_remote_code=False`, `use_safetensors=True` ở mọi chỗ nạp model; chỉ có `.bin`/`.pkl` → từ chối, cần cờ `--allow-pickle-weights` (finetune, export, evaluation). 5 model Hugging Face trong danh sách đều có safetensors (API ngày 5/10, `tests/fixtures/hf_api/safetensors_2026-10-05.json`). Bằng chứng: `SafeModelLoadingTests` (7 test, gồm quét AST mọi `from_pretrained`, cấm `pickle.load`/`torch.load` thiếu `weights_only=True`).
+- [x] 8. Ghim revision (6B.2): đọc danh sách model mà model/tokenizer Hugging Face chưa ghim mã commit 40 ký tự → từ chối; tải dataset thật chưa ghim → từ chối; `hf_sft.json` mẫu bỏ `main`. Bằng chứng: `PinnedRevisionTests` (4 test).
+- [x] 9. HF token (6B.3) chỉ từ env `HF_TOKEN`, không vào output/log: `HfTokenNotPersistedTests`.
+- [x] 10. Path traversal (6B.4): `safe_output_dir` (chỉ `data/`, thư mục tạm, `LOCAL_AI_DATA_DIR`; chặn `../`, symlink), tên preset chỉ chữ/số/`_`/`-`. Bằng chứng: `PathTraversalTests` (5 test).
+- [x] 11. `SECURITY.md`: secret và nơi lưu, checklist việc chủ repo làm trên GitHub, quy trình khi lộ secret, secret đã lộ.
+- [x] 12. Kiểm tra: `python -m local_ai.check` → 415 test, 0 sai, 0 lỗi, 0 bị bỏ qua; compileall sạch; secret-scan sạch; `KẾT QUẢ: XANH`.
+- [x] 13. Mở pull request `security/hardening` → `main` (bản nháp): PR #29. Chờ chủ repo duyệt lệnh `git filter-repo` và làm checklist trên GitHub.

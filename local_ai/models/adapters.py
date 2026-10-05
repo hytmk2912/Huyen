@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
 import sys
 import urllib.parse
 from dataclasses import asdict, dataclass, field
@@ -16,6 +17,74 @@ MODEL_KINDS = ("text", "multimodal")
 BACKENDS = ("transformers", "openai_compatible")
 QUANTIZATIONS = ("4bit", "8bit")
 TORCH_DTYPES = ("bfloat16", "float16", "float32")
+
+
+COMMIT = re.compile(r"^[0-9a-f]{40}$")  # revision ghim theo mã commit đầy đủ của repo trên Hugging Face
+HF_REPO_ID = re.compile(r"^[A-Za-z0-9][\w.-]*/[\w.-]+$")  # tên repo trên Hugging Face (org/name); tên khác (ví dụ "scripted") không tải từ Hub
+ALLOW_PICKLE_FLAG = "--allow-pickle-weights"
+_unsafe = {"allow_pickle_weights": False}  # chỉ đổi qua cờ dòng lệnh --allow-pickle-weights (set_allow_pickle_weights)
+
+
+class UnsafeModelError(RuntimeError):
+    """Từ chối nạp model/adapter vì không an toàn: revision chưa ghim, chỉ có trọng số dạng pickle (.bin/.pkl) mà chưa xác nhận."""
+
+
+def set_allow_pickle_weights(allowed: bool) -> None:
+    """Gọi từ lệnh có cờ --allow-pickle-weights: cho phép nạp trọng số .bin/.pkl (pickle có thể chạy mã độc khi nạp)."""
+    _unsafe["allow_pickle_weights"] = bool(allowed)
+    if allowed: print("CẢNH BÁO: đã bật --allow-pickle-weights. Trọng số dạng pickle (.bin/.pkl) có thể chứa mã độc chạy ngay khi nạp; "
+                      "chỉ dùng với repo bạn tin tưởng.", file=sys.stderr, flush=True)
+
+
+def is_local_source(source: str) -> bool:
+    return Path(source).exists()
+
+
+def unpinned_message(source: str, revision: str | None, what: str = "model") -> str | None:
+    """Lời báo nếu model/tokenizer tải từ Hugging Face chưa ghim revision bằng mã commit 40 ký tự; thư mục trên máy thì không cần ghim."""
+    if is_local_source(source) or not HF_REPO_ID.match(source) or COMMIT.match(revision or ""): return None
+    return (f"{what} '{source}' chưa ghim revision (đang là '{revision}'). Hãy ghi mã commit 40 ký tự của repo trên Hugging Face "
+            "vào trường revision trong configs/models/platform.json, để model không bị thay âm thầm.")
+
+
+def check_pinned(source: str, revision: str | None, what: str = "model") -> None:
+    """Lúc nạp: chưa ghim thì cảnh báo. Bắt buộc ghim được kiểm tra khi đọc danh sách model (local_ai.config.settings.load_model_configs)."""
+    message = unpinned_message(source, revision, what)
+    if message: print("Cảnh báo: " + message, file=sys.stderr, flush=True)
+
+
+def safe_model_kwargs(source: str, revision: str | None) -> dict[str, Any]:
+    """Tham số an toàn cho from_pretrained của model: không chạy code từ repo (trust_remote_code=False), chỉ nạp safetensors
+    (trừ khi đã bật --allow-pickle-weights)."""
+    check_pinned(source, revision)
+    return {"trust_remote_code": False, "use_safetensors": not _unsafe["allow_pickle_weights"]}
+
+
+def safe_tokenizer_kwargs(source: str, revision: str | None) -> dict[str, Any]:
+    """Tham số an toàn cho from_pretrained của tokenizer/processor: không chạy code từ repo."""
+    check_pinned(source, revision, "tokenizer")
+    return {"trust_remote_code": False}
+
+
+def from_pretrained_safely(loader: Any, source: str, **kwargs: Any) -> Any:
+    """Gọi loader.from_pretrained với tham số an toàn. Repo không có safetensors thì báo lỗi tiếng Việt, chỉ cách xác nhận bằng cờ."""
+    kwargs = {**kwargs, **safe_model_kwargs(source, kwargs.get("revision"))}
+    try:
+        return loader.from_pretrained(source, **kwargs)
+    except (OSError, EnvironmentError) as error:
+        if kwargs["use_safetensors"] and "safetensors" in str(error).lower():
+            raise UnsafeModelError(f"Model '{source}' không có file .safetensors (có thể chỉ có .bin/.pkl dạng pickle, có thể chứa mã độc). "
+                                   f"Chỉ khi tin tưởng repo này mới chạy lại lệnh với cờ {ALLOW_PICKLE_FLAG}.") from error
+        raise
+
+
+def check_adapter_files(adapter_dir: str | Path) -> None:
+    """Adapter LoRA phải có adapter_model.safetensors; chỉ có adapter_model.bin (pickle) thì cần cờ --allow-pickle-weights."""
+    folder = Path(adapter_dir)
+    if (folder / "adapter_model.safetensors").is_file(): return
+    if (folder / "adapter_model.bin").is_file() and not _unsafe["allow_pickle_weights"]:
+        raise UnsafeModelError(f"Adapter trong {folder} chỉ có adapter_model.bin (pickle, có thể chứa mã độc). "
+                               f"Chỉ khi tin tưởng nguồn của adapter mới chạy lại lệnh với cờ {ALLOW_PICKLE_FLAG}.")
 
 
 class ModelCapability(StrEnum):
@@ -111,15 +180,17 @@ def load_pretrained(config: ModelConfig) -> tuple[Any, Any]:
     except ImportError as error: raise RuntimeError("Hãy cài torch và transformers để nạp model Hugging Face") from error
     dtype = resolve_torch_dtype(torch, config.dtype)
     processor_class = transformers.AutoProcessor if config.kind == "multimodal" else transformers.AutoTokenizer
-    processor = processor_class.from_pretrained(config.tokenizer_source or config.source, revision=config.tokenizer_revision or config.revision, local_files_only=config.offline)
+    tokenizer_source, tokenizer_revision = config.tokenizer_source or config.source, config.tokenizer_revision or config.revision
+    processor = processor_class.from_pretrained(tokenizer_source, revision=tokenizer_revision, local_files_only=config.offline, **safe_tokenizer_kwargs(tokenizer_source, tokenizer_revision))
     kwargs = {"revision": config.revision, "local_files_only": config.offline, "dtype": dtype, "device_map": config.device_map}
     if config.quantization: kwargs["quantization_config"] = quantization_config(transformers, config.quantization, dtype)
-    model = model_loader_class(transformers, config.kind).from_pretrained(config.source, **kwargs)
+    model = from_pretrained_safely(model_loader_class(transformers, config.kind), config.source, **kwargs)
     if config.adapter_path:
         try:
             from peft import PeftModel
         except ImportError as error: raise RuntimeError("Nạp LoRA adapter cần thư viện peft; hãy chạy `python -m pip install peft`") from error
         if not Path(config.adapter_path).is_dir(): raise FileNotFoundError(f"Không tìm thấy thư mục adapter: {config.adapter_path}")
+        check_adapter_files(config.adapter_path)
         model = PeftModel.from_pretrained(model, config.adapter_path)
     return model, processor
 

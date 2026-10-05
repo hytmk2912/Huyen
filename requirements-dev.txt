@@ -1,0 +1,5 @@
+# Công cụ phát triển và kiểm tra (test notebook, chặn secret trước khi commit, quét lỗ hổng thư viện).
+-r requirements.txt
+nbformat==5.11.1
+pre-commit==4.6.2
+pip-audit==2.10.1

@@ -57,6 +57,8 @@ def main() -> None:
             if args.tool_calls:
                 from local_ai.data.tool_calls import tool_call_rows
                 tool_call_rows(plan["limit"] or 0, args.tool_calls); plan["tool_calls"] = {"share": args.tool_calls, "rows": round((plan["limit"] or 0) * args.tool_calls / (1 - args.tool_calls))}
+        from local_ai.data.hub import safe_output_dir
+        safe_output_dir(plan["output"])  # đường dẫn ghi phải nằm trong thư mục dữ liệu được phép
         from local_ai.data.quality import DEFAULT_QUALITY, QualityConfig
         if not args.no_quality: QualityConfig.from_file()  # cấu hình lọc sai thì báo ngay, trước khi tải dữ liệu
         plan["quality"] = "tắt" if args.no_quality else str(DEFAULT_QUALITY.relative_to(DEFAULT_QUALITY.parents[2]))
