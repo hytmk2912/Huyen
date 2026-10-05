@@ -109,4 +109,4 @@ Nhánh `security/hardening` (tạo từ `main` tại `c2610bc`). Repo nhận di�
 - [x] 10. Path traversal (6B.4): `safe_output_dir` (chỉ `data/`, thư mục tạm, `LOCAL_AI_DATA_DIR`; chặn `../`, symlink), tên preset chỉ chữ/số/`_`/`-`. Bằng chứng: `PathTraversalTests` (5 test).
 - [x] 11. `SECURITY.md`: secret và nơi lưu, checklist việc chủ repo làm trên GitHub, quy trình khi lộ secret, secret đã lộ.
 - [x] 12. Kiểm tra: `python -m local_ai.check` → 415 test, 0 sai, 0 lỗi, 0 bị bỏ qua; compileall sạch; secret-scan sạch; `KẾT QUẢ: XANH`.
-- [ ] 13. Mở pull request `security/hardening` → `main` (bản nháp). Chờ chủ repo duyệt lệnh `git filter-repo` và làm checklist trên GitHub.
+- [x] 13. Mở pull request `security/hardening` → `main` (bản nháp): PR #29. Chờ chủ repo duyệt lệnh `git filter-repo` và làm checklist trên GitHub.
