@@ -1,0 +1,14 @@
+# Chặn secret và file lớn trước khi commit. Cài một lần: python -m pip install -r requirements-dev.txt && pre-commit install
+# Chạy tay trên mọi file: pre-commit run --all-files
+# rev ghim theo mã commit đầy đủ (chống bị thay tag); phiên bản ghi ở chú thích bên cạnh.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 4fb43823ef3d152d239e92d7d5cb04783b548062  # v8.28.0
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]

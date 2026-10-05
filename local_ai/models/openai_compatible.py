@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import os
 import socket
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
+from local_ai.config.secrets import require_secret
 from local_ai.contracts import Message
 from local_ai.models.adapters import ModelConfig
 
@@ -69,8 +69,8 @@ class OpenAICompatibleAdapter:
                    "max_tokens": self.config.max_new_tokens}  # M23: giới hạn độ dài câu trả lời như max_new_tokens của model transformers
         if self.config.enable_thinking is not None: payload["chat_template_kwargs"] = {"enable_thinking": self.config.enable_thinking}  # vLLM, llama.cpp server hiểu khóa này
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        key = os.environ.get(self.config.api_key_env) if self.config.api_key_env else None
-        if key: headers["Authorization"] = f"Bearer {key}"
+        if self.config.api_key_env:  # đã khai báo api_key_env thì khóa là bắt buộc: thiếu thì dừng, không gửi yêu cầu không có khóa
+            headers["Authorization"] = "Bearer " + require_secret(self.config.api_key_env, reason=f"khóa server của model '{self.name}'")
         request = urllib.request.Request(self.endpoint, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
         try:
             with self._opener.open(request, timeout=self.config.timeout_s) as response: body = response.read()

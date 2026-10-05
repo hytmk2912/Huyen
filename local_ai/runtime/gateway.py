@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from local_ai.config.secrets import MissingSecretError, require_secret
 from local_ai.runtime.auth import AuthError, require_token
 from local_ai.runtime.jobs import JobError, JobQueue
 
@@ -48,8 +48,8 @@ def create_server(config: GatewayConfig, environ: dict[str, str] | None = None) 
     """Kiểm tra cấu hình rồi tạo server (chưa chạy). Dùng `server.serve_forever()` để chạy."""
     if not config.enabled: raise GatewayRefused("Gateway đang tắt; muốn bật phải đặt enabled: true trong cấu hình")
     if config.host != ALLOWED_HOST: raise GatewayRefused(f"Gateway chỉ được nghe {ALLOWED_HOST}, không nghe '{config.host}'")
-    token = (environ if environ is not None else os.environ).get(config.token_env, "")
-    if len(token) < MIN_TOKEN_LENGTH: raise GatewayRefused(f"Thiếu token: hãy đặt biến môi trường {config.token_env} (ít nhất {MIN_TOKEN_LENGTH} ký tự) trước khi bật gateway")
+    try: token = require_secret(config.token_env, environ, min_length=MIN_TOKEN_LENGTH)  # đọc qua local_ai.config.secrets, không có giá trị mặc định
+    except MissingSecretError: raise GatewayRefused(f"Thiếu token: hãy đặt biến môi trường {config.token_env} (ít nhất {MIN_TOKEN_LENGTH} ký tự) trước khi bật gateway") from None
     queue = JobQueue(max_jobs=config.max_jobs)
 
     class Handler(BaseHTTPRequestHandler):

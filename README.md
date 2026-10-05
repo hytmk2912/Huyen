@@ -56,6 +56,8 @@ python -m pip install tokenizers nbformat             # test model tí hon và t
 python -m local_ai.check                              # test + compileall + secret-scan
 ```
 
+Muốn cài đúng phiên bản đã ghim: `python -m pip install -r requirements.txt` (thêm `requirements-gpu.txt` trên máy GPU, `requirements-dev.txt` để phát triển); bản khóa kèm hash: `requirements.lock`. Bảo mật (secret cần có, nạp model an toàn, `--allow-pickle-weights`, việc cần làm khi lộ token): xem `SECURITY.md`.
+
 `python -m local_ai.check` chạy toàn bộ test (`unittest`), `compileall` thư mục `local_ai` và `secret-scan`, rồi in "KẾT QUẢ: XANH" hoặc "CHƯA XANH" (mã thoát khác 0).
 - Test bị bỏ qua vì thiếu thư viện (torch, transformers, trl, peft, datasets, tokenizers, nbformat) cũng tính là chưa xanh, vì khi đó các test train thật trên CPU không chạy. Máy không có GPU thì cài torch bản CPU trước (dòng chú thích ở trên), rồi cài các thư viện kia và chạy lại.
 - `--allow-skip` cho phép bỏ qua các test đó, chỉ để xem nhanh; không dùng để đánh dấu mốc Xong hay gộp PR.

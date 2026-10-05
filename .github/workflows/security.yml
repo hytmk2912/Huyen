@@ -1,0 +1,46 @@
+# Quét secret (gitleaks) trên toàn bộ lịch sử và quét lỗ hổng thư viện (pip-audit) mỗi lần push và mỗi pull request.
+name: security
+
+on:
+  push:
+  pull_request:
+
+# Quyền mặc định tối thiểu: chỉ đọc code. Job nào cần thêm quyền thì khai báo riêng ở job đó.
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: "8.28.0"
+      GITLEAKS_SHA256: "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb"  # checksum chính thức của bản linux_x64
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Cài gitleaks (tải bản phát hành chính thức và kiểm tra checksum)
+        run: |
+          curl -sSfL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Quét toàn bộ lịch sử
+        run: ./gitleaks detect --source . --log-opts="--all" --redact --verbose
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
+        with:
+          python-version: "3.11"
+      - name: Quét lỗ hổng thư viện đã ghim
+        run: |
+          python -m pip install pip-audit==2.10.1
+          pip-audit -r requirements.lock --no-deps --disable-pip --progress-spinner off
+          pip-audit -r requirements-dev.txt -r requirements-gpu.txt --progress-spinner off

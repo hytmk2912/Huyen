@@ -1,0 +1,2 @@
+# Chỉ cho máy có GPU CUDA: nén 4bit/8bit và QLoRA.
+bitsandbytes==0.50.2

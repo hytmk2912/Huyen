@@ -1,5 +1,5 @@
 {
-  "_comment": "Mẫu tự khai báo một dataset Hugging Face cho bước SFT. Điền hf_dataset.name (dạng org/name), revision (nên là commit cố định) và giấy phép lấy từ trang giới thiệu dataset (dataset card). Dùng messages_field (cột hội thoại) hoặc mapping.input + mapping.expected_output. Mặc định đọc streaming tối đa 1000 dòng, giống các preset trong configs/datasets/presets/. HF_TOKEN chỉ đọc từ biến môi trường.",
+  "_comment": "Mẫu tự khai báo một dataset Hugging Face cho bước SFT. Điền hf_dataset.name (dạng org/name), revision (bắt buộc là mã commit 40 ký tự, khi tải thật sẽ từ chối tên nhánh như main) và giấy phép lấy từ trang giới thiệu dataset (dataset card). Dùng messages_field (cột hội thoại) hoặc mapping.input + mapping.expected_output. Mặc định đọc streaming tối đa 1000 dòng, giống các preset trong configs/datasets/presets/. HF_TOKEN chỉ đọc từ biến môi trường.",
   "description": "Dataset tự khai báo",
   "dataset_version": "hf-sft-v1",
   "seed": 17,
@@ -10,7 +10,7 @@
     "name": "",
     "subset": null,
     "split": "train",
-    "revision": "main",
+    "revision": "",
     "streaming": true,
     "limit": 1000,
     "domain": "reasoning",

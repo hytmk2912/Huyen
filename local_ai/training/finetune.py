@@ -20,7 +20,7 @@ from typing import Any, Literal
 
 from local_ai.config.settings import find_model_config
 from local_ai.experiments.tracking import RunTracker, seed_everything
-from local_ai.models.adapters import QUANTIZATIONS, TORCH_DTYPES, ModelConfig, model_loader_class, quantization_config, resolve_torch_dtype
+from local_ai.models.adapters import QUANTIZATIONS, TORCH_DTYPES, ModelConfig, from_pretrained_safely, model_loader_class, quantization_config, resolve_torch_dtype, safe_tokenizer_kwargs
 from local_ai.training.hub import check_repo_id, download_file, download_last_checkpoint, downloaded_checkpoint
 from local_ai.training.plans import TrainingPlan
 
@@ -263,12 +263,13 @@ def train(config: FinetuneConfig) -> dict[str, Any]:
     seed_everything(config.seed)
     dtype = resolve_torch_dtype(torch, config.dtype or model_config.dtype)
     # sft.jsonl chỉ có chữ, nên kể cả model multimodal cũng dùng tokenizer (không cần phần xử lý ảnh).
-    tokenizer = transformers.AutoTokenizer.from_pretrained(model_config.tokenizer_source or model_config.source, revision=model_config.tokenizer_revision or model_config.revision, local_files_only=model_config.offline)
+    tokenizer_source, tokenizer_revision = model_config.tokenizer_source or model_config.source, model_config.tokenizer_revision or model_config.revision
+    tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_source, revision=tokenizer_revision, local_files_only=model_config.offline, **safe_tokenizer_kwargs(tokenizer_source, tokenizer_revision))
     if tokenizer.pad_token is None: tokenizer.pad_token = tokenizer.eos_token
     if config.assistant_only_loss: print(check_assistant_only_loss(tokenizer, model_config), file=sys.stderr, flush=True)  # trước khi nạp model: báo lỗi sớm
     model_kwargs = {"revision": model_config.revision, "dtype": dtype, "device_map": model_config.device_map, "local_files_only": model_config.offline}
     if quantization: model_kwargs["quantization_config"] = quantization_config(transformers, quantization, dtype)
-    model = model_loader_class(transformers, model_config.kind).from_pretrained(model_config.source, **model_kwargs)
+    model = from_pretrained_safely(model_loader_class(transformers, model_config.kind), model_config.source, **model_kwargs)
     model.config.use_cache = not config.gradient_checkpointing
     if quantization:
         from peft import prepare_model_for_kbit_training
@@ -311,7 +312,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--push-to-hub", action="store_true", help="Đẩy checkpoint lên Hugging Face Hub trong lúc train; chạy lại thì tự tải last-checkpoint về để train tiếp (token lấy từ biến môi trường HF_TOKEN)")
     parser.add_argument("--hub-model-id", help="Repo nhận checkpoint, dạng tên-người-dùng/tên-repo (mặc định riêng tư)")
     parser.add_argument("--no-resume", action="store_true", help="Không chạy tiếp từ checkpoint cũ, bắt đầu lại từ đầu"); parser.add_argument("--dry-run", action="store_true", help="Chỉ in kế hoạch đã phân giải, không import thư viện huấn luyện")
+    parser.add_argument("--allow-pickle-weights", action="store_true", help="Cho phép nạp trọng số dạng pickle (.bin/.pkl) khi repo không có safetensors. Pickle có thể chạy mã độc khi nạp: chỉ dùng với repo bạn tin tưởng")
     args = parser.parse_args(argv)
+    from local_ai.models.adapters import set_allow_pickle_weights
+    set_allow_pickle_weights(args.allow_pickle_weights)
     config = load_finetune_config(args.config, method=args.method, base_model=args.base_model, dataset_path=args.dataset_path, output_dir=args.output_dir, quantization=args.quantization, dtype=args.dtype, push_to_hub=True if args.push_to_hub else None, hub_model_id=args.hub_model_id, resume=False if args.no_resume else None)
     print(json.dumps(describe(config) if args.dry_run else train(config), indent=2, default=str))
 

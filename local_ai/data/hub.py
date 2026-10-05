@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import tempfile
 from itertools import islice
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -16,6 +17,9 @@ from local_ai.data.core import build_dataset, write_jsonl
 
 RowLoader = Callable[..., Iterable[dict[str, Any]]]
 PRESET_DIR = Path(__file__).resolve().parents[2] / "configs" / "datasets" / "presets"
+DATA_ROOT = Path(__file__).resolve().parents[2] / "data"  # thư mục dữ liệu của repo
+DATA_DIR_ENV = "LOCAL_AI_DATA_DIR"  # (tùy chọn) thêm một thư mục được phép ghi dữ liệu, ví dụ ổ Drive trên Colab
+COMMIT = re.compile(r"^[0-9a-f]{40}$")
 DEFAULT_SFT_DIR = "data/processed/hf_sft"  # nơi các cấu hình train (configs/training/*.json) đọc sft.jsonl
 ROLE_ALIASES = {"human": "user", "gpt": "assistant"}  # dạng ShareGPT: {"from": "human", "value": "..."}
 _state = {"real_stream": False}
@@ -27,8 +31,38 @@ def real_stream_used() -> bool:
 
 
 def hf_token() -> str | None:
-    """HF_TOKEN chỉ được đọc từ biến môi trường; dataset công khai thì không cần."""
-    return os.environ.get("HF_TOKEN") or None
+    """HF_TOKEN chỉ được đọc từ biến môi trường (qua local_ai.config.secrets); dataset công khai thì không cần."""
+    from local_ai.config.secrets import hf_token as read_token
+    return read_token()
+
+
+class UnsafePathError(ValueError):
+    """Đường dẫn ghi dữ liệu nằm ngoài các thư mục được phép (chống path traversal, ví dụ ../../.ssh)."""
+
+
+def allowed_data_roots() -> list[Path]:
+    """Thư mục được phép ghi dữ liệu tải về: data/ của repo, data/ ở thư mục đang chạy, thư mục tạm của hệ thống (test, Colab /tmp)
+    và thư mục trong biến môi trường LOCAL_AI_DATA_DIR nếu có."""
+    roots = [DATA_ROOT, Path.cwd() / "data", Path(tempfile.gettempdir())]
+    if os.environ.get(DATA_DIR_ENV): roots.append(Path(os.environ[DATA_DIR_ENV]))
+    return [root.resolve() for root in roots]
+
+
+def safe_output_dir(path: str | Path) -> Path:
+    """Trả về `path` nếu (sau khi giải `..` và symlink) nằm trong một thư mục được phép; ngoài ra thì từ chối."""
+    resolved = Path(path).resolve()
+    roots = allowed_data_roots()
+    if not any(resolved == root or resolved.is_relative_to(root) for root in roots):
+        raise UnsafePathError(f"Không ghi dữ liệu ra '{path}': chỉ được ghi trong {', '.join(str(root) for root in roots)}. "
+                              f"Muốn dùng thư mục khác thì đặt biến môi trường {DATA_DIR_ENV}.")
+    return Path(path)
+
+
+def check_pinned_revision(spec: dict[str, Any]) -> None:
+    """Dataset tải thật từ Hugging Face phải ghim revision bằng mã commit 40 ký tự, để dữ liệu không đổi âm thầm."""
+    if not COMMIT.match(str(spec.get("revision") or "")):
+        raise ValueError(f"hf_dataset.revision của '{spec.get('name')}' phải là mã commit 40 ký tự (đang là '{spec.get('revision')}'); "
+                         "lấy mã commit ở tab \"Files and versions\" của dataset trên Hugging Face")
 
 
 def validate_spec(spec: dict[str, Any]) -> None:
@@ -47,6 +81,7 @@ def validate_spec(spec: dict[str, Any]) -> None:
 def load_hf_rows(spec: dict[str, Any], loader: RowLoader | None = None) -> list[dict[str, Any]]:
     """Tải các dòng bằng `datasets.load_dataset` (hoặc một hàm tải được truyền vào, có cùng tham số)."""
     if loader is None:
+        check_pinned_revision(spec)  # chỉ khi tải thật; test dùng loader giả
         try:
             from datasets import load_dataset
         except ImportError as error: raise RuntimeError("Hãy cài gói tùy chọn `datasets` để tải dataset từ Hugging Face") from error
@@ -118,7 +153,7 @@ def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None,
     """Tải -> chuyển đổi -> kiểm tra/loại trùng/lọc chất lượng/xuất qua build_dataset. Ghi ra raw.jsonl, train.jsonl, sft.jsonl, rejected.jsonl, manifest.json.
     `tool_calls` (ví dụ 0.1): trộn thêm dòng gọi công cụ tự sinh, chiếm khoảng tỉ lệ đó của dữ liệu."""
     spec = config["hf_dataset"]; validate_spec(spec)
-    version = config.get("dataset_version", "hf-v1"); output = Path(output_dir or config.get("output_dir", DEFAULT_SFT_DIR))
+    version = config.get("dataset_version", "hf-v1"); output = safe_output_dir(output_dir or config.get("output_dir", DEFAULT_SFT_DIR))
     records = map_rows(load_hf_rows(spec, loader), spec, version)
     synthetic, tool_info = tool_call_mix(len(records), tool_calls, config.get("seed", 0))
     raw = output / "raw.jsonl"; write_jsonl(raw, records + synthetic)
@@ -128,6 +163,7 @@ def prepare_hf_sft(config: dict[str, Any], output_dir: str | Path | None = None,
 
 
 def load_preset(name: str, directory: str | Path = PRESET_DIR) -> dict[str, Any]:
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", name or ""): raise LookupError(f"Tên preset chỉ gồm chữ, số, '_' và '-', không phải '{name}'")  # chặn ../ trong tên
     path = Path(directory) / f"{name}.json"
     if not path.is_file():
         available = ", ".join(sorted(item.stem for item in Path(directory).glob("*.json"))) or "(chưa có)"
@@ -186,6 +222,7 @@ def prepare_hf_mix(weights: dict[str, float], output_dir: str | Path, loader: Ro
     """Trộn nhiều preset theo tỉ lệ thành một sft.jsonl. `limit` (nếu có) ghi đè số dòng tối đa của mọi preset.
     `tool_calls` (ví dụ 0.1, M20): khoảng 10% số dòng là dòng gọi công cụ tự sinh (local_ai/data/tool_calls.py).
     Bộ lọc chất lượng chạy sau khi trộn, nên sft.jsonl có thể ít dòng hơn tổng số dòng đọc vào; số dòng bị loại ghi trong manifest.json."""
+    output_dir = safe_output_dir(output_dir)
     presets = {name: load_preset(name, directory) for name in weights}
     for config in presets.values(): validate_spec(config["hf_dataset"])
     limits = {name: limit or config["hf_dataset"].get("limit") or 1000 for name, config in presets.items()}

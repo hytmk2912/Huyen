@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from local_ai.models.adapters import ModelConfig
+from local_ai.models.adapters import ModelConfig, UnsafeModelError, unpinned_message
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,11 @@ def load_model_configs(path: str | Path) -> list[ModelConfig]:
     names = [config.name for config in configs]
     duplicates = sorted({name for name in names if names.count(name) > 1})
     if duplicates: raise ValueError(f"Tên model bị trùng trong {path}: {', '.join(duplicates)}")
+    for config in configs:  # model tải từ Hugging Face phải ghim revision (mã commit 40 ký tự), cả model lẫn tokenizer
+        if config.backend != "transformers": continue
+        for source, revision, what in ((config.source, config.revision, "model"), (config.tokenizer_source or config.source, config.tokenizer_revision or (config.revision if config.tokenizer_source in (None, config.source) else None), "tokenizer")):
+            message = unpinned_message(source, revision, f"{what} của mục '{config.name}':")
+            if message: raise UnsafeModelError(f"{path}: {message}")
     return configs
 
 

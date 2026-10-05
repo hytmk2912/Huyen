@@ -34,7 +34,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hub-path", default="eval", help="Thư mục trong repo chứa report.json (mặc định eval)")
     parser.add_argument("--no-reuse", action="store_true", help="Luôn chấm lại, không dùng lại báo cáo đã có trên Hub (vẫn đẩy báo cáo mới lên nếu có --hub-repo); dùng khi adapter có thể đã đổi")
     parser.add_argument("--dry-run", action="store_true", help="Chỉ kiểm tra tham số và in kế hoạch, không nạp model")
+    parser.add_argument("--allow-pickle-weights", action="store_true", help="Cho phép nạp trọng số dạng pickle (.bin/.pkl) khi repo không có safetensors. Pickle có thể chạy mã độc khi nạp: chỉ dùng với repo bạn tin tưởng")
     args = parser.parse_args(argv)
+    from local_ai.models.adapters import set_allow_pickle_weights
+    set_allow_pickle_weights(args.allow_pickle_weights)
     if args.hub_repo:
         from local_ai.training.hub import check_repo_id
         check_repo_id(args.hub_repo)
